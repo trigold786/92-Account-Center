@@ -7,6 +7,7 @@ type AssessRiskRequest struct {
 	IPAddress         string    `json:"ip_address" binding:"required"`
 	DeviceFingerprint string    `json:"device_fingerprint" binding:"required"`
 	Timestamp         time.Time `json:"timestamp" binding:"required"`
+	Location          *Location `json:"location,omitempty"`
 }
 
 type RiskFactor struct {

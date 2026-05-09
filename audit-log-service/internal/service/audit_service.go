@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -11,6 +10,8 @@ import (
 
 	"account-center/audit-log-service/internal/model"
 	"account-center/audit-log-service/internal/repository"
+
+	"golang.org/x/crypto/sm3"
 )
 
 var (
@@ -227,7 +228,7 @@ func (s *auditService) CleanupOldLogs(ctx context.Context, retentionDays int) (*
 }
 
 func computeSM3Hash(data string) string {
-	h := sha256.New()
+	h := sm3.New()
 	h.Write([]byte(data))
 	return hex.EncodeToString(h.Sum(nil))
 }

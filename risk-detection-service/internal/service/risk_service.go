@@ -37,7 +37,12 @@ type RiskFactors []model.RiskFactor
 func (s *RiskService) AssessRisk(ctx context.Context, req model.AssessRiskRequest) (*model.RiskAssessmentResponse, error) {
 	var factors model.RiskFactors
 
-	geoAnomaly, distance, _ := s.DetectGeoAnomaly(ctx, req.UserID, &model.Location{Latitude: 0, Longitude: 0})
+	location := req.Location
+	if location == nil {
+		location = &model.Location{}
+	}
+
+	geoAnomaly, distance, _ := s.DetectGeoAnomaly(ctx, req.UserID, location)
 	if geoAnomaly {
 		factors = append(factors, model.RiskFactor{
 			Type:   "impossible_travel",

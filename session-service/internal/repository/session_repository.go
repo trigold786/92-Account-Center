@@ -22,6 +22,7 @@ const (
 
 type SessionRepository interface {
 	Create(ctx context.Context, session *model.Session) error
+	CreateWithEviction(ctx context.Context, session *model.Session, maxSessions int64) error
 	GetByID(ctx context.Context, sessionID string) (*model.Session, error)
 	GetUserSessions(ctx context.Context, userID int64) ([]*model.Session, error)
 	UpdateLastAccessed(ctx context.Context, sessionID string, lastAccessedAt time.Time, expiresAt time.Time) error
@@ -62,6 +63,67 @@ func (r *sessionRepository) Create(ctx context.Context, session *model.Session) 
 	pipe.Expire(ctx, r.userSessionsKey(session.UserID), SessionTTL*10)
 
 	_, err = pipe.Exec(ctx)
+	return err
+}
+
+var createWithEvictionScript = redis.NewScript(`
+local userSessionsKey = KEYS[1]
+local sessionKeyPrefix = "session:"
+local maxSessions = tonumber(ARGV[1])
+local sessionData = ARGV[2]
+local sessionTTL = tonumber(ARGV[3])
+local sessionID = ARGV[4]
+
+local sessionIDs = redis.call("SMEMBERS", userSessionsKey)
+local count = 0
+local oldestSessionID = nil
+local oldestTime = nil
+
+for i, sid in ipairs(sessionIDs) do
+    local exists = redis.call("EXISTS", sessionKeyPrefix .. sid)
+    if exists == 1 then
+        count = count + 1
+        local data = redis.call("GET", sessionKeyPrefix .. sid)
+        if data then
+            local session = cjson.decode(data)
+            local createdAt = session.CreatedAt
+            if oldestTime == nil or createdAt < oldestTime then
+                oldestTime = createdAt
+                oldestSessionID = sid
+            end
+        end
+    else
+        redis.call("SREM", userSessionsKey, sid)
+    end
+end
+
+if count >= maxSessions and oldestSessionID then
+    redis.call("DEL", sessionKeyPrefix .. oldestSessionID)
+    redis.call("SREM", userSessionsKey, oldestSessionID)
+end
+
+redis.call("SET", sessionKeyPrefix .. sessionID, sessionData, sessionTTL)
+redis.call("SADD", userSessionsKey, sessionID)
+redis.call("EXPIRE", userSessionsKey, sessionTTL * 10)
+
+return 1
+`)
+
+func (r *sessionRepository) CreateWithEviction(ctx context.Context, session *model.Session, maxSessions int64) error {
+	data, err := json.Marshal(session)
+	if err != nil {
+		return err
+	}
+
+	ttlSeconds := int64(SessionTTL.Seconds())
+	if ttlSeconds <= 0 {
+		ttlSeconds = 1200
+	}
+
+	_, err = createWithEvictionScript.Run(ctx, r.rdb, []string{
+		r.userSessionsKey(session.UserID),
+	}, maxSessions, string(data), ttlSeconds*1000000000, session.SessionID).Result()
+
 	return err
 }
 

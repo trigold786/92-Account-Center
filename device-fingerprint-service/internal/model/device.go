@@ -23,7 +23,7 @@ type DeviceFingerprintRequest struct {
 	FingerprintID string `json:"fingerprint_id" binding:"required"`
 	UserAgent     string `json:"user_agent"`
 	IPAddress     string `json:"ip_address"`
-	Country       string `json:"city"` // Note: keeping as per spec, though usually country and city are separate
+	Country       string `json:"country"`
 	City          string `json:"city"`
 	Latitude      float64 `json:"latitude"`
 	Longitude     float64 `json:"longitude"`

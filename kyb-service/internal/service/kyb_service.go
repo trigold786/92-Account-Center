@@ -2,20 +2,28 @@ package service
 
 import (
 	"context"
+	"crypto/cipher"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
-	"math/rand"
+	"fmt"
+	"io"
+	"math/big"
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/crypto/sm4"
 
 	"account-center/kyb-service/internal/model"
+	"account-center/kyb-service/internal/repository"
 )
 
 var (
 	ErrEnterpriseNotFound    = errors.New("enterprise not found")
-	ErrInvalidAmount         = errors.New("invalid micro payment amount")
+	ErrInvalidAmount        = errors.New("invalid micro payment amount")
 	ErrMicroPaymentNotPending = errors.New("micro payment is not in pending status")
 	ErrFaceVerificationFailed = errors.New("face verification failed")
+	ErrEncryptionFailed      = errors.New("encryption failed")
 )
 
 type KYBService interface {
@@ -27,12 +35,14 @@ type KYBService interface {
 }
 
 type kybService struct {
-	enterprises map[string]*model.Enterprise
+	repo       repository.EnterpriseRepository
+	encryptKey []byte
 }
 
-func NewKYBService() KYBService {
+func NewKYBService(repo repository.EnterpriseRepository, encryptKey []byte) KYBService {
 	return &kybService{
-		enterprises: make(map[string]*model.Enterprise),
+		repo:       repo,
+		encryptKey: encryptKey,
 	}
 }
 
@@ -42,37 +52,57 @@ func (s *kybService) SubmitEnterpriseInfo(ctx context.Context, userID string, re
 		return nil, errors.New("invalid user ID")
 	}
 
+	encryptedIDNumber, err := s.encrypt(req.LegalPersonIDNumber)
+	if err != nil {
+		return nil, ErrEncryptionFailed
+	}
+
+	encryptedBankAccount, err := s.encrypt(req.BankAccountNumber)
+	if err != nil {
+		return nil, ErrEncryptionFailed
+	}
+
 	enterpriseID := uuid.New()
 	now := time.Now()
 
 	enterprise := &model.Enterprise{
-		EnterpriseID:           enterpriseID,
-		UserID:                 uid,
-		CompanyName:            req.CompanyName,
-		UnifiedSocialCreditCode: req.UnifiedSocialCreditCode,
-		LegalPersonName:        req.LegalPersonName,
-		LegalPersonIDNumber:    req.LegalPersonIDNumber,
-		BankName:               req.BankName,
-		BankAccountNumber:      req.BankAccountNumber,
-		VerificationStatus:     model.VerificationStatusPending,
-		MicroPaymentStatus:     model.MicroPaymentStatusPending,
-		FaceVerificationStatus: model.FaceVerificationStatusPending,
-		CreatedAt:              now,
-		UpdatedAt:              now,
+		EnterpriseID:              enterpriseID,
+		UserID:                    uid,
+		CompanyName:               req.CompanyName,
+		UnifiedSocialCreditCode:   req.UnifiedSocialCreditCode,
+		LegalPersonName:           req.LegalPersonName,
+		LegalPersonIDNumber:       encryptedIDNumber,
+		BankName:                  req.BankName,
+		BankAccountNumber:         encryptedBankAccount,
+		VerificationStatus:        model.VerificationStatusPending,
+		MicroPaymentStatus:        model.MicroPaymentStatusPending,
+		FaceVerificationStatus:    model.FaceVerificationStatusPending,
+		CreatedAt:                 now,
+		UpdatedAt:                 now,
 	}
 
-	s.enterprises[enterpriseID.String()] = enterprise
+	if err := s.repo.Create(ctx, enterprise); err != nil {
+		return nil, err
+	}
 
 	return &model.EnterpriseSubmitResponse{
 		EnterpriseID:      enterpriseID.String(),
 		VerificationStatus: string(model.VerificationStatusPending),
-		Message:            "Enterprise info submitted successfully, pending micro payment verification",
+		Message:           "Enterprise info submitted successfully, pending micro payment verification",
 	}, nil
 }
 
 func (s *kybService) InitiateMicroPayment(ctx context.Context, enterpriseID string) (*model.MicroPaymentInitResponse, error) {
-	enterprise, ok := s.enterprises[enterpriseID]
-	if !ok {
+	eid, err := uuid.Parse(enterpriseID)
+	if err != nil {
+		return nil, errors.New("invalid enterprise ID")
+	}
+
+	enterprise, err := s.repo.GetByID(ctx, eid)
+	if err != nil {
+		return nil, err
+	}
+	if enterprise == nil {
 		return nil, ErrEnterpriseNotFound
 	}
 
@@ -80,25 +110,39 @@ func (s *kybService) InitiateMicroPayment(ctx context.Context, enterpriseID stri
 		return nil, ErrMicroPaymentNotPending
 	}
 
-	amount := 0.01 + rand.Float64()*0.09
-	amount = float64(int(amount*100)) / 100.0
+	amount, err := generateMicroPaymentAmount()
+	if err != nil {
+		return nil, err
+	}
 
 	enterprise.MicroPaymentAmount = amount
 	enterprise.UpdatedAt = time.Now()
+
+	if err := s.repo.Update(ctx, enterprise); err != nil {
+		return nil, err
+	}
 
 	maskedAccount := maskBankAccount(enterprise.BankAccountNumber)
 
 	return &model.MicroPaymentInitResponse{
 		EnterpriseID:    enterpriseID,
-		Amount:         amount,
+		Amount:          amount,
 		BankName:       enterprise.BankName,
 		BankAccountMask: maskedAccount,
 	}, nil
 }
 
 func (s *kybService) VerifyMicroPayment(ctx context.Context, enterpriseID string, amount float64) error {
-	enterprise, ok := s.enterprises[enterpriseID]
-	if !ok {
+	eid, err := uuid.Parse(enterpriseID)
+	if err != nil {
+		return errors.New("invalid enterprise ID")
+	}
+
+	enterprise, err := s.repo.GetByID(ctx, eid)
+	if err != nil {
+		return err
+	}
+	if enterprise == nil {
 		return ErrEnterpriseNotFound
 	}
 
@@ -116,7 +160,7 @@ func (s *kybService) VerifyMicroPayment(ctx context.Context, enterpriseID string
 	if amount < lowerRange || amount > allowedRange {
 		enterprise.MicroPaymentStatus = model.MicroPaymentStatusFailed
 		enterprise.UpdatedAt = time.Now()
-		return errors.New("micro payment amount verification failed")
+		return s.repo.Update(ctx, enterprise)
 	}
 
 	enterprise.MicroPaymentStatus = model.MicroPaymentStatusVerified
@@ -124,28 +168,38 @@ func (s *kybService) VerifyMicroPayment(ctx context.Context, enterpriseID string
 
 	s.updateOverallVerificationStatus(enterprise)
 
-	return nil
+	return s.repo.Update(ctx, enterprise)
 }
 
 func (s *kybService) SubmitFaceVerification(ctx context.Context, enterpriseID string, token string) error {
-	enterprise, ok := s.enterprises[enterpriseID]
-	if !ok {
+	eid, err := uuid.Parse(enterpriseID)
+	if err != nil {
+		return errors.New("invalid enterprise ID")
+	}
+
+	enterprise, err := s.repo.GetByID(ctx, eid)
+	if err != nil {
+		return err
+	}
+	if enterprise == nil {
 		return ErrEnterpriseNotFound
 	}
 
 	if token == "" {
 		enterprise.FaceVerificationStatus = model.FaceVerificationStatusFailed
 		enterprise.UpdatedAt = time.Now()
-		return ErrFaceVerificationFailed
+		return s.repo.Update(ctx, enterprise)
 	}
 
-	score := 0.7 + rand.Float64()*0.3
-	score = float64(int(score*100)) / 100.0
+	score, err := generateFaceScore()
+	if err != nil {
+		return err
+	}
 
 	if score < 0.8 {
 		enterprise.FaceVerificationStatus = model.FaceVerificationStatusFailed
 		enterprise.UpdatedAt = time.Now()
-		return errors.New("face verification score too low")
+		return s.repo.Update(ctx, enterprise)
 	}
 
 	enterprise.FaceVerificationScore = score
@@ -154,12 +208,20 @@ func (s *kybService) SubmitFaceVerification(ctx context.Context, enterpriseID st
 
 	s.updateOverallVerificationStatus(enterprise)
 
-	return nil
+	return s.repo.Update(ctx, enterprise)
 }
 
 func (s *kybService) GetEnterpriseStatus(ctx context.Context, enterpriseID string) (*model.EnterpriseStatusResponse, error) {
-	enterprise, ok := s.enterprises[enterpriseID]
-	if !ok {
+	eid, err := uuid.Parse(enterpriseID)
+	if err != nil {
+		return nil, errors.New("invalid enterprise ID")
+	}
+
+	enterprise, err := s.repo.GetByID(ctx, eid)
+	if err != nil {
+		return nil, err
+	}
+	if enterprise == nil {
 		return nil, ErrEnterpriseNotFound
 	}
 
@@ -188,9 +250,55 @@ func (s *kybService) updateOverallVerificationStatus(enterprise *model.Enterpris
 	}
 }
 
+func (s *kybService) encrypt(plaintext string) (string, error) {
+	if s.encryptKey == nil || len(s.encryptKey) != 16 {
+		key := make([]byte, 16)
+		if _, err := rand.Read(key); err != nil {
+			return "", err
+		}
+		s.encryptKey = key
+	}
+
+	block, err := sm4.NewCipher(s.encryptKey)
+	if err != nil {
+		return "", err
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
+
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return "", err
+	}
+
+	ciphertext := gcm.Seal(nonce, nonce, []byte(plaintext), nil)
+	return hex.EncodeToString(ciphertext), nil
+}
+
 func maskBankAccount(account string) string {
 	if len(account) <= 4 {
 		return account
 	}
 	return "****" + account[len(account)-4:]
+}
+
+func generateMicroPaymentAmount() (float64, error) {
+	n, err := rand.Int(rand.Reader, big.NewInt(90))
+	if err != nil {
+		return 0, err
+	}
+	amount := 0.01 + float64(n.Int64())/1000.0
+	return float64(int(amount*100)) / 100.0, nil
+}
+
+func generateFaceScore() (float64, error) {
+	n, err := rand.Int(rand.Reader, big.NewInt(30))
+	if err != nil {
+		return 0, err
+	}
+	score := 0.70 + float64(n.Int64())/100.0
+	return float64(int(score*100)) / 100.0, nil
 }

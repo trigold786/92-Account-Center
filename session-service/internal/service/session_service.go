@@ -48,28 +48,6 @@ func NewSessionService(repo repository.SessionRepository, maxConSessions int64) 
 }
 
 func (s *sessionService) CreateSession(ctx context.Context, req *model.CreateSessionRequest) (*model.Session, error) {
-	count, err := s.repo.CountUserSessions(ctx, req.UserID)
-	if err != nil {
-		return nil, err
-	}
-
-	if count >= s.maxConSessions {
-		sessions, err := s.repo.GetUserSessions(ctx, req.UserID)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(sessions) > 0 {
-			oldest := sessions[0]
-			for _, session := range sessions {
-				if session.CreatedAt.Before(oldest.CreatedAt) {
-					oldest = session
-				}
-			}
-			s.repo.Delete(ctx, oldest.SessionID, oldest.UserID)
-		}
-	}
-
 	now := time.Now()
 	session := &model.Session{
 		SessionID:         uuid.New().String(),
@@ -82,7 +60,7 @@ func (s *sessionService) CreateSession(ctx context.Context, req *model.CreateSes
 		IsActive:          true,
 	}
 
-	if err := s.repo.Create(ctx, session); err != nil {
+	if err := s.repo.CreateWithEviction(ctx, session, s.maxConSessions); err != nil {
 		return nil, err
 	}
 
