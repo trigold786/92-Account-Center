@@ -1,55 +1,55 @@
-You are an expert software engineer tasked with implementing Task 5: SMS/Email Service with Circuit Breaker (多云短信服务) from the Account Center microservice implementation plan.
+You are an expert software engineer tasked with implementing Task 6: Device Fingerprint Service (设备指纹服务) from the Account Center microservice implementation plan.
 
 ## Task Description
-**Task 5: SMS/Email Service with Circuit Breaker (多云短信服务)**
+**Task 6: Device Fingerprint Service (设备指纹服务)**
 
 **Files:**
-- Create: `sms-email-service/internal/provider/aliyun.go`
-- Create: `sms-email-service/internal/provider/tencent.go`
-- Create: `sms-email-service/internal/provider/chinatelecom.go`
-- Create: `sms-email-service/internal/service/sms_service.go`
-- Create: `sms-email-service/pkg/circuitbreaker/circuitbreaker.go`
+- Create: `device-fingerprint-service/internal/service/device_service.go`
+- Create: `device-fingerprint-service/internal/handler/device_handler.go`
+- Create: `device-fingerprint-service/internal/model/device.go`
+- Modify: `account-service/internal/service/user_service.go` (add trusted device check)
+- Modify: `auth-service/internal/service/auth_service.go` (integrate device fingerprint check)
+- Modify: `migrations/001_initial_schema.sql` (add device_fingerprints table if not already there)
 
 **Steps to complete:**
-1. Create circuit breaker utility
-2. Create SMS provider interface and implementations
-3. Create SMS service with provider failover
-4. Create SMS handler
-5. Run tests
-6. Commit
+1. Create device fingerprint model
+2. Create device fingerprint service with risk assessment
+3. Create device fingerprint handler
+4. Integrate device fingerprint check in auth service
+5. Update user service for trusted device management
+6. Run tests
+7. Commit
 
 **Technical Details:**
 - Use Go for backend service
-- Redis for rate limiting and verification code storage
-- Circuit breaker pattern for provider failover
-- Support for multiple SMS providers (Aliyun, Tencent, Chinatelecom)
-- Rate limiting (120s interval, 10 per day per phone number)
-- Verification code generation and validation
-- Integration with existing services via message queue (Kafka)
+- PostgreSQL for storing device fingerprints
+- FingerprintJS concepts for device identification (though actual fingerprinting happens on frontend)
+- Risk assessment based on device feature changes and geolocation
+- Integration with auth service for login flow
 
 **Requirements from Spec:**
-- Multi-cloud SMS service with 阿里云, 腾讯云, 天翼云
-- Strict frequency control: 120s interval between sends, 10 per day limit per phone number
-- Verification code validity: 5 minutes
-- Automatic failover when primary channel error rate >15% in 5 minutes
-- Alerting to operations personnel when failover occurs
-- Support for both SMS verification codes and email OTP/Magic Link
-- Integration with Kafka for asynchronous communication
+- Device fingerprint generation via FingerprintJS (frontend) with backend storage and validation
+- Trusted device mechanism: "最近一次强验证通过时间 + N 天", where N is 0-60 days, default 3 days
+- Risk-aware trigger: 
+  - Geolocation change detection (IP library) - force re-verification on drastic location change
+  - Device fingerprint change detection - if key features change beyond threshold, force re-verification
+- Store device features for risk assessment
+- Trusted device bypasses second-factor authentication when within valid period
+- Integration with login flow to check if device is trusted
 
 **Best Practices:**
 - Follow TDD: write failing tests first, then implement
 - Proper error handling with meaningful error messages
-- Circuit breaker pattern for resilience
-- Rate limiting to prevent abuse
+- Input validation at handler level
+- Repository pattern for data access
+- Service layer for business logic
 - Context cancellation support
 - No hardcoded values (use constants/config)
 - Follow Go conventions and formatting
-- Provider abstraction for easy extension
 
 **Deliverables:**
 - All files listed above with complete implementation
-- Working SMS service with provider failover
-- Rate limiting implementation
-- Verification code generation and storage
-- Circuit breaker functionality
+- Working device fingerprint service with trust assessment
+- Risk detection based on geolocation and device features
+- Integration with authentication flow
 - Clean, maintainable code following Go best practices

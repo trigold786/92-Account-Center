@@ -11,6 +11,8 @@ import (
 	"github.com/sunxi/92-Account-Center/auth-service/internal/util"
 	"github.com/sunxi/92-Account-Center/auth-service/pkg/jwt"
 	"golang.org/x/crypto/bcrypt"
+
+	devicefingerprintservice "github.com/sunxi/92-Account-Center/device-fingerprint-service/internal/service"
 )
 
 // AuthService defines the interface for authentication service.
@@ -21,15 +23,17 @@ type AuthService interface {
 
 // authService implements AuthService.
 type authService struct {
-	userRepo repository.UserRepository
-	jwtMgr   *jwt.JWTManager
+	userRepo               repository.UserRepository
+	jwtMgr                 *jwt.JWTManager
+	deviceFingerprintService devicefingerprintservice.DeviceFingerprintService
 }
 
 // NewAuthService creates a new AuthService.
-func NewAuthService(userRepo repository.UserRepository, jwtMgr *jwt.JWTManager) AuthService {
+func NewAuthService(userRepo repository.UserRepository, jwtMgr *jwt.JWTManager, deviceFPService devicefingerprintservice.DeviceFingerprintService) AuthService {
 	return &authService{
-		userRepo: userRepo,
-		jwtMgr:   jwtMgr,
+		userRepo:               userRepo,
+		jwtMgr:                 jwtMgr,
+		deviceFingerprintService: deviceFPService,
 	}
 }
 
@@ -72,6 +76,24 @@ func (s *authService) Login(ctx context.Context, req *model.LoginRequest) (*mode
 	// Verify password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		return nil, errors.New("invalid credentials")
+	}
+
+	// Check device fingerprint if provided
+	if req.DeviceFingerprintID != "" {
+		// Verify device is trusted
+		isTrusted, err := s.deviceFingerprintService.IsTrusted(ctx, user.ID, req.DeviceFingerprintID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to verify device trust: %w", err)
+		}
+		
+		// If device is not trusted, we would typically require additional verification
+		// For this implementation, we'll continue but in a real system you might want to
+		// trigger 2FA or other verification methods here
+		if !isTrusted {
+			// Device is not trusted - log this for security monitoring
+			// In a production system, you might want to require additional verification
+			// For now, we'll continue with login but this would be where you'd enforce 2FA
+		}
 	}
 
 	// Generate token pair

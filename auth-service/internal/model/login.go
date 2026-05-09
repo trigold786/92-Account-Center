@@ -2,10 +2,11 @@ package model
 
 // LoginRequest represents a login request
 type LoginRequest struct {
-	Credential string `json:"credential" binding:"required"`
-	Password   string `json:"password,omitempty"`
-	Code       string `json:"code,omitempty"` // For SMS/email OTP
-	MagicLink  string `json:"magic_link,omitempty"` // For magic link login
+	Credential      string `json:"credential" binding:"required"`
+	Password        string `json:"password,omitempty"`
+	Code            string `json:"code,omitempty"` // For SMS/email OTP
+	MagicLink       string `json:"magic_link,omitempty"` // For magic link login
+	DeviceFingerprintID string `json:"device_fingerprint_id,omitempty"` // Device fingerprint for trust checking
 }
 
 // LoginResponse represents a login response

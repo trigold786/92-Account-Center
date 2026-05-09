@@ -133,3 +133,30 @@ func (s *userService) GetDeletionStatus(ctx context.Context, userID string) (*mo
 		DeletedAt:   user.DeletionDeletedAt,
 	}, nil
 }
+
+// IsTrustedDevice checks if a device is trusted for the user based on device fingerprint service
+func (s *userService) IsTrustedDevice(ctx context.Context, userID string, fingerprintID string) (bool, error) {
+	// Validate inputs
+	if userID == "" {
+		return false, errors.New("user ID is required")
+	}
+	if fingerprintID == "" {
+		return false, errors.New("fingerprint ID is required")
+	}
+
+	// Convert userID to uint64
+	var uid uint64
+	parsedID, err := strconv.ParseUint(userID, 10, 64)
+	if err != nil {
+		return false, fmt.Errorf("invalid user ID: %w", err)
+	}
+	uid = parsedID
+
+	// Call device fingerprint service to check if device is trusted
+	isTrusted, err := s.deviceFingerprintService.IsTrusted(ctx, uid, fingerprintID)
+	if err != nil {
+		return false, fmt.Errorf("failed to check device trust status: %w", err)
+	}
+
+	return isTrusted, nil
+}
