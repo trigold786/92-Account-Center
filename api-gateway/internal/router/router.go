@@ -17,5 +17,15 @@ func SetupRouter(userService service.UserService) *gin.Engine {
 	// User registration endpoint
 	r.POST("/register", registerHandler.Register)
 
+	// Password handler
+	passwordHandler := handler.NewPasswordHandler(userService)
+
+	// Password change endpoints
+	r.POST("/password/send-verification-code", passwordHandler.SendVerificationCode)
+	r.POST("/password/change", passwordHandler.ChangePassword)
+
+	// TODO: Add login routes when auth service is implemented
+	// For now, we'll add placeholder comments
+
 	return r
 }
