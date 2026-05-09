@@ -24,6 +24,14 @@ func SetupRouter(userService service.UserService) *gin.Engine {
 	r.POST("/password/send-verification-code", passwordHandler.SendVerificationCode)
 	r.POST("/password/change", passwordHandler.ChangePassword)
 
+	// Deletion handler
+	deletionHandler := handler.NewDeletionHandler(userService)
+
+	// Account deletion endpoints
+	r.POST("/account/deletion/request", deletionHandler.RequestDeletion)
+	r.POST("/account/deletion/cancel", deletionHandler.CancelDeletion)
+	r.GET("/account/deletion/status", deletionHandler.GetDeletionStatus)
+
 	// TODO: Add login routes when auth service is implemented
 	// For now, we'll add placeholder comments
 

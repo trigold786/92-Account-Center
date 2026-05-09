@@ -14,8 +14,10 @@ type UserRepository interface {
 	GetByAccountID(ctx context.Context, accountID string) (*model.User, error)
 	GetByEmail(ctx context.Context, email string) (*model.User, error)
 	GetByID(ctx context.Context, userID string) (*model.User, error)
+	Update(ctx context.Context, user *model.User) error
 	ExistsByPhoneNumber(ctx context.Context, phoneNumber string) (bool, error)
 	ExistsByAccountID(ctx context.Context, accountID string) (bool, error)
+	PermanentDelete(ctx context.Context, userID int64) error
 }
 
 // userRepository implements UserRepository using PostgreSQL.
@@ -144,4 +146,35 @@ func (r *userRepository) GetByID(ctx context.Context, userID string) (*model.Use
 	}
 	user.ID = id
 	return user, nil
+}
+
+// Update updates an existing user in the database.
+func (r *userRepository) Update(ctx context.Context, user *model.User) error {
+	query := `
+		UPDATE users 
+		SET phone_number = $2, account_id = $3, password_hash = $4, 
+			updated_at = $5, deletion_requested_at = $6, 
+			deletion_expires_at = $7, deletion_cancelled_at = $8, 
+			deletion_deleted_at = $9
+		WHERE id = $1
+		RETURNING updated_at`
+	err := r.db.QueryRowContext(ctx, query,
+		user.ID,
+		user.PhoneNumber,
+		user.AccountID,
+		user.PasswordHash,
+		time.Now(),
+		user.DeletionRequestedAt,
+		user.DeletionExpiresAt,
+		user.DeletionCancelledAt,
+		user.DeletionDeletedAt,
+	).Scan(&user.UpdatedAt)
+	return err
+}
+
+// PermanentDelete permanently removes a user from the database.
+func (r *userRepository) PermanentDelete(ctx context.Context, userID int64) error {
+	query := `DELETE FROM users WHERE id = $1`
+	_, err := r.db.ExecContext(ctx, query, userID)
+	return err
 }

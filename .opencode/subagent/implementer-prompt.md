@@ -1,64 +1,55 @@
-You are an expert software engineer tasked with implementing Task 1: User Registration (手机号注册) from the Account Center microservice implementation plan.
+You are an expert software engineer tasked with implementing Task 5: SMS/Email Service with Circuit Breaker (多云短信服务) from the Account Center microservice implementation plan.
 
 ## Task Description
-**Task 1: User Registration (手机号注册)**
+**Task 5: SMS/Email Service with Circuit Breaker (多云短信服务)**
 
 **Files:**
-- Create: `account-service/internal/model/user.go`
-- Create: `account-service/internal/repository/user_repository.go`
-- Create: `account-service/internal/service/user_service.go`
-- Create: `account-service/internal/handler/register_handler.go`
-- Create: `account-service/pkg/crypto/sm4.go`
-- Create: `account-service/pkg/crypto/sm3.go`
-- Create: `migrations/001_initial_schema.sql`
-- Modify: `api-gateway/internal/router/router.go`
+- Create: `sms-email-service/internal/provider/aliyun.go`
+- Create: `sms-email-service/internal/provider/tencent.go`
+- Create: `sms-email-service/internal/provider/chinatelecom.go`
+- Create: `sms-email-service/internal/service/sms_service.go`
+- Create: `sms-email-service/pkg/circuitbreaker/circuitbreaker.go`
 
 **Steps to complete:**
-1. Write database migration for users table
-2. Create user model
-3. Create SM3 hash utility
-4. Create user repository
-5. Create user service with password hashing and validation
-6. Create register handler
-7. Add routes to API gateway
-8. Run tests
-9. Commit
+1. Create circuit breaker utility
+2. Create SMS provider interface and implementations
+3. Create SMS service with provider failover
+4. Create SMS handler
+5. Run tests
+6. Commit
 
 **Technical Details:**
-- Use Go/Gin for backend services
-- PostgreSQL for database
-- Redis for caching (though not used in this task specifically)
-- SM3 for hash utilities
-- bcrypt for password hashing
-- JWT for tokens (though more relevant to auth service)
-- Gin framework for HTTP handlers
-- govalidator or similar for input validation (using struct tags)
+- Use Go for backend service
+- Redis for rate limiting and verification code storage
+- Circuit breaker pattern for provider failover
+- Support for multiple SMS providers (Aliyun, Tencent, Chinatelecom)
+- Rate limiting (120s interval, 10 per day per phone number)
+- Verification code generation and validation
+- Integration with existing services via message queue (Kafka)
 
 **Requirements from Spec:**
-- User registration via phone number + SMS verification code
-- Account ID must be 6-20 chars, letters/numbers/underscore, not starting with number
-- Password must meet security policy (8-20 chars, upper/lower/number/special char)
-- Must agree to terms
-- Phone number verification with 5-minute expiry
-- Global uniqueness check for phone number and account ID
-- Password hashed with bcrypt + salt
-- Generate JWT access/refresh tokens on successful registration
+- Multi-cloud SMS service with 阿里云, 腾讯云, 天翼云
+- Strict frequency control: 120s interval between sends, 10 per day limit per phone number
+- Verification code validity: 5 minutes
+- Automatic failover when primary channel error rate >15% in 5 minutes
+- Alerting to operations personnel when failover occurs
+- Support for both SMS verification codes and email OTP/Magic Link
+- Integration with Kafka for asynchronous communication
 
 **Best Practices:**
 - Follow TDD: write failing tests first, then implement
 - Proper error handling with meaningful error messages
-- Input validation at handler level
-- Repository pattern for data access
-- Service layer for business logic
-- Proper logging (though not explicitly required in this task)
-- Return appropriate HTTP status codes
+- Circuit breaker pattern for resilience
+- Rate limiting to prevent abuse
 - Context cancellation support
 - No hardcoded values (use constants/config)
 - Follow Go conventions and formatting
+- Provider abstraction for easy extension
 
 **Deliverables:**
 - All files listed above with complete implementation
-- Working user registration endpoint
-- Proper error handling and validation
-- Database schema with appropriate indexes
+- Working SMS service with provider failover
+- Rate limiting implementation
+- Verification code generation and storage
+- Circuit breaker functionality
 - Clean, maintainable code following Go best practices
