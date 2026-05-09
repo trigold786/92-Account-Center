@@ -1,4 +1,4 @@
-module account-center/account-service
+module account-center/audit-log-service
 
 go 1.21
 

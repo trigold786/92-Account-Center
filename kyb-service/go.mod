@@ -1,4 +1,4 @@
-module account-center/account-service
+module account-center/kyb-service
 
 go 1.21
 
