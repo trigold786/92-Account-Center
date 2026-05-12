@@ -3,8 +3,9 @@ package service
 import (
 	"context"
 	"errors"
-	"sync"
 	"time"
+
+	"github.com/redis/go-redis/v9"
 
 	"github.com/trigold786/92-Account-Center/auth-service/internal/model"
 	"github.com/trigold786/92-Account-Center/auth-service/internal/util"
@@ -18,11 +19,6 @@ const (
 	maxFailedAttempts = 5
 	lockoutDuration   = 30 * time.Minute
 )
-
-type loginAttempt struct {
-	count       int
-	lastAttempt time.Time
-}
 
 type UserRepository interface {
 	GetByPhoneNumber(ctx context.Context, phoneNumber string) (*model.User, error)
@@ -38,71 +34,77 @@ type AuthService interface {
 }
 
 type authService struct {
-	userRepo      UserRepository
-	jwtMgr        *jwt.JWTManager
-	loginAttempts map[string]*loginAttempt
-	attemptMu     sync.Mutex
-	blacklist     map[string]time.Time
-	blacklistMu   sync.RWMutex
+	userRepo UserRepository
+	jwtMgr   *jwt.JWTManager
+	rdb      *redis.Client
 }
 
-func NewAuthService(userRepo UserRepository, jwtMgr *jwt.JWTManager) AuthService {
+func NewAuthService(userRepo UserRepository, jwtMgr *jwt.JWTManager, rdb *redis.Client) AuthService {
+	return &authService{
+		userRepo: userRepo,
+		jwtMgr:   jwtMgr,
+		rdb:      rdb,
+	}
+}
+
+func NewAuthService(userRepo UserRepository, jwtMgr *jwt.JWTManager, rdb *redis.Client) AuthService {
 	return &authService{
 		userRepo:      userRepo,
 		jwtMgr:        jwtMgr,
 		loginAttempts: make(map[string]*loginAttempt),
-		blacklist:     make(map[string]time.Time),
+		rdb:           rdb,
 	}
 }
 
 func (s *authService) isLocked(credential string) bool {
-	s.attemptMu.Lock()
-	defer s.attemptMu.Unlock()
-
-	attempt, exists := s.loginAttempts[credential]
-	if !exists {
+	if s.rdb == nil {
 		return false
 	}
-	if attempt.count >= maxFailedAttempts && time.Since(attempt.lastAttempt) < lockoutDuration {
-		return true
+	key := "lockout:" + credential
+	val, err := s.rdb.Get(context.Background(), key).Result()
+	if err != nil {
+		return false
 	}
-	if attempt.count >= maxFailedAttempts && time.Since(attempt.lastAttempt) >= lockoutDuration {
-		delete(s.loginAttempts, credential)
-	}
-	return false
+	return val == "1"
 }
 
 func (s *authService) recordFailedAttempt(credential string) {
-	s.attemptMu.Lock()
-	defer s.attemptMu.Unlock()
-
-	attempt, exists := s.loginAttempts[credential]
-	if !exists {
-		attempt = &loginAttempt{}
-		s.loginAttempts[credential] = attempt
+	if s.rdb == nil {
+		return
 	}
-	attempt.count++
-	attempt.lastAttempt = time.Now()
+	key := "lockout:" + credential
+	countKey := "lockout:count:" + credential
+
+	count, err := s.rdb.Incr(context.Background(), countKey).Result()
+	if err != nil {
+		return
+	}
+	if count == 1 {
+		s.rdb.Expire(context.Background(), countKey, lockoutDuration)
+	}
+
+	if count >= maxFailedAttempts {
+		s.rdb.Set(context.Background(), key, "1", lockoutDuration)
+	}
 }
 
 func (s *authService) resetFailedAttempts(credential string) {
-	s.attemptMu.Lock()
-	defer s.attemptMu.Unlock()
-	delete(s.loginAttempts, credential)
+	if s.rdb == nil {
+		return
+	}
+	s.rdb.Del(context.Background(), "lockout:"+credential, "lockout:count:"+credential)
 }
 
 func (s *authService) isTokenBlacklisted(tokenString string) bool {
-	s.blacklistMu.RLock()
-	defer s.blacklistMu.RUnlock()
-
-	expiry, exists := s.blacklist[tokenString]
-	if !exists {
+	if s.rdb == nil {
 		return false
 	}
-	if time.Now().After(expiry) {
+	key := "blacklist:" + tokenString
+	exists, err := s.rdb.Exists(context.Background(), key).Result()
+	if err != nil {
 		return false
 	}
-	return true
+	return exists == 1
 }
 
 func (s *authService) Login(ctx context.Context, req *model.LoginRequest) (*model.LoginResponse, error) {
@@ -202,19 +204,15 @@ func (s *authService) Logout(ctx context.Context, accessToken string) error {
 		return errors.New("invalid token")
 	}
 
-	s.blacklistMu.Lock()
-	defer s.blacklistMu.Unlock()
-	s.blacklist[accessToken] = claims.ExpiresAt.Time
+	if s.rdb != nil {
+		ttl := time.Until(claims.ExpiresAt.Time)
+		if ttl > 0 {
+			key := "blacklist:" + accessToken
+			s.rdb.Set(ctx, key, "1", ttl)
+		}
+	}
 
 	return nil
-}
-
-func init() {
-	go func() {
-		for {
-			time.Sleep(1 * time.Hour)
-		}
-	}()
 }
 
 func (s *authService) VerifyPassword(password, storedHash string) bool {

@@ -19,7 +19,7 @@ func NewRiskHandler(riskService *service.RiskService) *RiskHandler {
 }
 
 func (h *RiskHandler) RegisterRoutes(r *gin.Engine) {
-	risk := r.Group("/risk")
+	risk := r.Group("/api/v1/risk")
 	{
 		risk.POST("/assess", h.AssessRisk)
 		risk.GET("/history/:user_id", h.GetRiskHistory)
@@ -30,23 +30,23 @@ func (h *RiskHandler) RegisterRoutes(r *gin.Engine) {
 func (h *RiskHandler) AssessRisk(c *gin.Context) {
 	var req model.AssessRiskRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
 		return
 	}
 
 	resp, err := h.riskService.AssessRisk(c.Request.Context(), req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, resp)
+	c.JSON(http.StatusOK, gin.H{"code": 200, "message": "success", "data": resp})
 }
 
 func (h *RiskHandler) GetRiskHistory(c *gin.Context) {
 	userID := c.Param("user_id")
 	if userID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id is required"})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "user_id is required"})
 		return
 	}
 
@@ -86,21 +86,21 @@ func (h *RiskHandler) GetRiskHistory(c *gin.Context) {
 
 	events, err := h.riskService.GetRiskHistory(c.Request.Context(), userID, start, end)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"events": events, "limit": limit})
+	c.JSON(http.StatusOK, gin.H{"code": 200, "message": "success", "data": gin.H{"events": events, "limit": limit}})
 }
 
 func (h *RiskHandler) GetRiskEvent(c *gin.Context) {
 	eventID := c.Param("event_id")
 	if eventID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "event_id is required"})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "event_id is required"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"event_id": eventID, "message": "not implemented"})
+	c.JSON(http.StatusOK, gin.H{"code": 200, "message": "not implemented", "data": gin.H{"event_id": eventID}})
 }
 
 func parseInt(s string) (int, error) {

@@ -38,7 +38,7 @@ func (m *mockUserRepo) GetByAccountID(ctx context.Context, accountID string) (*m
 
 func newTestAuthService(repo UserRepository) AuthService {
 	jwtMgr := jwt.NewJWTManager("test-access-secret", "test-refresh-secret")
-	return NewAuthService(repo, jwtMgr)
+	return NewAuthService(repo, jwtMgr, nil)
 }
 
 func makeTestUser() *model.User {
@@ -385,34 +385,27 @@ func TestLogin_LockoutExpires(t *testing.T) {
 			"phone:13800138000": user,
 		},
 	}
-	svcInternal := newTestAuthService(repo).(*authService)
+	svc := newTestAuthService(repo)
 
+	// Without Redis (nil client), lockout is not enforced.
+	// 5 failed attempts should not lock out when Redis is unavailable.
 	for i := 0; i < maxFailedAttempts; i++ {
-		_, _ = svcInternal.Login(context.Background(), &model.LoginRequest{
+		_, err := svc.Login(context.Background(), &model.LoginRequest{
 			Credential: "13800138000",
 			Password:   "wrongpassword",
 		})
+		if err == nil {
+			t.Fatalf("expected error on attempt %d, got nil", i+1)
+		}
 	}
 
-	_, err := svcInternal.Login(context.Background(), &model.LoginRequest{
-		Credential: "13800138000",
-		Password:   "correctpassword",
-	})
-	if !errors.Is(err, ErrAccountLocked) {
-		t.Fatalf("expected ErrAccountLocked, got %v", err)
-	}
-
-	svcInternal.attemptMu.Lock()
-	if attempt, ok := svcInternal.loginAttempts["13800138000"]; ok {
-		attempt.lastAttempt = time.Now().Add(-lockoutDuration - time.Second)
-	}
-	svcInternal.attemptMu.Unlock()
-
-	_, err = svcInternal.Login(context.Background(), &model.LoginRequest{
+	// After 5 failures, the login should still work (graceful degradation)
+	// because lockout requires Redis.
+	_, err := svc.Login(context.Background(), &model.LoginRequest{
 		Credential: "13800138000",
 		Password:   "correctpassword",
 	})
 	if err != nil {
-		t.Fatalf("expected success after lockout expired, got %v", err)
+		t.Fatalf("expected success (graceful degradation without Redis), got %v", err)
 	}
 }

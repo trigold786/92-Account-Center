@@ -18,7 +18,9 @@ import (
 	"syscall"
 	"time"
 
+	"context"
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 type GatewayConfig struct {
@@ -210,19 +212,26 @@ func main() {
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
+	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	port := getEnv("PORT", "30300")
-	log.Printf("API Gateway starting on :%s", port)
+	srv := &http.Server{
+		Addr:    ":" + port,
+		Handler: r,
+	}
 
 	go func() {
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 		<-sigChan
 		log.Println("Shutting down...")
-		os.Exit(0)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		srv.Shutdown(shutdownCtx)
 	}()
 
-	if err := r.Run(":" + port); err != nil {
+	log.Printf("API Gateway starting on :%s", port)
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }
