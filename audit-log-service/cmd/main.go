@@ -4,9 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
@@ -14,7 +18,7 @@ import (
 	"github.com/trigold786/92-Account-Center/audit-log-service/internal/handler"
 	"github.com/trigold786/92-Account-Center/audit-log-service/internal/repository"
 	"github.com/trigold786/92-Account-Center/audit-log-service/internal/service"
-	"github.com/trigold786/92-Account-Center/audit-log-service/pkg/kafka"
+	"github.com/trigold786/92-Account-Center/audit-log-service/pkg/mq"
 )
 
 func main() {
@@ -52,22 +56,59 @@ func main() {
 		auditGroup.POST("/logs/cleanup", auditHandler.CleanupOldLogs)
 	}
 
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok"})
+	})
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	kafkaBrokers := []string{getEnv("KAFKA_BROKERS", "localhost:9092")}
-	kafkaTopic := getEnv("KAFKA_AUDIT_TOPIC", "audit-logs")
-	kafkaGroupID := getEnv("KAFKA_GROUP_ID", "audit-log-service")
+	mqType := getEnv("AUDIT_MQ_TYPE", "redis")
 
-	consumer, err := kafka.NewAuditLogConsumer(kafkaBrokers, kafkaGroupID, kafkaTopic, auditService)
-	if err != nil {
-		log.Printf("Warning: Failed to create Kafka consumer: %v (continuing without Kafka)", err)
-	} else {
-		if err := consumer.Start(ctx); err != nil {
-			log.Printf("Warning: Failed to start Kafka consumer: %v", err)
+	var messageQueue mq.MessageQueue
+
+	switch mqType {
+	case "kafka":
+		brokers := strings.Split(getEnv("KAFKA_BROKERS", "localhost:9092"), ",")
+		topic := getEnv("KAFKA_AUDIT_TOPIC", "audit-logs")
+		groupID := getEnv("KAFKA_GROUP_ID", "audit-log-service")
+
+		kafkaMQ, err := mq.NewKafkaMQ(brokers, topic, groupID)
+		if err != nil {
+			log.Printf("Warning: Failed to create Kafka MQ: %v (audit logs will be synchronous only)", err)
 		} else {
-			defer consumer.Close()
+			messageQueue = kafkaMQ
 		}
+
+	case "redis":
+		redisAddr := getEnv("REDIS_ADDR", "localhost:6379")
+		redisPassword := getEnv("REDIS_PASSWORD", "")
+		redisDB, _ := strconv.Atoi(getEnv("REDIS_DB", "0"))
+		streamKey := getEnv("REDIS_STREAM_KEY", "audit-logs")
+		groupName := getEnv("REDIS_CONSUMER_GROUP", "audit-log-service")
+		consumerID := getEnv("REDIS_CONSUMER_ID", "w004-audit-1")
+
+		messageQueue = mq.NewRedisStreamsMQ(redisAddr, redisPassword, redisDB, streamKey, groupName, consumerID)
+
+	default:
+		log.Printf("Unknown AUDIT_MQ_TYPE=%s, falling back to synchronous-only mode", mqType)
+	}
+
+	if messageQueue != nil {
+		defer messageQueue.Close()
+		if err := messageQueue.StartConsumer(ctx, auditService); err != nil {
+			log.Printf("Warning: Failed to start MQ consumer: %v (audit logs will be synchronous only)", err)
+		} else {
+			log.Printf("MQ consumer started: type=%s", mqType)
+		}
+	} else {
+		log.Printf("No message queue configured, audit logs are synchronous only")
+	}
+
+	port := getEnv("PORT", "30305")
+	srv := &http.Server{
+		Addr:    ":" + port,
+		Handler: r,
 	}
 
 	go func() {
@@ -76,16 +117,16 @@ func main() {
 		<-sigChan
 		log.Println("Shutting down...")
 		cancel()
-		os.Exit(0)
+
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer shutdownCancel()
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			log.Printf("Server forced shutdown: %v", err)
+		}
 	}()
 
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok"})
-	})
-
-	port := getEnv("PORT", "30305")
 	log.Printf("Audit log service starting on :%s", port)
-	if err := r.Run(":" + port); err != nil {
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }
