@@ -250,7 +250,6 @@ func proxyHandler(target string) gin.HandlerFunc {
 	}
 
 	return func(c *gin.Context) {
-		c.Request.URL.Path = c.Param("path")
 		c.Request.URL.Host = targetURL.Host
 		c.Request.URL.Scheme = targetURL.Scheme
 		c.Request.Host = targetURL.Host
