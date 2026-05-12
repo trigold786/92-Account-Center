@@ -25,6 +25,11 @@ const (
 	StateHalfOpen
 )
 
+// New creates a new circuit breaker with the specified max failures and timeout.
+func New(maxFailures int, timeout time.Duration) *CircuitBreaker {
+	return NewCircuitBreaker(maxFailures, timeout)
+}
+
 // NewCircuitBreaker creates a new circuit breaker.
 func NewCircuitBreaker(maxFailures int, timeout time.Duration) *CircuitBreaker {
 	return &CircuitBreaker{

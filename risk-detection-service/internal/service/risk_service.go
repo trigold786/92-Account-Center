@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"risk-detection-service/internal/model"
-	"risk-detection-service/internal/repository"
+	"github.com/trigold786/92-Account-Center/risk-detection-service/internal/model"
+	"github.com/trigold786/92-Account-Center/risk-detection-service/internal/repository"
 
 	"github.com/google/uuid"
 )
@@ -35,7 +35,7 @@ func NewRiskService(repo *repository.RiskRepository, geoService *GeoService) *Ri
 type RiskFactors []model.RiskFactor
 
 func (s *RiskService) AssessRisk(ctx context.Context, req model.AssessRiskRequest) (*model.RiskAssessmentResponse, error) {
-	var factors model.RiskFactors
+	var factors RiskFactors
 
 	location := req.Location
 	if location == nil {
@@ -52,7 +52,7 @@ func (s *RiskService) AssessRisk(ctx context.Context, req model.AssessRiskReques
 		})
 	}
 
-	deviceAnomaly, similarity := s.DetectDeviceAnomaly(ctx, req.UserID, req.DeviceFingerprint)
+	deviceAnomaly, similarity, _ := s.DetectDeviceAnomaly(ctx, req.UserID, req.DeviceFingerprint)
 	if deviceAnomaly {
 		factors = append(factors, model.RiskFactor{
 			Type:   "device_change",
@@ -64,7 +64,7 @@ func (s *RiskService) AssessRisk(ctx context.Context, req model.AssessRiskReques
 
 	_ = similarity
 
-	velocityAnomaly, count := s.DetectVelocityAnomaly(ctx, req.UserID)
+	velocityAnomaly, count, _ := s.DetectVelocityAnomaly(ctx, req.UserID)
 	if velocityAnomaly {
 		factors = append(factors, model.RiskFactor{
 			Type:   "velocity_exceeded",
@@ -172,7 +172,7 @@ func (s *RiskService) DetectVelocityAnomaly(ctx context.Context, userID string) 
 	return count >= VelocityThreshold, int(count), nil
 }
 
-func (s *RiskService) CalculateRiskScore(factors model.RiskFactors) int {
+func (s *RiskService) CalculateRiskScore(factors RiskFactors) int {
 	if len(factors) == 0 {
 		return 0
 	}

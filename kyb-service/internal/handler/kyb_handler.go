@@ -6,8 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"account-center/kyb-service/internal/model"
-	"account-center/kyb-service/internal/service"
+	"github.com/trigold786/92-Account-Center/kyb-service/internal/model"
+	"github.com/trigold786/92-Account-Center/kyb-service/internal/service"
 )
 
 type KYBHandler struct {

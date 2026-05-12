@@ -5,8 +5,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"account-center/email-service/internal/model"
-	"account-center/email-service/internal/service"
+	"github.com/trigold786/92-Account-Center/email-service/internal/model"
+	"github.com/trigold786/92-Account-Center/email-service/internal/service"
 )
 
 type EmailHandler struct {

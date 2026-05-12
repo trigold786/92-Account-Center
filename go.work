@@ -1,0 +1,14 @@
+go 1.21
+
+use (
+	./account-service
+	./auth-service
+	./device-fingerprint-service
+	./sms-email-service
+	./email-service
+	./session-service
+	./audit-log-service
+	./kyb-service
+	./risk-detection-service
+	./api-gateway
+)

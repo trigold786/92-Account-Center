@@ -1,24 +1,38 @@
 package model
 
-// LoginRequest represents a login request
+import "time"
+
 type LoginRequest struct {
-	Credential      string `json:"credential" binding:"required"`
-	Password        string `json:"password,omitempty"`
-	Code            string `json:"code,omitempty"` // For SMS/email OTP
-	MagicLink       string `json:"magic_link,omitempty"` // For magic link login
-	DeviceFingerprintID string `json:"device_fingerprint_id,omitempty"` // Device fingerprint for trust checking
+	Credential            string `json:"credential" binding:"required"`
+	Password              string `json:"password,omitempty"`
+	Code                  string `json:"code,omitempty"`
+	MagicLink             string `json:"magic_link,omitempty"`
+	DeviceFingerprintID   string `json:"device_fingerprint_id,omitempty"`
 }
 
-// LoginResponse represents a login response
 type LoginResponse struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
 	ExpiresIn    int64  `json:"expires_in"`
 	UserID       int64  `json:"user_id"`
 	AccountID    string `json:"account_id"`
+	IsTrusted    bool   `json:"is_trusted"`
+	MFARequired  bool   `json:"mfa_required"`
 }
 
-// TokenPair represents a pair of access and refresh tokens
+type User struct {
+	ID               int64      `json:"id" db:"id"`
+	PhoneNumber      string     `json:"phone_number" db:"phone_number"`
+	AccountID        string     `json:"account_id" db:"account_id"`
+	Email            string     `json:"email,omitempty" db:"email"`
+	PasswordHash     string     `json:"-" db:"password_hash"`
+	MFAEnabled       bool       `json:"mfa_enabled" db:"mfa_enabled"`
+	MFASecret        string     `json:"-" db:"mfa_secret"`
+	LastStrongAuthAt *time.Time `json:"last_strong_auth_at,omitempty" db:"last_strong_auth_at"`
+	CreatedAt        time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at" db:"updated_at"`
+}
+
 type TokenPair struct {
 	AccessToken  string
 	RefreshToken string

@@ -7,8 +7,8 @@ import (
 
 	"github.com/IBM/sarama"
 
-	"account-center/audit-log-service/internal/model"
-	"account-center/audit-log-service/internal/service"
+	"github.com/trigold786/92-Account-Center/audit-log-service/internal/model"
+	"github.com/trigold786/92-Account-Center/audit-log-service/internal/service"
 )
 
 type AuditLogConsumer struct {

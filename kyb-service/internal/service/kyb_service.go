@@ -6,16 +6,15 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"io"
 	"math/big"
 	"time"
 
 	"github.com/google/uuid"
-	"golang.org/x/crypto/sm4"
 
-	"account-center/kyb-service/internal/model"
-	"account-center/kyb-service/internal/repository"
+	"github.com/trigold786/92-Account-Center/kyb-service/internal/model"
+	"github.com/trigold786/92-Account-Center/kyb-service/internal/repository"
+	"github.com/trigold786/92-Account-Center/kyb-service/pkg/crypto"
 )
 
 var (
@@ -259,7 +258,7 @@ func (s *kybService) encrypt(plaintext string) (string, error) {
 		s.encryptKey = key
 	}
 
-	block, err := sm4.NewCipher(s.encryptKey)
+	block, err := crypto.NewCipher(s.encryptKey)
 	if err != nil {
 		return "", err
 	}

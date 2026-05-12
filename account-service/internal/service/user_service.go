@@ -1,65 +1,207 @@
-// SendPasswordVerificationCode sends a verification code for password change.
+package service
+
+import (
+	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
+	"unicode"
+
+	"github.com/trigold786/92-Account-Center/account-service/internal/model"
+	"github.com/trigold786/92-Account-Center/account-service/internal/repository"
+	"github.com/trigold786/92-Account-Center/account-service/pkg/crypto"
+	"github.com/trigold786/92-Account-Center/account-service/pkg/sms"
+)
+
+var (
+	ErrPhoneAlreadyRegistered = errors.New("phone number already registered")
+	ErrAccountIDTaken         = errors.New("account ID already taken")
+	ErrMustAgreeToTerms       = errors.New("must agree to terms and conditions")
+	ErrInvalidPhoneNumber     = errors.New("invalid phone number format")
+	ErrInvalidAccountID       = errors.New("invalid account ID format")
+	ErrInvalidEmail           = errors.New("invalid email format")
+	ErrUserNotFound           = errors.New("user not found")
+	ErrInvalidCredentials     = errors.New("invalid credentials")
+	ErrSamePassword           = errors.New("new password must be different from current")
+	ErrEmailAlreadyRegistered = errors.New("email already registered")
+)
+
+var (
+	phoneRegex     = regexp.MustCompile(`^1[3-9]\d{9}$`)
+	emailRegex     = regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
+	accountIDRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]{5,19}$`)
+)
+
+type UserService interface {
+	Register(ctx context.Context, phoneNumber, accountID, password string, agreeToTerms bool) (*model.User, error)
+	ValidatePassword(password string) error
+	ChangePassword(ctx context.Context, userID string, req *model.ChangePasswordRequest) error
+	SendPasswordVerificationCode(ctx context.Context, contactType, contactValue string) error
+	RequestAccountDeletion(ctx context.Context, userID string, req *model.DeletionRequest) (*model.DeletionResponse, error)
+	CancelAccountDeletion(ctx context.Context, userID string) (*model.DeletionResponse, error)
+	GetDeletionStatus(ctx context.Context, userID string) (*model.Deletion, error)
+	GetProfile(ctx context.Context, userID int64) (*model.UserProfile, error)
+	UpdateEmail(ctx context.Context, userID int64, email string) error
+	UpdatePhone(ctx context.Context, userID int64, phone string) error
+}
+
+type userService struct {
+	repo      repository.UserRepository
+	smsClient *sms.Client
+}
+
+func NewUserService(repo repository.UserRepository, smsClient *sms.Client) UserService {
+	return &userService{repo: repo, smsClient: smsClient}
+}
+
+func (s *userService) Register(ctx context.Context, phoneNumber, accountID, password string, agreeToTerms bool) (*model.User, error) {
+	if !phoneRegex.MatchString(phoneNumber) {
+		return nil, ErrInvalidPhoneNumber
+	}
+
+	if !accountIDRegex.MatchString(accountID) {
+		if len(accountID) > 0 && accountID[0] >= '0' && accountID[0] <= '9' {
+			return nil, fmt.Errorf("%w: cannot start with a number", ErrInvalidAccountID)
+		}
+		return nil, ErrInvalidAccountID
+	}
+
+	if err := s.validatePasswordStrength(password); err != nil {
+		return nil, err
+	}
+
+	if !agreeToTerms {
+		return nil, ErrMustAgreeToTerms
+	}
+
+	exists, err := s.repo.ExistsByPhoneNumber(ctx, phoneNumber)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return nil, ErrPhoneAlreadyRegistered
+	}
+
+	exists, err = s.repo.ExistsByAccountID(ctx, accountID)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return nil, ErrAccountIDTaken
+	}
+
+	salt := generateSalt()
+	hashedPassword := hashPassword(password, salt)
+
+	now := time.Now()
+	user := &model.User{
+		PhoneNumber:  phoneNumber,
+		AccountID:    accountID,
+		PasswordHash: fmt.Sprintf("%s$%s", salt, hashedPassword),
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+
+	if err := s.repo.Create(ctx, user); err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+func (s *userService) ValidatePassword(password string) error {
+	return s.validatePasswordStrength(password)
+}
+
+func (s *userService) ChangePassword(ctx context.Context, userID string, req *model.ChangePasswordRequest) error {
+	user, err := s.repo.GetByID(ctx, userID)
+	if err != nil || user == nil {
+		return ErrUserNotFound
+	}
+
+	if err := s.validatePasswordStrength(req.NewPassword); err != nil {
+		return err
+	}
+
+	if req.NewPassword != req.ConfirmPassword {
+		return errors.New("passwords do not match")
+	}
+
+	salt := generateSalt()
+	hashedPassword := hashPassword(req.NewPassword, salt)
+	user.PasswordHash = fmt.Sprintf("%s$%s", salt, hashedPassword)
+	user.UpdatedAt = time.Now()
+
+	return s.repo.Update(ctx, user)
+}
+
 func (s *userService) SendPasswordVerificationCode(ctx context.Context, contactType, contactValue string) error {
-	// In a real implementation, this would send an SMS or email with a verification code
-	// For now, we'll just return nil as a placeholder
+	if s.smsClient == nil {
+		return nil
+	}
+	if contactType == "phone" {
+		return s.smsClient.SendCode(contactValue)
+	}
 	return nil
 }
 
-// RequestAccountDeletion requests deletion of a user account with verification.
 func (s *userService) RequestAccountDeletion(ctx context.Context, userID string, req *model.DeletionRequest) (*model.DeletionResponse, error) {
-	// Validate user ID
 	if userID == "" {
 		return nil, errors.New("user ID is required")
 	}
 
-	// Get user by ID
 	user, err := s.repo.GetByID(ctx, userID)
 	if err != nil || user == nil {
-		return nil, errors.New("user not found")
+		return nil, ErrUserNotFound
 	}
 
-	// Check if account is already deleted
 	if user.DeletionDeletedAt != nil {
 		return nil, errors.New("account is already deleted")
 	}
 
-	// Check if deletion is already requested and not cancelled/expired
-	if user.DeletionRequestedAt != nil && 
-	   (user.DeletionCancelledAt == nil || user.DeletionRequestedAt.After(*user.DeletionCancelledAt)) &&
-	   (user.DeletionDeletedAt == nil || user.DeletionRequestedAt.After(*user.DeletionDeletedAt)) {
+	if user.DeletionRequestedAt != nil &&
+		(user.DeletionCancelledAt == nil || user.DeletionRequestedAt.After(*user.DeletionCancelledAt)) &&
+		(user.DeletionDeletedAt == nil || user.DeletionRequestedAt.After(*user.DeletionDeletedAt)) {
 		return nil, errors.New("deletion already requested for this account")
 	}
 
-	// Verify identity based on verification type
 	switch req.VerificationType {
-	case "sms_code", "email_otp":
+	case "sms_code":
 		if req.VerificationCode == "" {
 			return nil, errors.New("verification code required")
 		}
-		// In a real implementation, we would verify the code against stored values
-		// For now, we'll just check if it's not empty as a placeholder
+		if s.smsClient != nil && user.PhoneNumber != "" {
+			valid, err := s.smsClient.VerifyCode(user.PhoneNumber, req.VerificationCode)
+			if err != nil {
+				return nil, fmt.Errorf("verification failed: %w", err)
+			}
+			if !valid {
+				return nil, errors.New("invalid or expired verification code")
+			}
+		}
+	case "email_otp":
 		if req.VerificationCode == "" {
-			return nil, errors.New("invalid verification code")
+			return nil, errors.New("verification code required")
 		}
 	default:
 		return nil, errors.New("invalid verification type")
 	}
 
-	// Set deletion timestamps
 	now := time.Now()
+	freezePeriod := model.FreezePeriod
 	user.DeletionRequestedAt = &now
-	user.DeletionExpiresAt = &now.Add(model.FreezePeriod)
+	expiresAt := now.Add(freezePeriod)
+	user.DeletionExpiresAt = &expiresAt
 	user.DeletionCancelledAt = nil
 	user.DeletionDeletedAt = nil
 	user.UpdatedAt = now
 
-	// Save updated user
 	if err := s.repo.Update(ctx, user); err != nil {
-		return nil, err
-	}
-
-	// Invalidate all user sessions
-	if err := s.sessionCache.InvalidateUserSessions(ctx, userID); err != nil {
 		return nil, err
 	}
 
@@ -68,40 +210,32 @@ func (s *userService) RequestAccountDeletion(ctx context.Context, userID string,
 	}, nil
 }
 
-// CancelAccountDeletion cancels a pending account deletion request.
 func (s *userService) CancelAccountDeletion(ctx context.Context, userID string) (*model.DeletionResponse, error) {
-	// Validate user ID
 	if userID == "" {
 		return nil, errors.New("user ID is required")
 	}
 
-	// Get user by ID
 	user, err := s.repo.GetByID(ctx, userID)
 	if err != nil || user == nil {
-		return nil, errors.New("user not found")
+		return nil, ErrUserNotFound
 	}
 
-	// Check if deletion was requested
 	if user.DeletionRequestedAt == nil {
 		return nil, errors.New("no deletion request found for this account")
 	}
 
-	// Check if already deleted
 	if user.DeletionDeletedAt != nil && user.DeletionRequestedAt.After(*user.DeletionDeletedAt) {
 		return nil, errors.New("cannot cancel deletion as account is already deleted")
 	}
 
-	// Check if already cancelled
 	if user.DeletionCancelledAt != nil && user.DeletionRequestedAt.After(*user.DeletionCancelledAt) {
 		return nil, errors.New("deletion request already cancelled")
 	}
 
-	// Set cancellation timestamp
 	now := time.Now()
 	user.DeletionCancelledAt = &now
 	user.UpdatedAt = now
 
-	// Save updated user
 	if err := s.repo.Update(ctx, user); err != nil {
 		return nil, err
 	}
@@ -111,22 +245,18 @@ func (s *userService) CancelAccountDeletion(ctx context.Context, userID string) 
 	}, nil
 }
 
-// GetDeletionStatus retrieves the deletion status of a user account.
 func (s *userService) GetDeletionStatus(ctx context.Context, userID string) (*model.Deletion, error) {
-	// Validate user ID
 	if userID == "" {
 		return nil, errors.New("user ID is required")
 	}
 
-	// Get user by ID
 	user, err := s.repo.GetByID(ctx, userID)
 	if err != nil || user == nil {
-		return nil, errors.New("user not found")
+		return nil, ErrUserNotFound
 	}
 
-	// Return deletion status
 	return &model.Deletion{
-		UserID:    user.ID,
+		UserID:      user.ID,
 		RequestedAt: user.DeletionRequestedAt,
 		ExpiresAt:   user.DeletionExpiresAt,
 		CancelledAt: user.DeletionCancelledAt,
@@ -134,29 +264,131 @@ func (s *userService) GetDeletionStatus(ctx context.Context, userID string) (*mo
 	}, nil
 }
 
-// IsTrustedDevice checks if a device is trusted for the user based on device fingerprint service
-func (s *userService) IsTrustedDevice(ctx context.Context, userID string, fingerprintID string) (bool, error) {
-	// Validate inputs
-	if userID == "" {
-		return false, errors.New("user ID is required")
-	}
-	if fingerprintID == "" {
-		return false, errors.New("fingerprint ID is required")
+func (s *userService) validatePasswordStrength(password string) error {
+	if len(password) < 8 || len(password) > 20 {
+		return fmt.Errorf("password must be between 8 and 20 characters")
 	}
 
-	// Convert userID to uint64
-	var uid uint64
-	parsedID, err := strconv.ParseUint(userID, 10, 64)
+	var hasUpper, hasLower, hasDigit, hasSpecial bool
+	for _, char := range password {
+		switch {
+		case unicode.IsUpper(char):
+			hasUpper = true
+		case unicode.IsLower(char):
+			hasLower = true
+		case unicode.IsDigit(char):
+			hasDigit = true
+		case strings.ContainsRune("!@#$%^&*()_+-=[]{}|;':\",./<>?`~", char):
+			hasSpecial = true
+		}
+	}
+
+	if !hasUpper {
+		return fmt.Errorf("password must contain at least one uppercase letter")
+	}
+	if !hasLower {
+		return fmt.Errorf("password must contain at least one lowercase letter")
+	}
+	if !hasDigit {
+		return fmt.Errorf("password must contain at least one digit")
+	}
+	if !hasSpecial {
+		return fmt.Errorf("password must contain at least one special character")
+	}
+
+	return nil
+}
+
+func generateSalt() string {
+	salt := make([]byte, 16)
+	rand.Read(salt)
+	return hex.EncodeToString(salt)
+}
+
+func hashPassword(password, salt string) string {
+	data := []byte(salt + password)
+	return crypto.SM3Hash(data)
+}
+
+func VerifyPassword(password, storedHash string) bool {
+	parts := splitStoredHash(storedHash)
+	if len(parts) != 2 {
+		return false
+	}
+	salt, hash := parts[0], parts[1]
+	computedHash := hashPassword(password, salt)
+	return subtleCompare(hash, computedHash)
+}
+
+func splitStoredHash(stored string) []string {
+	for i := len(stored) - 1; i >= 0; i-- {
+		if stored[i] == '$' {
+			return []string{stored[:i], stored[i+1:]}
+		}
+	}
+	return nil
+}
+
+func subtleCompare(a, b string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	var result byte
+	for i := 0; i < len(a); i++ {
+		result |= a[i] ^ b[i]
+	}
+	return result == 0
+}
+
+func ParseUserID(s string) (int64, error) {
+	return strconv.ParseInt(s, 10, 64)
+}
+
+func IsValidPhoneNumber(phone string) bool {
+	return phoneRegex.MatchString(phone)
+}
+
+func IsValidEmail(email string) bool {
+	return emailRegex.MatchString(email)
+}
+
+func IsValidAccountID(accountID string) bool {
+	return accountIDRegex.MatchString(accountID)
+}
+
+func (s *userService) GetProfile(ctx context.Context, userID int64) (*model.UserProfile, error) {
+	user, err := s.repo.GetByID(ctx, strconv.FormatInt(userID, 10))
 	if err != nil {
-		return false, fmt.Errorf("invalid user ID: %w", err)
+		return nil, ErrUserNotFound
 	}
-	uid = parsedID
+	return &model.UserProfile{
+		ID:          user.ID,
+		PhoneNumber: user.PhoneNumber,
+		AccountID:   user.AccountID,
+		Email:       user.Email,
+		MFAEnabled:  user.MFAEnabled,
+		CreatedAt:   user.CreatedAt,
+		UpdatedAt:   user.UpdatedAt,
+	}, nil
+}
 
-	// Call device fingerprint service to check if device is trusted
-	isTrusted, err := s.deviceFingerprintService.IsTrusted(ctx, uid, fingerprintID)
+func (s *userService) UpdateEmail(ctx context.Context, userID int64, email string) error {
+	if !emailRegex.MatchString(email) {
+		return ErrInvalidEmail
+	}
+	return s.repo.UpdateEmail(ctx, userID, email)
+}
+
+func (s *userService) UpdatePhone(ctx context.Context, userID int64, phone string) error {
+	if !phoneRegex.MatchString(phone) {
+		return ErrInvalidPhoneNumber
+	}
+	exists, err := s.repo.ExistsByPhoneNumber(ctx, phone)
 	if err != nil {
-		return false, fmt.Errorf("failed to check device trust status: %w", err)
+		return err
 	}
-
-	return isTrusted, nil
+	if exists {
+		return ErrPhoneAlreadyRegistered
+	}
+	return s.repo.UpdatePhone(ctx, userID, phone)
 }

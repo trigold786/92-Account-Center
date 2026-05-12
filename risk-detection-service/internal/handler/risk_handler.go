@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
-	"risk-detection-service/internal/model"
-	"risk-detection-service/internal/service"
+	"github.com/trigold786/92-Account-Center/risk-detection-service/internal/model"
+	"github.com/trigold786/92-Account-Center/risk-detection-service/internal/service"
 
 	"github.com/gin-gonic/gin"
 )

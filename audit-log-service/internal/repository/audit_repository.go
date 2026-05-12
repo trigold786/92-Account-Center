@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"account-center/audit-log-service/internal/model"
+	"github.com/trigold786/92-Account-Center/audit-log-service/internal/model"
 )
 
 type AuditRepository interface {

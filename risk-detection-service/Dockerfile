@@ -11,10 +11,14 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /risk-detection-service ./cmd/main.go
 
 FROM alpine:latest
 
-RUN apk --no-cache add ca-certificates tzdata
+RUN apk --no-cache add ca-certificates tzdata wget
 
 COPY --from=builder /risk-detection-service /usr/local/bin/risk-detection-service
 
-EXPOSE 8086
+EXPOSE 30306
+USER nobody
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --spider -q http://127.0.0.1:30306/health || exit 1
 
 CMD ["risk-detection-service"]

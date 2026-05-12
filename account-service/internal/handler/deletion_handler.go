@@ -2,11 +2,12 @@ package handler
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/sunxi/92-Account-Center/account-service/internal/model"
-	"github.com/sunxi/92-Account-Center/account-service/internal/service"
+	"github.com/trigold786/92-Account-Center/account-service/internal/model"
+	"github.com/trigold786/92-Account-Center/account-service/internal/service"
 )
 
 // DeletionRequest represents the request body for account deletion.

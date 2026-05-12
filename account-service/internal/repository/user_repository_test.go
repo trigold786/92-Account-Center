@@ -2,13 +2,12 @@ package repository
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/sunxi/92-Account-Center/account-service/internal/model"
+	"github.com/trigold786/92-Account-Center/account-service/internal/model"
 )
 
 // MockUserRepository is a mock implementation of UserRepository for testing.
@@ -89,14 +88,11 @@ func TestUserRepository_GetByPhoneNumber(t *testing.T) {
 }
 
 func TestUserRepository_GetByPhoneNumber_NotFound(t *testing.T) {
-	// Arrange
 	mockRepo := new(MockUserRepository)
 
-	// Act
-	mockRepo.On("GetByPhoneNumber", mock.Anything, "13800138000").Return(nil, sql.ErrNoRows)
+	mockRepo.On("GetByPhoneNumber", mock.Anything, "13800138000").Return(nil, nil)
 	user, err := mockRepo.GetByPhoneNumber(context.Background(), "13800138000")
 
-	// Assert
 	assert.NoError(t, err)
 	assert.Nil(t, user)
 	mockRepo.AssertExpectations(t)
@@ -126,14 +122,11 @@ func TestUserRepository_GetByAccountID(t *testing.T) {
 }
 
 func TestUserRepository_GetByAccountID_NotFound(t *testing.T) {
-	// Arrange
 	mockRepo := new(MockUserRepository)
 
-	// Act
-	mockRepo.On("GetByAccountID", mock.Anything, "testuser").Return(nil, sql.ErrNoRows)
+	mockRepo.On("GetByAccountID", mock.Anything, "testuser").Return(nil, nil)
 	user, err := mockRepo.GetByAccountID(context.Background(), "testuser")
 
-	// Assert
 	assert.NoError(t, err)
 	assert.Nil(t, user)
 	mockRepo.AssertExpectations(t)

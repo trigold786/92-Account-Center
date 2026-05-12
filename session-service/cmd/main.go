@@ -5,21 +5,22 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 
-	"account-center/session-service/internal/handler"
-	"account-center/session-service/internal/repository"
-	"account-center/session-service/internal/service"
+	"github.com/trigold786/92-Account-Center/session-service/internal/handler"
+	"github.com/trigold786/92-Account-Center/session-service/internal/repository"
+	"github.com/trigold786/92-Account-Center/session-service/internal/service"
 )
 
 func main() {
 	redisHost := getEnv("REDIS_HOST", "localhost")
 	redisPort := getEnv("REDIS_PORT", "6379")
 	redisPassword := getEnv("REDIS_PASSWORD", "")
-	redisDB := getEnv("REDIS_DB", "0")
+	redisDB, _ := strconv.Atoi(getEnv("REDIS_DB", "0"))
 
 	redisClient := redis.NewClient(&redis.Options{
 		Addr:     redisHost + ":" + redisPort,
@@ -41,7 +42,11 @@ func main() {
 
 	r := gin.Default()
 
-	sessionGroup := r.Group("/session")
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok"})
+	})
+
+	sessionGroup := r.Group("/api/v1/session")
 	{
 		sessionGroup.POST("/create", sessionHandler.CreateSession)
 		sessionGroup.POST("/validate", sessionHandler.ValidateSession)
@@ -59,7 +64,7 @@ func main() {
 		os.Exit(0)
 	}()
 
-	port := getEnv("PORT", "8080")
+	port := getEnv("PORT", "30307")
 	log.Printf("Session service starting on :%s", port)
 	if err := r.Run(":" + port); err != nil {
 		log.Fatalf("Failed to start server: %v", err)

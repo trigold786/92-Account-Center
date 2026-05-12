@@ -10,10 +10,10 @@ import (
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
 
-	"account-center/account-service/internal/repository"
-	"account-center/auth-service/internal/handler"
-	"account-center/auth-service/internal/service"
-	"account-center/auth-service/pkg/jwt"
+	"github.com/trigold786/92-Account-Center/auth-service/internal/handler"
+	"github.com/trigold786/92-Account-Center/auth-service/internal/repository"
+	"github.com/trigold786/92-Account-Center/auth-service/internal/service"
+	"github.com/trigold786/92-Account-Center/auth-service/pkg/jwt"
 )
 
 func main() {
@@ -35,14 +35,12 @@ func main() {
 	}
 	log.Println("Connected to database")
 
+	accessSecret := getEnv("JWT_ACCESS_SECRET", "access-secret-key-change-in-production")
+	refreshSecret := getEnv("JWT_REFRESH_SECRET", "refresh-secret-key-change-in-production")
+	jwtMgr := jwt.NewJWTManager(accessSecret, refreshSecret)
+
 	userRepo := repository.NewUserRepository(db)
-	jwtManager := jwt.NewJWTManager(
-		getEnv("JWT_ACCESS_SECRET", "access-secret-key-change-in-production"),
-		getEnv("JWT_REFRESH_SECRET", "refresh-secret-key-change-in-production"),
-		15*60*1000000000,
-		7*24*60*60*1000000000,
-	)
-	authService := service.NewAuthService(userRepo, jwtManager)
+	authService := service.NewAuthService(userRepo, jwtMgr)
 	loginHandler := handler.NewLoginHandler(authService)
 
 	r := gin.Default()
@@ -50,11 +48,15 @@ func main() {
 	authGroup := r.Group("/api/v1/auth")
 	{
 		authGroup.POST("/login", loginHandler.Login)
-		authGroup.POST("/login/send-sms-code", loginHandler.SendSMSCode)
-		authGroup.POST("/login/send-email-otp", loginHandler.SendEmailOTP)
+		authGroup.POST("/refresh", loginHandler.RefreshToken)
+		authGroup.POST("/logout", loginHandler.Logout)
 	}
 
-	port := getEnv("PORT", "8082")
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok"})
+	})
+
+	port := getEnv("PORT", "30302")
 	log.Printf("Auth service starting on :%s", port)
 
 	go func() {

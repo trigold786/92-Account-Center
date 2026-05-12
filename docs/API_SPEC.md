@@ -2,7 +2,7 @@
 
 ## 基础信息
 
-- **基础 URL**: `http://localhost:8080/api/v1`
+- **基础 URL**: `http://localhost:30300/api/v1`
 - **认证方式**: Bearer Token (JWT)
 - **内容类型**: `application/json`
 

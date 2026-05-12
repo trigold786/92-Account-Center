@@ -7,8 +7,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/sunxi/92-Account-Center/session-service/internal/model"
-	"github.com/sunxi/92-Account-Center/session-service/internal/repository"
+	"github.com/trigold786/92-Account-Center/session-service/internal/model"
+	"github.com/trigold786/92-Account-Center/session-service/internal/repository"
 )
 
 var (

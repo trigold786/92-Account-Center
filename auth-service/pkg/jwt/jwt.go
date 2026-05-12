@@ -7,97 +7,90 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// JWTManager manages JWT token generation and validation
 type JWTManager struct {
-	secretKey        string
-	accessTokenExpiry  time.Duration
-	refreshTokenExpiry time.Duration
+	accessSecret  string
+	refreshSecret string
+	accessExpiry  time.Duration
+	refreshExpiry time.Duration
 }
 
-// NewJWTManager creates a new JWT manager
-func NewJWTManager(secretKey string, accessTokenExpiry, refreshTokenExpiry time.Duration) *JWTManager {
-	return &JWTManager{
-		secretKey:        secretKey,
-		accessTokenExpiry:  accessTokenExpiry,
-		refreshTokenExpiry: refreshTokenExpiry,
-	}
-}
-
-// Claims represents the JWT claims
 type Claims struct {
-	UserID   int64  `json:"user_id"`
+	UserID    int64  `json:"user_id"`
 	AccountID string `json:"account_id"`
 	jwt.RegisteredClaims
 }
 
-// GenerateTokenPair generates access and refresh tokens for a user
-func (m *JWTManager) GenerateTokenPair(userID int64, accountID string) (string, string, error) {
-	// Generate access token
-	accessClaims := Claims{
-		UserID:   userID,
-		AccountID: accountID,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(m.accessTokenExpiry)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-		},
+func NewJWTManager(accessSecret, refreshSecret string) *JWTManager {
+	return &JWTManager{
+		accessSecret:  accessSecret,
+		refreshSecret: refreshSecret,
+		accessExpiry:  24 * time.Hour,
+		refreshExpiry: 7 * 24 * time.Hour,
 	}
-	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
-	accessTokenString, err := accessToken.SignedString([]byte(m.secretKey))
-	if err != nil {
-		return "", "", err
-	}
-
-	// Generate refresh token
-	refreshClaims := Claims{
-		UserID:   userID,
-		AccountID: accountID,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(m.refreshTokenExpiry)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-		},
-	}
-	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
-	refreshTokenString, err := refreshToken.SignedString([]byte(m.secretKey))
-	if err != nil {
-		return "", "", err
-	}
-
-	return accessTokenString, refreshTokenString, nil
 }
 
-// ValidateToken validates a token and returns the claims
-func (m *JWTManager) ValidateToken(token string) (*Claims, error) {
-	tokenClaims := &Claims{}
-	_, err := jwt.ParseWithClaims(token, tokenClaims, func(token *jwt.Token) (interface{}, error) {
-		return []byte(m.secretKey), nil
+func (m *JWTManager) GenerateTokenPair(userID int64, accountID string) (string, string, error) {
+	accessToken, err := m.generateToken(userID, accountID, m.accessSecret, m.accessExpiry)
+	if err != nil {
+		return "", "", err
+	}
+
+	refreshToken, err := m.generateToken(userID, accountID, m.refreshSecret, m.refreshExpiry)
+	if err != nil {
+		return "", "", err
+	}
+
+	return accessToken, refreshToken, nil
+}
+
+func (m *JWTManager) ValidateToken(tokenString string) (*Claims, error) {
+	claims := &Claims{}
+	_, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+		return []byte(m.refreshSecret), nil
+	})
+	if err != nil {
+		claims2, err2 := m.validateAccessToken(tokenString)
+		if err2 != nil {
+			return nil, err
+		}
+		return claims2, nil
+	}
+	return claims, nil
+}
+
+func (m *JWTManager) validateAccessToken(tokenString string) (*Claims, error) {
+	claims := &Claims{}
+	_, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+		return []byte(m.accessSecret), nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	return tokenClaims, nil
+	return claims, nil
 }
 
-// RefreshAccessToken generates a new access token using a valid refresh token
 func (m *JWTManager) RefreshAccessToken(refreshToken string) (string, error) {
-	claims, err := m.ValidateToken(refreshToken)
+	claims := &Claims{}
+	_, err := jwt.ParseWithClaims(refreshToken, claims, func(token *jwt.Token) (interface{}, error) {
+		return []byte(m.refreshSecret), nil
+	})
 	if err != nil {
-		return "", err
+		return "", errors.New("invalid refresh token")
 	}
 
-	// Generate new access token
-	accessClaims := Claims{
-		UserID:   claims.UserID,
-		AccountID: claims.AccountID,
+	return m.generateToken(claims.UserID, claims.AccountID, m.accessSecret, m.accessExpiry)
+}
+
+func (m *JWTManager) generateToken(userID int64, accountID, secret string, expiry time.Duration) (string, error) {
+	claims := Claims{
+		UserID:    userID,
+		AccountID: accountID,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(m.accessTokenExpiry)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiry)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
-	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
-	accessTokenString, err := accessToken.SignedString([]byte(m.secretKey))
-	if err != nil {
-		return "", err
-	}
 
-	return accessTokenString, nil
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(secret))
 }

@@ -1,0 +1,19 @@
+# Environment / Secrets
+.env
+.env.secrets
+*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Go
+*.exe
+*.test
+*.out

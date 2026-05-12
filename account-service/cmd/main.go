@@ -10,10 +10,10 @@ import (
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
 
-	"account-center/account-service/internal/handler"
-	"account-center/account-service/internal/repository"
-	"account-center/account-service/internal/service"
-	"account-center/account-service/pkg/crypto"
+	"github.com/trigold786/92-Account-Center/account-service/internal/handler"
+	"github.com/trigold786/92-Account-Center/account-service/internal/repository"
+	"github.com/trigold786/92-Account-Center/account-service/internal/service"
+	"github.com/trigold786/92-Account-Center/account-service/pkg/sms"
 )
 
 func main() {
@@ -36,29 +36,32 @@ func main() {
 	log.Println("Connected to database")
 
 	userRepo := repository.NewUserRepository(db)
-	userService := service.NewUserService(userRepo)
+	smsClient := sms.NewClient(getEnv("SMS_SERVICE_URL", "http://localhost:8083"))
+	userService := service.NewUserService(userRepo, smsClient)
+
 	registerHandler := handler.NewRegisterHandler(userService)
 	passwordHandler := handler.NewPasswordHandler(userService)
 	deletionHandler := handler.NewDeletionHandler(userService)
-
-	encryptor := crypto.NewEncryptor()
 
 	r := gin.Default()
 
 	accountGroup := r.Group("/api/v1/account")
 	{
-		accountGroup.POST("/register/send-sms-code", registerHandler.SendSMSCode)
-		accountGroup.POST("/register/phone", registerHandler.Register)
+		accountGroup.POST("/register", registerHandler.Register)
 
 		accountGroup.POST("/password/send-verification-code", passwordHandler.SendVerificationCode)
 		accountGroup.POST("/password/change", passwordHandler.ChangePassword)
 
-		accountGroup.POST("/delete/send-verification-code", deletionHandler.SendVerificationCode)
-		accountGroup.POST("/delete", deletionHandler.DeleteAccount)
-		accountGroup.POST("/delete/cancel", deletionHandler.CancelDeletion)
+		accountGroup.POST("/deletion/request", deletionHandler.RequestDeletion)
+		accountGroup.POST("/deletion/cancel", deletionHandler.CancelDeletion)
+		accountGroup.GET("/deletion/status", deletionHandler.GetDeletionStatus)
 	}
 
-	port := getEnv("PORT", "8081")
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok"})
+	})
+
+	port := getEnv("PORT", "30301")
 	log.Printf("Account service starting on :%s", port)
 
 	go func() {

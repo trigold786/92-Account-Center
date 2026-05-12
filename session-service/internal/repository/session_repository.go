@@ -9,7 +9,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	"github.com/sunxi/92-Account-Center/session-service/internal/model"
+	"github.com/trigold786/92-Account-Center/session-service/internal/model"
 )
 
 var ErrSessionNotFound = errors.New("session not found")

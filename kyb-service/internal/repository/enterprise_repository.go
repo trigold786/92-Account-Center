@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"account-center/kyb-service/internal/model"
+	"github.com/trigold786/92-Account-Center/kyb-service/internal/model"
 )
 
 type EnterpriseRepository interface {

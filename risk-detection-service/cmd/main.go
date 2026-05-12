@@ -3,17 +3,25 @@ package main
 import (
 	"database/sql"
 	"log"
+	"os"
 
-	"risk-detection-service/internal/handler"
-	"risk-detection-service/internal/repository"
-	"risk-detection-service/internal/service"
+	"github.com/trigold786/92-Account-Center/risk-detection-service/internal/handler"
+	"github.com/trigold786/92-Account-Center/risk-detection-service/internal/repository"
+	"github.com/trigold786/92-Account-Center/risk-detection-service/internal/service"
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
 )
 
 func main() {
-	db, err := sql.Open("postgres", "postgres://localhost:5432/account_center?sslmode=disable")
+	dbHost := getEnv("DB_HOST", "localhost")
+	dbPort := getEnv("DB_PORT", "5432")
+	dbUser := getEnv("DB_USER", "postgres")
+	dbPassword := getEnv("DB_PASSWORD", "postgres")
+	dbName := getEnv("DB_NAME", "account_center")
+
+	dsn := "host=" + dbHost + " port=" + dbPort + " user=" + dbUser + " password=" + dbPassword + " dbname=" + dbName + " sslmode=disable"
+	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
@@ -30,10 +38,22 @@ func main() {
 
 	r := gin.Default()
 
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok"})
+	})
+
 	riskHandler.RegisterRoutes(r)
 
-	log.Println("Risk Detection Service starting on :8085")
-	if err := r.Run(":8085"); err != nil {
+	port := getEnv("PORT", "30306")
+	log.Printf("Risk Detection Service starting on :%s", port)
+	if err := r.Run(":" + port); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
+}
+
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
 }

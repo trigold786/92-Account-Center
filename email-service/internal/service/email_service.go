@@ -8,8 +8,8 @@ import (
 	"math/big"
 	"time"
 
-	"account-center/email-service/internal/model"
-	"account-center/email-service/internal/provider"
+	"github.com/trigold786/92-Account-Center/email-service/internal/model"
+	"github.com/trigold786/92-Account-Center/email-service/internal/provider"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/redis/go-redis/v9"
@@ -100,7 +100,7 @@ func (s *emailService) SendOTP(ctx context.Context, email string) (*model.OTPRes
 func (s *emailService) VerifyOTP(ctx context.Context, email, code string) (bool, error) {
 	otpKey := otpKeyPrefix + email
 
-	storedOTP, err := s.redisClient.Get(ctx, otpKey).String()
+	storedOTP, err := s.redisClient.Get(ctx, otpKey).Result()
 	if err != nil {
 		if err == redis.Nil {
 			return false, ErrInvalidOTP

@@ -11,10 +11,14 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /device-fingerprint-service ./cmd/main.
 
 FROM alpine:latest
 
-RUN apk --no-cache add ca-certificates tzdata
+RUN apk --no-cache add ca-certificates tzdata wget
 
 COPY --from=builder /device-fingerprint-service /usr/local/bin/device-fingerprint-service
 
-EXPOSE 8089
+EXPOSE 30309
+USER nobody
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --spider -q http://127.0.0.1:30309/health || exit 1
 
 CMD ["device-fingerprint-service"]

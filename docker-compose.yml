@@ -1,39 +1,63 @@
 version: '3.8'
 
+networks:
+  app_network:
+    driver: bridge
+
 services:
   postgres:
     image: postgres:15-alpine
+    container_name: postgres
     environment:
       POSTGRES_DB: account_center
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "5432:5432"
+      - "20002:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./migrations:/docker-entrypoint-initdb.d
+    networks:
+      - app_network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    restart: always
 
   redis:
     image: redis:7-alpine
+    container_name: redis
     ports:
-      - "6379:6379"
+      - "20003:6379"
     volumes:
       - redis_data:/data
+    networks:
+      - app_network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 256M
+    restart: always
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_started
     ports:
       - "9092:9092"
     environment:
@@ -41,111 +65,243 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - app_network
     healthcheck:
       test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
       interval: 30s
       timeout: 10s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+    restart: always
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
     ports:
       - "2181:2181"
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - app_network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 256M
+    restart: always
 
   api-gateway:
     build:
       context: ./api-gateway
       dockerfile: Dockerfile
+    container_name: api-gateway
     ports:
-      - "8080:8080"
+      - "30300:30300"
     environment:
-      ACCOUNT_SERVICE_URL: http://account-service:8081
-      AUTH_SERVICE_URL: http://auth-service:8082
-      SMS_SERVICE_URL: http://sms-email-service:8083
-      KYB_SERVICE_URL: http://kyb-service:8084
-      AUDIT_SERVICE_URL: http://audit-log-service:8085
-      RISK_SERVICE_URL: http://risk-detection-service:8086
-      SESSION_SERVICE_URL: http://session-service:8087
-      EMAIL_SERVICE_URL: http://email-service:8088
-      DEVICE_SERVICE_URL: http://device-fingerprint-service:8089
+      ACCOUNT_SERVICE_URL: http://account-service:30301
+      AUTH_SERVICE_URL: http://auth-service:30302
+      SMS_SERVICE_URL: http://sms-email-service:30303
+      KYB_SERVICE_URL: http://kyb-service:30304
+      AUDIT_SERVICE_URL: http://audit-log-service:30305
+      RISK_SERVICE_URL: http://risk-detection-service:30306
+      SESSION_SERVICE_URL: http://session-service:30307
+      EMAIL_SERVICE_URL: http://email-service:30308
+      DEVICE_SERVICE_URL: http://device-fingerprint-service:30309
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      PORT: "30300"
+    networks:
+      - app_network
     depends_on:
-      - account-service
-      - auth-service
-      - sms-email-service
+      account-service:
+        condition: service_started
+      auth-service:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:30300/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 128M
+    restart: always
 
   account-service:
     build:
       context: ./account-service
       dockerfile: Dockerfile
+    container_name: account-service
     ports:
-      - "8081:8081"
+      - "30301:30301"
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: postgres
       DB_PASSWORD: postgres
       DB_NAME: account_center
+      SMS_SERVICE_URL: http://sms-email-service:30303
+      PORT: "30301"
+    networks:
+      - app_network
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:30301/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 256M
+    restart: always
 
   auth-service:
     build:
       context: ./auth-service
       dockerfile: Dockerfile
+    container_name: auth-service
     ports:
-      - "8082:8082"
+      - "30302:30302"
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: postgres
       DB_PASSWORD: postgres
       DB_NAME: account_center
-      JWT_ACCESS_SECRET: access-secret-key-change-in-production
-      JWT_REFRESH_SECRET: refresh-secret-key-change-in-production
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-access-secret-change-me}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-refresh-secret-change-me}
+      PORT: "30302"
+    networks:
+      - app_network
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:30302/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 256M
+    restart: always
 
   sms-email-service:
     build:
       context: ./sms-email-service
       dockerfile: Dockerfile
+    container_name: sms-email-service
     ports:
-      - "8083:8083"
+      - "30303:30303"
+    environment:
+      REDIS_ADDR: redis:6379
+      ALIYUN_ACCESS_KEY_ID: ${ALIYUN_ACCESS_KEY_ID:-}
+      ALIYUN_ACCESS_KEY_SECRET: ${ALIYUN_ACCESS_KEY_SECRET:-}
+      ALIYUN_SIGN_NAME: 速通互联验证码
+      SMTP_HOST: smtp.163.com
+      SMTP_PORT: "465"
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-noreply@accountcenter.com}
+      PORT: "30303"
+    networks:
+      - app_network
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:30303/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 256M
+    restart: always
 
   device-fingerprint-service:
     build:
       context: ./device-fingerprint-service
       dockerfile: Dockerfile
+    container_name: device-fingerprint-service
     ports:
-      - "8089:8089"
+      - "30309:30309"
+    environment:
+      TRUST_DAYS: "3"
+      PORT: "30309"
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:30309/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 128M
+    restart: always
 
   kyb-service:
     build:
       context: ./kyb-service
       dockerfile: Dockerfile
+    container_name: kyb-service
     ports:
-      - "8084:8084"
+      - "30304:30304"
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: postgres
       DB_PASSWORD: postgres
       DB_NAME: account_center
+      PORT: "30304"
+    networks:
+      - app_network
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:30304/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 256M
+    restart: always
 
   audit-log-service:
     build:
       context: ./audit-log-service
       dockerfile: Dockerfile
+    container_name: audit-log-service
     ports:
-      - "8085:8085"
+      - "30305:30305"
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
@@ -155,54 +311,124 @@ services:
       KAFKA_BROKERS: kafka:9092
       KAFKA_AUDIT_TOPIC: audit-logs
       KAFKA_GROUP_ID: audit-log-service
+      PORT: "30305"
+    networks:
+      - app_network
     depends_on:
       postgres:
         condition: service_healthy
       kafka:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:30305/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 256M
+    restart: always
 
   email-service:
     build:
       context: ./email-service
       dockerfile: Dockerfile
+    container_name: email-service
     ports:
-      - "8088:8088"
+      - "30308:30308"
     environment:
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      JWT_SECRET: email-jwt-secret-change-in-production
+      JWT_SECRET: ${EMAIL_JWT_SECRET:-email-jwt-secret-change-me}
+      SMTP_HOST: smtp.163.com
+      SMTP_PORT: "465"
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      FROM_ADDRESS: ${SMTP_FROM:-noreply@accountcenter.com}
+      EMAIL_PROVIDER: smtp
+      PORT: "30308"
+    networks:
+      - app_network
     depends_on:
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:30308/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 256M
+    restart: always
 
   risk-detection-service:
     build:
       context: ./risk-detection-service
       dockerfile: Dockerfile
+    container_name: risk-detection-service
     ports:
-      - "8086:8086"
+      - "30306:30306"
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: postgres
       DB_PASSWORD: postgres
       DB_NAME: account_center
+      PORT: "30306"
+    networks:
+      - app_network
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:30306/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 256M
+    restart: always
 
   session-service:
     build:
       context: ./session-service
       dockerfile: Dockerfile
+    container_name: session-service
     ports:
-      - "8087:8087"
+      - "30307:30307"
     environment:
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      MAX_CONCURRENT_SESSIONS: "5"
+      PORT: "30307"
+    networks:
+      - app_network
     depends_on:
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:30307/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 128M
+    restart: always
 
 volumes:
   postgres_data:

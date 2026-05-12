@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	"risk-detection-service/internal/model"
+	"github.com/trigold786/92-Account-Center/risk-detection-service/internal/model"
 )
 
 type RiskRepository struct {

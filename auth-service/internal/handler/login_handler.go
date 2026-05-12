@@ -2,22 +2,22 @@ package handler
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/sunxi/92-Account-Center/auth-service/internal/model"
-	"github.com/sunxi/92-Account-Center/auth-service/internal/service"
+	"github.com/trigold786/92-Account-Center/auth-service/internal/model"
+	"github.com/trigold786/92-Account-Center/auth-service/internal/service"
 )
 
-// LoginRequest represents the request body for login.
 type LoginRequest struct {
-	Credential string `json:"credential" binding:"required"`
-	Password   string `json:"password,omitempty"`
-	Code       string `json:"code,omitempty"` // For SMS/email OTP
-	MagicLink  string `json:"magic_link,omitempty"` // For magic link login
+	Credential          string `json:"credential" binding:"required"`
+	Password            string `json:"password,omitempty"`
+	Code                string `json:"code,omitempty"`
+	MagicLink           string `json:"magic_link,omitempty"`
+	DeviceFingerprintID string `json:"device_fingerprint_id,omitempty"`
 }
 
-// LoginResponse represents the response for login.
 type LoginResponse struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
@@ -26,17 +26,14 @@ type LoginResponse struct {
 	AccountID    string `json:"account_id"`
 }
 
-// LoginHandler handles login requests.
 type LoginHandler struct {
 	authService service.AuthService
 }
 
-// NewLoginHandler creates a new LoginHandler.
 func NewLoginHandler(authService service.AuthService) *LoginHandler {
 	return &LoginHandler{authService: authService}
 }
 
-// Login handles the login endpoint.
 func (h *LoginHandler) Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -45,10 +42,11 @@ func (h *LoginHandler) Login(c *gin.Context) {
 	}
 
 	resp, err := h.authService.Login(c.Request.Context(), &model.LoginRequest{
-		Credential: req.Credential,
-		Password:   req.Password,
-		Code:       req.Code,
-		MagicLink:  req.MagicLink,
+		Credential:          req.Credential,
+		Password:            req.Password,
+		Code:                req.Code,
+		MagicLink:           req.MagicLink,
+		DeviceFingerprintID: req.DeviceFingerprintID,
 	})
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
@@ -64,7 +62,6 @@ func (h *LoginHandler) Login(c *gin.Context) {
 	})
 }
 
-// RefreshToken handles the token refresh endpoint.
 func (h *LoginHandler) RefreshToken(c *gin.Context) {
 	var req struct {
 		RefreshToken string `json:"refresh_token" binding:"required"`
@@ -87,4 +84,31 @@ func (h *LoginHandler) RefreshToken(c *gin.Context) {
 		UserID:       resp.UserID,
 		AccountID:    resp.AccountID,
 	})
+}
+
+func (h *LoginHandler) Logout(c *gin.Context) {
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing authorization header"})
+		return
+	}
+
+	parts := strings.SplitN(authHeader, " ", 2)
+	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authorization header format"})
+		return
+	}
+
+	accessToken := parts[1]
+	if accessToken == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "empty token"})
+		return
+	}
+
+	if err := h.authService.Logout(c.Request.Context(), accessToken); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "logged out successfully"})
 }

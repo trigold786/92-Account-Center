@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sunxi/92-Account-Center/email-service/internal/model"
+	"github.com/trigold786/92-Account-Center/email-service/internal/model"
 )
 
 type SESProvider struct {

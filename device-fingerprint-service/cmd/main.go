@@ -4,16 +4,22 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 
 	"github.com/gin-gonic/gin"
 
-	"account-center/device-fingerprint-service/internal/handler"
-	"account-center/device-fingerprint-service/internal/service"
+	"github.com/trigold786/92-Account-Center/device-fingerprint-service/internal/handler"
+	"github.com/trigold786/92-Account-Center/device-fingerprint-service/internal/service"
 )
 
 func main() {
-	deviceService := service.NewDeviceService()
+	trustDays := getEnvInt("TRUST_DAYS", 3)
+	riskThreshold := 0.3
+
+	var repo service.DeviceFingerprintRepository
+
+	deviceService := service.NewDeviceFingerprintService(repo, trustDays, riskThreshold)
 	deviceHandler := handler.NewDeviceHandler(deviceService)
 
 	r := gin.Default()
@@ -27,7 +33,11 @@ func main() {
 		deviceGroup.DELETE("/:device_id", deviceHandler.RemoveDevice)
 	}
 
-	port := getEnv("PORT", "8089")
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok"})
+	})
+
+	port := getEnv("PORT", "30309")
 	log.Printf("Device fingerprint service starting on :%s", port)
 
 	go func() {
@@ -48,4 +58,16 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+func getEnvInt(key string, defaultValue int) int {
+	v := os.Getenv(key)
+	if v == "" {
+		return defaultValue
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return defaultValue
+	}
+	return n
 }

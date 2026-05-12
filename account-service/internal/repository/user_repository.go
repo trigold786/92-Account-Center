@@ -3,11 +3,11 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"time"
 
-	"github.com/sunxi/92-Account-Center/account-service/internal/model"
+	"github.com/trigold786/92-Account-Center/account-service/internal/model"
 )
 
-// UserRepository defines the interface for user data access.
 type UserRepository interface {
 	Create(ctx context.Context, user *model.User) error
 	GetByPhoneNumber(ctx context.Context, phoneNumber string) (*model.User, error)
@@ -17,7 +17,10 @@ type UserRepository interface {
 	Update(ctx context.Context, user *model.User) error
 	ExistsByPhoneNumber(ctx context.Context, phoneNumber string) (bool, error)
 	ExistsByAccountID(ctx context.Context, accountID string) (bool, error)
+	ExistsByEmail(ctx context.Context, email string) (bool, error)
 	PermanentDelete(ctx context.Context, userID int64) error
+	UpdateEmail(ctx context.Context, id int64, email string) error
+	UpdatePhone(ctx context.Context, id int64, phone string) error
 }
 
 // userRepository implements UserRepository using PostgreSQL.
@@ -87,19 +90,24 @@ func (r *userRepository) GetByAccountID(ctx context.Context, accountID string) (
 	return user, nil
 }
 
-// GetByEmail retrieves a user by email (phone number in our schema).
-// Note: In our current schema, we use phone_number for email as well for simplicity.
-// A production system would have a separate email field.
 func (r *userRepository) GetByEmail(ctx context.Context, email string) (*model.User, error) {
 	user := &model.User{}
-	query := `SELECT id, phone_number, account_id, password_hash, created_at, updated_at FROM users WHERE phone_number = $1`
+	query := `SELECT id, phone_number, account_id, email, password_hash, mfa_enabled, mfa_secret, last_strong_auth_at, created_at, updated_at, deletion_requested_at, deletion_expires_at, deletion_cancelled_at, deletion_deleted_at FROM users WHERE email = $1`
 	err := r.db.QueryRowContext(ctx, query, email).Scan(
 		&user.ID,
 		&user.PhoneNumber,
 		&user.AccountID,
+		&user.Email,
 		&user.PasswordHash,
+		&user.MFAEnabled,
+		&user.MFASecret,
+		&user.LastStrongAuthAt,
 		&user.CreatedAt,
 		&user.UpdatedAt,
+		&user.DeletionRequestedAt,
+		&user.DeletionExpiresAt,
+		&user.DeletionCancelledAt,
+		&user.DeletionDeletedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -129,6 +137,7 @@ func (r *userRepository) ExistsByAccountID(ctx context.Context, accountID string
 // GetByID retrieves a user by ID.
 func (r *userRepository) GetByID(ctx context.Context, userID string) (*model.User, error) {
 	var id int64
+	user := &model.User{}
 	query := `SELECT id, phone_number, account_id, password_hash, created_at, updated_at FROM users WHERE id = $1`
 	err := r.db.QueryRowContext(ctx, query, userID).Scan(
 		&id,
@@ -169,6 +178,25 @@ func (r *userRepository) Update(ctx context.Context, user *model.User) error {
 		user.DeletionCancelledAt,
 		user.DeletionDeletedAt,
 	).Scan(&user.UpdatedAt)
+	return err
+}
+
+func (r *userRepository) ExistsByEmail(ctx context.Context, email string) (bool, error) {
+	var exists bool
+	query := `SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)`
+	err := r.db.QueryRowContext(ctx, query, email).Scan(&exists)
+	return exists, err
+}
+
+func (r *userRepository) UpdateEmail(ctx context.Context, id int64, email string) error {
+	query := `UPDATE users SET email = $2, updated_at = NOW() WHERE id = $1`
+	_, err := r.db.ExecContext(ctx, query, id, email)
+	return err
+}
+
+func (r *userRepository) UpdatePhone(ctx context.Context, id int64, phone string) error {
+	query := `UPDATE users SET phone_number = $2, updated_at = NOW() WHERE id = $1`
+	_, err := r.db.ExecContext(ctx, query, id, phone)
 	return err
 }
 

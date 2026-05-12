@@ -5,8 +5,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/sunxi/92-Account-Center/session-service/internal/model"
-	"github.com/sunxi/92-Account-Center/session-service/internal/service"
+	"github.com/trigold786/92-Account-Center/session-service/internal/model"
+	"github.com/trigold786/92-Account-Center/session-service/internal/service"
 )
 
 type SessionHandler struct {

@@ -3,15 +3,14 @@ package service
 import (
 	"context"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
 
-	"account-center/audit-log-service/internal/model"
-	"account-center/audit-log-service/internal/repository"
-
-	"golang.org/x/crypto/sm3"
+	"github.com/google/uuid"
+	"github.com/trigold786/92-Account-Center/audit-log-service/internal/model"
+	"github.com/trigold786/92-Account-Center/audit-log-service/internal/repository"
+	"github.com/trigold786/92-Account-Center/audit-log-service/pkg/crypto"
 )
 
 var (
@@ -228,16 +227,11 @@ func (s *auditService) CleanupOldLogs(ctx context.Context, retentionDays int) (*
 }
 
 func computeSM3Hash(data string) string {
-	h := sm3.New()
+	h := crypto.NewSM3()
 	h.Write([]byte(data))
 	return hex.EncodeToString(h.Sum(nil))
 }
 
 func generateUUID() string {
-	return fmt.Sprintf("%d-%d-%d-%d",
-		time.Now().UnixNano()%1000000,
-		time.Now().Unix()%100000,
-		time.Now().UnixNano()%100000,
-		time.Now().UnixNano()%1000000,
-	)
+	return uuid.New().String()
 }

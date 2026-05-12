@@ -11,10 +11,10 @@ import (
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
 
-	"account-center/audit-log-service/internal/handler"
-	"account-center/audit-log-service/internal/repository"
-	"account-center/audit-log-service/internal/service"
-	"account-center/audit-log-service/pkg/kafka"
+	"github.com/trigold786/92-Account-Center/audit-log-service/internal/handler"
+	"github.com/trigold786/92-Account-Center/audit-log-service/internal/repository"
+	"github.com/trigold786/92-Account-Center/audit-log-service/internal/service"
+	"github.com/trigold786/92-Account-Center/audit-log-service/pkg/kafka"
 )
 
 func main() {
@@ -42,7 +42,7 @@ func main() {
 
 	r := gin.Default()
 
-	auditGroup := r.Group("/audit")
+	auditGroup := r.Group("/api/v1/audit")
 	{
 		auditGroup.POST("/logs", auditHandler.RecordLog)
 		auditGroup.POST("/logs/batch", auditHandler.RecordBatch)
@@ -52,18 +52,17 @@ func main() {
 		auditGroup.POST("/logs/cleanup", auditHandler.CleanupOldLogs)
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	kafkaBrokers := []string{getEnv("KAFKA_BROKERS", "localhost:9092")}
 	kafkaTopic := getEnv("KAFKA_AUDIT_TOPIC", "audit-logs")
 	kafkaGroupID := getEnv("KAFKA_GROUP_ID", "audit-log-service")
 
-	var consumer *kafka.AuditLogConsumer
-	consumer, err = kafka.NewAuditLogConsumer(kafkaBrokers, kafkaGroupID, kafkaTopic, auditService)
+	consumer, err := kafka.NewAuditLogConsumer(kafkaBrokers, kafkaGroupID, kafkaTopic, auditService)
 	if err != nil {
 		log.Printf("Warning: Failed to create Kafka consumer: %v (continuing without Kafka)", err)
 	} else {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
 		if err := consumer.Start(ctx); err != nil {
 			log.Printf("Warning: Failed to start Kafka consumer: %v", err)
 		} else {
@@ -77,9 +76,14 @@ func main() {
 		<-sigChan
 		log.Println("Shutting down...")
 		cancel()
+		os.Exit(0)
 	}()
 
-	port := getEnv("PORT", "8080")
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok"})
+	})
+
+	port := getEnv("PORT", "30305")
 	log.Printf("Audit log service starting on :%s", port)
 	if err := r.Run(":" + port); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
