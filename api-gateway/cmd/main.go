@@ -183,6 +183,7 @@ func main() {
 		"/api/v1/sms/":               true,
 		"/api/v1/email/otp/send":     true,
 		"/api/v1/email/magic-link/":  true,
+		"/metrics":                   true,
 	}
 
 	r.Use(func(c *gin.Context) {
