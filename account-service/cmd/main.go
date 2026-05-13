@@ -57,7 +57,7 @@ func main() {
 		accountGroup.GET("/deletion/status", deletionHandler.GetDeletionStatus)
 	}
 
-	r.GET("/health", func(c *gin.Context) {
+	r.Any("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 

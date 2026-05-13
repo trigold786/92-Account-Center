@@ -47,15 +47,6 @@ func NewAuthService(userRepo UserRepository, jwtMgr *jwt.JWTManager, rdb *redis.
 	}
 }
 
-func NewAuthService(userRepo UserRepository, jwtMgr *jwt.JWTManager, rdb *redis.Client) AuthService {
-	return &authService{
-		userRepo:      userRepo,
-		jwtMgr:        jwtMgr,
-		loginAttempts: make(map[string]*loginAttempt),
-		rdb:           rdb,
-	}
-}
-
 func (s *authService) isLocked(credential string) bool {
 	if s.rdb == nil {
 		return false

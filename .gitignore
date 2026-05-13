@@ -17,3 +17,13 @@ Thumbs.db
 *.exe
 *.test
 *.out
+account-service/account-service
+api-gateway/api-gateway
+audit-log-service/audit-log-service
+auth-service/auth-service
+device-fingerprint-service/device-fingerprint-service
+email-service/email-service
+kyb-service/kyb-service
+risk-detection-service/risk-detection-service
+session-service/session-service
+sms-email-service/sms-email-service

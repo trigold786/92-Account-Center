@@ -210,10 +210,10 @@ func main() {
 	r.Any("/api/v1/email/*path", proxyHandler(getEnv("EMAIL_SERVICE_URL", "http://localhost:30308")))
 	r.Any("/api/v1/device/*path", proxyHandler(getEnv("DEVICE_SERVICE_URL", "http://localhost:30309")))
 
-	r.GET("/health", func(c *gin.Context) {
+	r.Any("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
-	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
+	r.Any("/metrics", gin.WrapH(promhttp.Handler()))
 
 	port := getEnv("PORT", "30300")
 	srv := &http.Server{
