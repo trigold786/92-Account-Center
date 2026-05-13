@@ -20,7 +20,6 @@ import (
 
 	"context"
 	"github.com/gin-gonic/gin"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 type GatewayConfig struct {
@@ -183,7 +182,6 @@ func main() {
 		"/api/v1/sms/":               true,
 		"/api/v1/email/otp/send":     true,
 		"/api/v1/email/magic-link/":  true,
-		"/metrics":                   true,
 	}
 
 	r.Use(func(c *gin.Context) {
@@ -213,7 +211,6 @@ func main() {
 	r.Any("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
-	r.Any("/metrics", gin.WrapH(promhttp.Handler()))
 
 	port := getEnv("PORT", "30300")
 	srv := &http.Server{
