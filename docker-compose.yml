@@ -13,7 +13,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     networks:
       - app_network
     healthcheck:
@@ -55,7 +55,8 @@ services:
       dockerfile: Dockerfile
     container_name: db-migrate
     environment:
-      DATABASE_URL: "postgres://postgres:postgres@postgres:5432/account_center?sslmode=disable"
+      GOOSE_DRIVER: postgres
+      GOOSE_DBSTRING: "postgres://postgres:postgres@postgres:5432/account_center?sslmode=disable"
     networks:
       - app_network
     depends_on:
@@ -78,7 +79,7 @@ services:
       CREDIT_SERVICE_URL: "http://credit-service:30312"
       COMPLIANCE_SERVICE_URL: "http://compliance-service:30313"
       DATA_PRODUCT_SERVICE_URL: "http://data-product-service:30314"
-      JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-change-in-production}
+      JWT_SECRET: ${JWT_SECRET:-dev-access-secret}
       PORT: "30300"
     networks:
       - app_network

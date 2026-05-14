@@ -246,10 +246,10 @@ func (s *authService) verifyMFA(ctx context.Context, user *model.User, req *mode
 	if !user.MFAEnabled {
 		return true
 	}
-	if req.Code == "" {
+	if req.Code == "" || user.MFASecret == nil {
 		return false
 	}
-	return VerifyTOTPCode(user.MFASecret, req.Code)
+	return VerifyTOTPCode(*user.MFASecret, req.Code)
 }
 
 func sm3Hash(data []byte) string {

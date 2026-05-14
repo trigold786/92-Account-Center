@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     phone_number VARCHAR(20) UNIQUE NOT NULL,
@@ -85,3 +86,10 @@ CREATE TABLE risk_events (
 
 CREATE INDEX idx_risk_events_user_id ON risk_events(user_id);
 CREATE INDEX idx_risk_events_created_at ON risk_events(created_at);
+
+-- +goose Down
+DROP TABLE IF EXISTS risk_events;
+DROP TABLE IF EXISTS audit_logs;
+DROP TABLE IF EXISTS sub_accounts;
+DROP TABLE IF EXISTS enterprises;
+DROP TABLE IF EXISTS users;
