@@ -1,55 +1,107 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"database/sql"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
+	"sync/atomic"
 	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	_ "github.com/lib/pq"
+
+	"github.com/trigold786/92-Account-Center/data-product-service/internal/handler"
+	"github.com/trigold786/92-Account-Center/data-product-service/internal/repository"
+	"github.com/trigold786/92-Account-Center/data-product-service/internal/service"
 )
 
+var requestCount uint64
+
 func main() {
-	port := os.Getenv("DATA_PRODUCT_PORT")
-	if port == "" {
-		port = "30314"
+	dbHost := getEnv("DB_HOST", "localhost")
+	dbPort := getEnv("DB_PORT", "5432")
+	dbUser := getEnv("DB_USER", "postgres")
+	dbPassword := getEnv("DB_PASSWORD", "postgres")
+	dbName := getEnv("DB_NAME", "account_center")
+
+	dsn := "host=" + dbHost + " port=" + dbPort + " user=" + dbUser + " password=" + dbPassword + " dbname=" + dbName + " sslmode=disable"
+	db, err := sql.Open("postgres", dsn)
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
 	}
+	defer db.Close()
+	if err := db.Ping(); err != nil {
+		log.Fatalf("Failed to ping database: %v", err)
+	}
+	log.Println("Connected to database")
 
-	gin.SetMode(gin.ReleaseMode)
-	r := gin.New()
-	r.Use(gin.Recovery())
+	dataRepo := repository.NewDataRepository(db)
+	rfmSvc := service.NewRFMService(dataRepo)
+	dashSvc := service.NewDashboardService(dataRepo, rfmSvc)
 
-	r.Any("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"status":  "healthy",
-			"service": "data-product-service",
-		})
+	rfmHandler := handler.NewRFMHandler(rfmSvc)
+	dashHandler := handler.NewDashboardHandler(dashSvc)
+	funnelHandler := handler.NewFunnelHandler(dashSvc)
+
+	r := gin.Default()
+
+	r.Use(func(c *gin.Context) {
+		atomic.AddUint64(&requestCount, 1)
+		c.Next()
 	})
 
-	srv := &http.Server{
-		Addr:    ":" + port,
-		Handler: r,
+	dataGroup := r.Group("/api/v1/data")
+	{
+		dataGroup.GET("/rfm/:user_id", rfmHandler.GetRFM)
+		dataGroup.POST("/rfm/batch", rfmHandler.GetRFMBatch)
+		dataGroup.GET("/dashboard/overview", dashHandler.GetOverview)
+		dataGroup.GET("/funnel/subscription", funnelHandler.GetSubscriptionFunnel)
 	}
+
+	r.GET("/metrics", func(c *gin.Context) {
+		var buf bytes.Buffer
+		fmt.Fprintf(&buf, "# HELP http_requests_total Total HTTP requests\n")
+		fmt.Fprintf(&buf, "# TYPE http_requests_total counter\n")
+		fmt.Fprintf(&buf, "http_requests_total{service=\"data-product-service\"} %d\n", atomic.LoadUint64(&requestCount))
+		fmt.Fprintf(&buf, "# HELP go_goroutines Number of goroutines\n")
+		fmt.Fprintf(&buf, "# TYPE go_goroutines gauge\n")
+		fmt.Fprintf(&buf, "go_goroutines{service=\"data-product-service\"} %d\n", runtime.NumGoroutine())
+		c.Data(http.StatusOK, "text/plain; version=0.0.4", buf.Bytes())
+	})
+
+	r.Any("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
+
+	port := getEnv("PORT", "30314")
+	srv := &http.Server{Addr: ":" + port, Handler: r}
 
 	go func() {
-		log.Printf("data-product-service starting on :%s", port)
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("listen: %s\n", err)
-		}
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+		<-sigChan
+		log.Println("Shutting down...")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		srv.Shutdown(shutdownCtx)
 	}()
 
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-	log.Println("shutting down data-product-service...")
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatal("forced shutdown:", err)
+	log.Printf("Data product service starting on :%s", port)
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatalf("Failed to start server: %v", err)
 	}
-	log.Println("data-product-service exited")
+}
+
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
 }

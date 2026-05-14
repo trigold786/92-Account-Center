@@ -1,14 +1,18 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -22,6 +26,8 @@ import (
 	"github.com/trigold786/92-Account-Center/compliance-service/pkg/crypto"
 	"github.com/trigold786/92-Account-Center/compliance-service/pkg/mq"
 )
+
+var requestCount uint64
 
 func main() {
 	dbHost := getEnv("DB_HOST", "localhost")
@@ -79,6 +85,11 @@ func main() {
 
 	r := gin.Default()
 
+	r.Use(func(c *gin.Context) {
+		atomic.AddUint64(&requestCount, 1)
+		c.Next()
+	})
+
 	riskHandler.RegisterRoutes(r)
 
 	auditGroup := r.Group("/api/v1/audit")
@@ -127,6 +138,17 @@ func main() {
 			c.JSON(200, gin.H{"blocked": !allowed, "current_count": count, "limit": 3})
 		})
 	}
+
+	r.GET("/metrics", func(c *gin.Context) {
+		var buf bytes.Buffer
+		fmt.Fprintf(&buf, "# HELP http_requests_total Total HTTP requests\n")
+		fmt.Fprintf(&buf, "# TYPE http_requests_total counter\n")
+		fmt.Fprintf(&buf, "http_requests_total{service=\"compliance-service\"} %d\n", atomic.LoadUint64(&requestCount))
+		fmt.Fprintf(&buf, "# HELP go_goroutines Number of goroutines\n")
+		fmt.Fprintf(&buf, "# TYPE go_goroutines gauge\n")
+		fmt.Fprintf(&buf, "go_goroutines{service=\"compliance-service\"} %d\n", runtime.NumGoroutine())
+		c.Data(http.StatusOK, "text/plain; version=0.0.4", buf.Bytes())
+	})
 
 	r.Any("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
