@@ -12,10 +12,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/trigold786/92-Account-Center/credit-service/internal/handler"
 	"github.com/trigold786/92-Account-Center/credit-service/internal/repository"
 	"github.com/trigold786/92-Account-Center/credit-service/internal/service"
+	"github.com/trigold786/92-Account-Center/credit-service/internal/worker"
 )
 
 func main() {
@@ -31,25 +33,41 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer db.Close()
-
 	if err := db.Ping(); err != nil {
 		log.Fatalf("Failed to ping database: %v", err)
 	}
 	log.Println("Connected to database")
 
+	redisAddr := getEnv("REDIS_URL", "localhost:6379")
+	rdb := redis.NewClient(&redis.Options{Addr: redisAddr})
+	defer rdb.Close()
+	if err := rdb.Ping(context.Background()).Err(); err != nil {
+		log.Printf("Warning: Redis not available: %v", err)
+	}
+
 	creditRepo := repository.NewCreditRepository(db)
 	referralRepo := repository.NewReferralRepository(db)
 
-	creditService := service.NewCreditService(creditRepo, db)
-	referralService := service.NewReferralService(referralRepo)
+	creditSvc := service.NewCreditService(creditRepo, db)
+	referralSvc := service.NewReferralService(referralRepo)
+	rebateSvc := service.NewRebateService(creditRepo, referralRepo, creditSvc)
 
-	creditHandler := handler.NewCreditHandler(creditService)
-	referralHandler := handler.NewReferralHandler(referralService)
+	subWorker := worker.NewSubscriptionWorker(rdb, rebateSvc)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go subWorker.Start(ctx)
+
+	creditHandler := handler.NewCreditHandler(creditSvc)
+	referralHandler := handler.NewReferralHandler(referralSvc)
 
 	r := gin.Default()
 
-	r.GET("/api/v1/credits/:user_id/account", creditHandler.GetAccount)
-	r.GET("/api/v1/credits/:user_id/transactions", creditHandler.GetTransactions)
+	creditsGroup := r.Group("/api/v1/credits")
+	{
+		creditsGroup.GET("/:user_id/account", creditHandler.GetAccount)
+		creditsGroup.GET("/:user_id/transactions", creditHandler.GetTransactions)
+		creditsGroup.POST("/calculate-discount", creditHandler.CalculateDiscount)
+	}
 
 	internalCredits := r.Group("/internal/v1/credits")
 	{
@@ -58,36 +76,32 @@ func main() {
 		internalCredits.POST("/refund", creditHandler.RefundCredits)
 	}
 
-	r.POST("/api/v1/credits/calculate-discount", creditHandler.CalculateDiscount)
-
-	r.POST("/api/v1/referral/bind", referralHandler.BindReferral)
-	r.POST("/api/v1/referral/generate-link", referralHandler.GenerateLink)
-	r.GET("/api/v1/referral/:user_id/summary", referralHandler.GetSummary)
+	referralGroup := r.Group("/api/v1/referral")
+	{
+		referralGroup.POST("/bind", referralHandler.BindReferral)
+		referralGroup.POST("/generate-link", referralHandler.GenerateLink)
+		referralGroup.GET("/:user_id/summary", referralHandler.GetSummary)
+	}
 
 	r.Any("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
 	port := getEnv("PORT", "30312")
-	srv := &http.Server{
-		Addr:    ":" + port,
-		Handler: r,
-	}
+	srv := &http.Server{Addr: ":" + port, Handler: r}
 
 	go func() {
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 		<-sigChan
 		log.Println("Shutting down...")
-
+		cancel()
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer shutdownCancel()
-		if err := srv.Shutdown(shutdownCtx); err != nil {
-			log.Printf("Server forced shutdown: %v", err)
-		}
+		srv.Shutdown(shutdownCtx)
 	}()
 
-	log.Printf("Credit Service starting on :%s", port)
+	log.Printf("Credit service starting on :%s", port)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("Failed to start server: %v", err)
 	}

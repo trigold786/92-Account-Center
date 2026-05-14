@@ -58,7 +58,13 @@ func main() {
 	entitlementService := service.NewEntitlementService(entitlementRepo, entitlementCache)
 	subscriptionService := service.NewSubscriptionService(subscriptionRepo, userRepo, entitlementService)
 
-	registerHandler := handler.NewRegisterHandler(userService)
+	var referralBinder handler.ReferralBinder
+	creditServiceURL := getEnv("CREDIT_SERVICE_URL", "")
+	if creditServiceURL != "" {
+		referralBinder = service.NewReferralClient(creditServiceURL)
+	}
+
+	registerHandler := handler.NewRegisterHandler(userService, referralBinder)
 	passwordHandler := handler.NewPasswordHandler(userService)
 	deletionHandler := handler.NewDeletionHandler(userService)
 	tierHandler := handler.NewTierHandler(userRepo)

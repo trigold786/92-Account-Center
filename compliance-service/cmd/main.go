@@ -71,6 +71,12 @@ func main() {
 	kybService := service.NewKYBService(entRepo, encryptKey)
 	kybHandler := handler.NewKYBHandler(kybService)
 
+	blacklistRepo := repository.NewBlacklistRepository(db)
+	blacklistSvc := service.NewBlacklistService(blacklistRepo, rdb)
+	blacklistHandler := handler.NewBlacklistHandler(blacklistSvc)
+	windowLimiter := service.NewSlidingWindowLimiter(rdb)
+	_ = windowLimiter
+
 	r := gin.Default()
 
 	riskHandler.RegisterRoutes(r)
@@ -92,6 +98,34 @@ func main() {
 		kybGroup.POST("/micro-payment/verify", kybHandler.VerifyMicroPayment)
 		kybGroup.POST("/face-verify", kybHandler.SubmitFaceVerification)
 		kybGroup.GET("/status/:enterprise_id", kybHandler.GetEnterpriseStatus)
+	}
+
+	blacklistGroup := r.Group("/api/v1/blacklist")
+	{
+		blacklistGroup.POST("/", blacklistHandler.AddEntry)
+		blacklistGroup.POST("/check", blacklistHandler.CheckEntry)
+		blacklistGroup.DELETE("/:type/:value", blacklistHandler.RemoveEntry)
+		blacklistGroup.GET("/", blacklistHandler.ListEntries)
+	}
+
+	internalFraud := r.Group("/internal/v1/fraud")
+	{
+		internalFraud.POST("/check-registration", func(c *gin.Context) {
+			var req struct {
+				IP string `json:"ip" binding:"required"`
+			}
+			if err := c.ShouldBindJSON(&req); err != nil {
+				c.JSON(400, gin.H{"error": err.Error()})
+				return
+			}
+			blocked, reason, _ := blacklistSvc.CheckBlocked(c.Request.Context(), "IP", req.IP)
+			if blocked {
+				c.JSON(200, gin.H{"blocked": true, "reason": reason})
+				return
+			}
+			allowed, count, _ := windowLimiter.CheckRegistrationLimit(c.Request.Context(), req.IP)
+			c.JSON(200, gin.H{"blocked": !allowed, "current_count": count, "limit": 3})
+		})
 	}
 
 	r.Any("/health", func(c *gin.Context) {

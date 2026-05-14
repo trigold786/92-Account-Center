@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -13,6 +15,7 @@ type RegisterRequest struct {
 	AccountID    string `json:"account_id" binding:"required"`
 	Password     string `json:"password" binding:"required"`
 	AgreeToTerms bool   `json:"agree_to_terms" binding:"required"`
+	ReferralCode string `json:"referral_code,omitempty"`
 }
 
 type RegisterResponse struct {
@@ -22,12 +25,17 @@ type RegisterResponse struct {
 	Message     string `json:"message"`
 }
 
-type RegisterHandler struct {
-	userService service.UserService
+type ReferralBinder interface {
+	BindReferral(ctx context.Context, referralCode, refereeID string) error
 }
 
-func NewRegisterHandler(userService service.UserService) *RegisterHandler {
-	return &RegisterHandler{userService: userService}
+type RegisterHandler struct {
+	userService    service.UserService
+	referralBinder ReferralBinder
+}
+
+func NewRegisterHandler(userService service.UserService, referralBinder ReferralBinder) *RegisterHandler {
+	return &RegisterHandler{userService: userService, referralBinder: referralBinder}
 }
 
 func (h *RegisterHandler) Register(c *gin.Context) {
@@ -41,6 +49,12 @@ func (h *RegisterHandler) Register(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+
+	if req.ReferralCode != "" && h.referralBinder != nil {
+		go func() {
+			_ = h.referralBinder.BindReferral(context.Background(), req.ReferralCode, fmt.Sprintf("%d", user.ID))
+		}()
 	}
 
 	c.JSON(http.StatusCreated, RegisterResponse{

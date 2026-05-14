@@ -66,3 +66,17 @@ type TransactionListResponse struct {
 	Page         int                 `json:"page"`
 	PageSize     int                 `json:"page_size"`
 }
+
+type RebateConfig struct {
+	ID                  int64   `json:"id" db:"id"`
+	SubscriptionCountMin int     `json:"subscription_count_min" db:"subscription_count_min"`
+	SubscriptionCountMax int     `json:"subscription_count_max" db:"subscription_count_max"`
+	RebatePercentage    float64 `json:"rebate_percentage" db:"rebate_percentage"`
+	Description         string  `json:"description" db:"description"`
+}
+
+type ProcessSubscriptionPaidEvent struct {
+	RefereeID         int64   `json:"referee_id"`
+	SubscriptionPrice float64 `json:"subscription_price"`
+	OrderID           string  `json:"order_id"`
+}

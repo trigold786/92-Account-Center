@@ -19,6 +19,7 @@ type CreditRepository interface {
 	GetTransactionByReferenceID(ctx context.Context, referenceID string) (*model.CreditTransaction, error)
 	UpdateTransactionStatus(ctx context.Context, id int64, status string) error
 	GetAllTransactionsOrdered(ctx context.Context) ([]model.CreditTransaction, error)
+	GetRebateConfig(ctx context.Context, subscriptionCount int) (*model.RebateConfig, error)
 }
 
 type creditRepository struct {
@@ -191,4 +192,21 @@ func (r *creditRepository) GetAllTransactionsOrdered(ctx context.Context) ([]mod
 		transactions = append(transactions, txn)
 	}
 	return transactions, rows.Err()
+}
+
+func (r *creditRepository) GetRebateConfig(ctx context.Context, subscriptionCount int) (*model.RebateConfig, error) {
+	cfg := &model.RebateConfig{}
+	query := `SELECT id, subscription_count_min, subscription_count_max, rebate_percentage, description
+		FROM rebate_configs WHERE $1 >= subscription_count_min AND $1 <= subscription_count_max LIMIT 1`
+	err := r.db.QueryRowContext(ctx, query, subscriptionCount).Scan(
+		&cfg.ID, &cfg.SubscriptionCountMin, &cfg.SubscriptionCountMax,
+		&cfg.RebatePercentage, &cfg.Description,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return cfg, nil
 }

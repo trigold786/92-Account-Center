@@ -110,6 +110,9 @@ func (s *creditService) computeSM3Hash(txn *model.CreditTransaction, prevHash st
 }
 
 func (s *creditService) EarnCredits(ctx context.Context, userID int64, amount float64, txnType, referenceID, details string) error {
+	if details == "" {
+		details = "{}"
+	}
 	if referenceID != "" {
 		existing, err := s.creditRepo.GetTransactionByReferenceID(ctx, referenceID)
 		if err != nil {
@@ -141,7 +144,7 @@ func (s *creditService) EarnCredits(ctx context.Context, userID int64, amount fl
 		Amount:          amount,
 		ReferenceID:     referenceID,
 		Details:         details,
-		Status:          "COMPLETED",
+		Status:          "AVAILABLE",
 	}
 
 	lastTxn, err := s.creditRepo.GetLastTransaction(ctx, account.ID)
@@ -172,6 +175,9 @@ func (s *creditService) EarnCredits(ctx context.Context, userID int64, amount fl
 }
 
 func (s *creditService) ConsumeCredits(ctx context.Context, userID int64, amount float64, referenceID, details string) error {
+	if details == "" {
+		details = "{}"
+	}
 	existing, err := s.creditRepo.GetTransactionByReferenceID(ctx, referenceID)
 	if err != nil {
 		return err
@@ -203,7 +209,7 @@ func (s *creditService) ConsumeCredits(ctx context.Context, userID int64, amount
 		Amount:          amount,
 		ReferenceID:     referenceID,
 		Details:         details,
-		Status:          "COMPLETED",
+		Status:          "CONSUMED",
 	}
 
 	lastTxn, err := s.creditRepo.GetLastTransaction(ctx, account.ID)

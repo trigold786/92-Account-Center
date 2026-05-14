@@ -123,6 +123,7 @@ services:
       DB_PASSWORD: postgres
       DB_NAME: account_center
       REDIS_URL: "redis:6379"
+      CREDIT_SERVICE_URL: "http://credit-service:30312"
       PORT: "30301"
     networks:
       - app_network
@@ -228,11 +229,14 @@ services:
       DB_USER: postgres
       DB_PASSWORD: postgres
       DB_NAME: account_center
+      REDIS_URL: "redis:6379"
       PORT: "30312"
     networks:
       - app_network
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:30312/health"]
