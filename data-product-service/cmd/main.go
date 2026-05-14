@@ -52,6 +52,11 @@ func main() {
 
 	r := gin.Default()
 
+	r.Use(func(c *gin.Context) {
+		atomic.AddUint64(&requestCount, 1)
+		c.Next()
+	})
+
 	dataGroup := r.Group("/api/v1/data")
 	{
 		dataGroup.GET("/rfm/:user_id", rfmHandler.GetRFM)

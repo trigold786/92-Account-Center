@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/lib/pq"
 
@@ -35,9 +36,6 @@ func (r *dataRepository) GetSubscriptionStats(ctx context.Context, userID int64)
 	query := `SELECT COUNT(*), COALESCE(SUM(price), 0), COALESCE(TO_CHAR(MAX(end_time), 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), '') FROM subscriptions WHERE user_id = $1`
 	err := r.db.QueryRowContext(ctx, query, userID).Scan(&stats.Freq, &stats.Monetary, &stats.LastSubAt)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return &model.SubscriptionStats{Freq: 0, Monetary: 0, LastSubAt: ""}, nil
-		}
 		return nil, err
 	}
 	return stats, nil
@@ -89,7 +87,7 @@ func (r *dataRepository) GetActiveBlacklistCount(ctx context.Context) (int, erro
 }
 
 func (r *dataRepository) GetRegistrationTrend(ctx context.Context, days int) ([]model.DailyCount, error) {
-	query := `SELECT TO_CHAR(created_at, 'YYYY-MM-DD') AS d, COUNT(*) FROM users WHERE created_at >= NOW() - interval '30 days' GROUP BY d ORDER BY d DESC`
+	query := fmt.Sprintf(`SELECT TO_CHAR(created_at, 'YYYY-MM-DD') AS d, COUNT(*) FROM users WHERE created_at >= NOW() - interval '%d days' GROUP BY d ORDER BY d DESC`, days)
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"time"
 
 	"github.com/trigold786/92-Account-Center/data-product-service/internal/model"
 	"github.com/trigold786/92-Account-Center/data-product-service/internal/repository"
@@ -99,7 +100,12 @@ func (s *rfmService) classifySegment(r, f, m int) segment {
 func (s *rfmService) statsToRFM(userID int64, stats *model.SubscriptionStats) *model.RFMScore {
 	r := 1
 	if stats.LastSubAt != "" && stats.Freq > 0 {
-		r = s.computeRecency(0)
+		if t, err := time.Parse("2006-01-02T15:04:05Z", stats.LastSubAt); err == nil {
+			days := int(time.Since(t).Hours() / 24)
+			r = s.computeRecency(days)
+		} else {
+			r = s.computeRecency(0)
+		}
 	}
 	f := s.computeFrequency(stats.Freq)
 	m := s.computeMonetary(stats.Monetary)

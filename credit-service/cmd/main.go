@@ -68,6 +68,11 @@ func main() {
 
 	r := gin.Default()
 
+	r.Use(func(c *gin.Context) {
+		atomic.AddUint64(&requestCount, 1)
+		c.Next()
+	})
+
 	creditsGroup := r.Group("/api/v1/credits")
 	{
 		creditsGroup.GET("/:user_id/account", creditHandler.GetAccount)

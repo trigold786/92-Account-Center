@@ -190,6 +190,11 @@ func main() {
 
 	r := gin.Default()
 
+	r.Use(func(c *gin.Context) {
+		atomic.AddUint64(&gatewayRequestCount, 1)
+		c.Next()
+	})
+
 	r.Use(requestIDMiddleware())
 	r.Use(corsMiddleware())
 	r.Use(rateLimitMiddleware(100))
@@ -376,6 +381,7 @@ func desensitizeMiddleware() gin.HandlerFunc {
 		}
 
 		if len(captureWriter.body) > 1048576 {
+			captureWriter.ResponseWriter.Write(captureWriter.body)
 			return
 		}
 

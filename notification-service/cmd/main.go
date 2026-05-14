@@ -117,6 +117,11 @@ func main() {
 
 	r := gin.Default()
 
+	r.Use(func(c *gin.Context) {
+		atomic.AddUint64(&requestCount, 1)
+		c.Next()
+	})
+
 	r.GET("/metrics", func(c *gin.Context) {
 		var buf bytes.Buffer
 		fmt.Fprintf(&buf, "# HELP http_requests_total Total HTTP requests\n")
