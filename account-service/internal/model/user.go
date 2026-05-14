@@ -13,6 +13,8 @@ type User struct {
 	MFAEnabled          bool       `json:"mfa_enabled" db:"mfa_enabled"`
 	MFASecret           string     `json:"-" db:"mfa_secret"`
 	LastStrongAuthAt    *time.Time `json:"last_strong_auth_at,omitempty" db:"last_strong_auth_at"`
+	IdentityTier        int        `json:"identity_tier" db:"identity_tier"`
+	Status              string     `json:"status" db:"status"`
 	CreatedAt           time.Time  `json:"created_at" db:"created_at"`
 	UpdatedAt           time.Time  `json:"updated_at" db:"updated_at"`
 	DeletionRequestedAt *time.Time `json:"deletion_requested_at,omitempty" db:"deletion_requested_at"`

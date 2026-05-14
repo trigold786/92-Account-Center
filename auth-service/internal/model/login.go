@@ -11,13 +11,16 @@ type LoginRequest struct {
 }
 
 type LoginResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	ExpiresIn    int64  `json:"expires_in"`
-	UserID       int64  `json:"user_id"`
-	AccountID    string `json:"account_id"`
-	IsTrusted    bool   `json:"is_trusted"`
-	MFARequired  bool   `json:"mfa_required"`
+	AccessToken       string `json:"access_token"`
+	RefreshToken      string `json:"refresh_token"`
+	ExpiresIn         int64  `json:"expires_in"`
+	UserID            int64  `json:"user_id"`
+	AccountID         string `json:"account_id"`
+	IsTrusted         bool   `json:"is_trusted"`
+	IsTrustedDevice   bool   `json:"is_trusted_device"`
+	MFARequired       bool   `json:"mfa_required"`
+	TokenID           string `json:"token_id,omitempty"`
+	DeviceBindingInfo string `json:"device_binding_info,omitempty"`
 }
 
 type User struct {

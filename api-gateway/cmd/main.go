@@ -23,9 +23,12 @@ import (
 )
 
 type GatewayConfig struct {
-	AccountServiceURL string
-	AuthServiceURL    string
-	SMSServiceURL     string
+	AccountServiceURL       string
+	AuthServiceURL          string
+	NotificationServiceURL  string
+	CreditServiceURL        string
+	ComplianceServiceURL    string
+	DataProductServiceURL   string
 }
 
 type tokenBucket struct {
@@ -67,6 +70,15 @@ func (l *ipRateLimiter) allow(ip string) bool {
 	}
 	b.tokens--
 	return true
+}
+
+func cacheControlMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.Request.Method == http.MethodGet {
+			c.Header("Cache-Control", "public, max-age=60")
+		}
+		c.Next()
+	}
 }
 
 func jwtAuthMiddleware(secret string) gin.HandlerFunc {
@@ -164,9 +176,12 @@ func requestIDMiddleware() gin.HandlerFunc {
 
 func main() {
 	config := GatewayConfig{
-		AccountServiceURL: getEnv("ACCOUNT_SERVICE_URL", "http://localhost:30301"),
-		AuthServiceURL:    getEnv("AUTH_SERVICE_URL", "http://localhost:30302"),
-		SMSServiceURL:     getEnv("SMS_SERVICE_URL", "http://localhost:30303"),
+		AccountServiceURL:      getEnv("ACCOUNT_SERVICE_URL", "http://localhost:30301"),
+		AuthServiceURL:         getEnv("AUTH_SERVICE_URL", "http://localhost:30302"),
+		NotificationServiceURL: getEnv("NOTIFICATION_SERVICE_URL", "http://localhost:30311"),
+		CreditServiceURL:       getEnv("CREDIT_SERVICE_URL", "http://localhost:30312"),
+		ComplianceServiceURL:   getEnv("COMPLIANCE_SERVICE_URL", "http://localhost:30313"),
+		DataProductServiceURL:  getEnv("DATA_PRODUCT_SERVICE_URL", "http://localhost:30314"),
 	}
 
 	r := gin.Default()
@@ -174,14 +189,19 @@ func main() {
 	r.Use(requestIDMiddleware())
 	r.Use(corsMiddleware())
 	r.Use(rateLimitMiddleware(100))
+	r.Use(cacheControlMiddleware())
 
 	publicPaths := map[string]bool{
-		"/api/v1/auth/login":         true,
-		"/api/v1/auth/refresh":       true,
-		"/api/v1/account/register":   true,
-		"/api/v1/sms/":               true,
-		"/api/v1/email/otp/send":     true,
-		"/api/v1/email/magic-link/":  true,
+		"/api/v1/auth/login":              true,
+		"/api/v1/auth/refresh":            true,
+		"/api/v1/auth/biometric/login":    true,
+		"/api/v1/account/register":        true,
+		"/api/v1/qrcode/generate":         true,
+		"/api/v1/qrcode/":                 true,
+		"/api/v1/sms/send":                true,
+		"/api/v1/sms/verify":              true,
+		"/api/v1/email/otp/send":          true,
+		"/api/v1/email/magic-link/":       true,
 	}
 
 	r.Use(func(c *gin.Context) {
@@ -199,14 +219,21 @@ func main() {
 	})
 
 	r.Any("/api/v1/account/*path", proxyHandler(config.AccountServiceURL))
+	r.Any("/api/v1/entitlements/*path", proxyHandler(config.AccountServiceURL))
+	r.Any("/api/v1/subscriptions/*path", proxyHandler(config.AccountServiceURL))
 	r.Any("/api/v1/auth/*path", proxyHandler(config.AuthServiceURL))
-	r.Any("/api/v1/sms/*path", proxyHandler(config.SMSServiceURL))
-	r.Any("/api/v1/kyb/*path", proxyHandler(getEnv("KYB_SERVICE_URL", "http://localhost:30304")))
-	r.Any("/api/v1/audit/*path", proxyHandler(getEnv("AUDIT_SERVICE_URL", "http://localhost:30305")))
-	r.Any("/api/v1/risk/*path", proxyHandler(getEnv("RISK_SERVICE_URL", "http://localhost:30306")))
-	r.Any("/api/v1/session/*path", proxyHandler(getEnv("SESSION_SERVICE_URL", "http://localhost:30307")))
-	r.Any("/api/v1/email/*path", proxyHandler(getEnv("EMAIL_SERVICE_URL", "http://localhost:30308")))
-	r.Any("/api/v1/device/*path", proxyHandler(getEnv("DEVICE_SERVICE_URL", "http://localhost:30309")))
+	r.Any("/api/v1/session/*path", proxyHandler(config.AuthServiceURL))
+	r.Any("/api/v1/device/*path", proxyHandler(config.AuthServiceURL))
+	r.Any("/api/v1/qrcode/*path", proxyHandler(config.AuthServiceURL))
+	r.Any("/api/v1/sms/*path", proxyHandler(config.NotificationServiceURL))
+	r.Any("/api/v1/email/*path", proxyHandler(config.NotificationServiceURL))
+	r.Any("/api/v1/push/*path", proxyHandler(config.NotificationServiceURL))
+	r.Any("/api/v1/credits/*path", proxyHandler(config.CreditServiceURL))
+	r.Any("/api/v1/referral/*path", proxyHandler(config.CreditServiceURL))
+	r.Any("/api/v1/risk/*path", proxyHandler(config.ComplianceServiceURL))
+	r.Any("/api/v1/audit/*path", proxyHandler(config.ComplianceServiceURL))
+	r.Any("/api/v1/kyb/*path", proxyHandler(config.ComplianceServiceURL))
+	r.Any("/api/v1/data/*path", proxyHandler(config.DataProductServiceURL))
 
 	r.Any("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})

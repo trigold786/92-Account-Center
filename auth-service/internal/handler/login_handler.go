@@ -112,3 +112,40 @@ func (h *LoginHandler) Logout(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "logged out successfully"})
 }
+
+func (h *LoginHandler) RegisterBiometric(c *gin.Context) {
+	var req model.BiometricRegisterRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.authService.RegisterBiometric(c.Request.Context(), &req); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "注册生物识别失败: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "生物识别注册成功"})
+}
+
+func (h *LoginHandler) LoginWithBiometric(c *gin.Context) {
+	var req model.BiometricLoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	resp, err := h.authService.LoginWithBiometric(c.Request.Context(), &req)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, LoginResponse{
+		AccessToken:  resp.AccessToken,
+		RefreshToken: resp.RefreshToken,
+		ExpiresIn:    resp.ExpiresIn,
+		UserID:       resp.UserID,
+		AccountID:    resp.AccountID,
+	})
+}

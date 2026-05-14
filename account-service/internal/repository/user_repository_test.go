@@ -46,6 +46,57 @@ func (m *MockUserRepository) ExistsByAccountID(ctx context.Context, accountID st
 	return args.Bool(0), args.Error(1)
 }
 
+func (m *MockUserRepository) GetByEmail(ctx context.Context, email string) (*model.User, error) {
+	args := m.Called(ctx, email)
+	if args.Get(0) != nil {
+		return args.Get(0).(*model.User), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockUserRepository) GetByID(ctx context.Context, userID string) (*model.User, error) {
+	args := m.Called(ctx, userID)
+	if args.Get(0) != nil {
+		return args.Get(0).(*model.User), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockUserRepository) Update(ctx context.Context, user *model.User) error {
+	args := m.Called(ctx, user)
+	return args.Error(0)
+}
+
+func (m *MockUserRepository) ExistsByEmail(ctx context.Context, email string) (bool, error) {
+	args := m.Called(ctx, email)
+	return args.Bool(0), args.Error(1)
+}
+
+func (m *MockUserRepository) PermanentDelete(ctx context.Context, userID int64) error {
+	args := m.Called(ctx, userID)
+	return args.Error(0)
+}
+
+func (m *MockUserRepository) UpdateEmail(ctx context.Context, id int64, email string) error {
+	args := m.Called(ctx, id, email)
+	return args.Error(0)
+}
+
+func (m *MockUserRepository) UpdatePhone(ctx context.Context, id int64, phone string) error {
+	args := m.Called(ctx, id, phone)
+	return args.Error(0)
+}
+
+func (m *MockUserRepository) UpdateIdentityTier(ctx context.Context, userID int64, tier int) error {
+	args := m.Called(ctx, userID, tier)
+	return args.Error(0)
+}
+
+func (m *MockUserRepository) GetIdentityTier(ctx context.Context, userID int64) (int, error) {
+	args := m.Called(ctx, userID)
+	return args.Int(0), args.Error(1)
+}
+
 func TestUserRepository_Create(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockUserRepository)

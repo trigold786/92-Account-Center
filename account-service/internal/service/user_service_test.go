@@ -104,6 +104,21 @@ func (m *MockUserRepository) UpdatePhone(ctx context.Context, id int64, phone st
 	return nil
 }
 
+func (m *MockUserRepository) UpdateIdentityTier(ctx context.Context, userID int64, tier int) error {
+	if u, ok := m.users[int64ToString(userID)]; ok {
+		u.IdentityTier = tier
+		return nil
+	}
+	return nil
+}
+
+func (m *MockUserRepository) GetIdentityTier(ctx context.Context, userID int64) (int, error) {
+	if u, ok := m.users[int64ToString(userID)]; ok {
+		return u.IdentityTier, nil
+	}
+	return 0, nil
+}
+
 func int64ToString(n int64) string {
 	return string(rune(n))
 }

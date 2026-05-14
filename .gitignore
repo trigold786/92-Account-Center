@@ -17,3 +17,5 @@ Thumbs.db
 *.exe
 *.test
 *.out
+
+nul

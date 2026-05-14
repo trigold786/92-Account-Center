@@ -21,6 +21,8 @@ type UserRepository interface {
 	PermanentDelete(ctx context.Context, userID int64) error
 	UpdateEmail(ctx context.Context, id int64, email string) error
 	UpdatePhone(ctx context.Context, id int64, phone string) error
+	UpdateIdentityTier(ctx context.Context, userID int64, tier int) error
+	GetIdentityTier(ctx context.Context, userID int64) (int, error)
 }
 
 // userRepository implements UserRepository using PostgreSQL.
@@ -36,13 +38,15 @@ func NewUserRepository(db *sql.DB) UserRepository {
 // Create inserts a new user into the database.
 func (r *userRepository) Create(ctx context.Context, user *model.User) error {
 	query := `
-		INSERT INTO users (phone_number, account_id, password_hash, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO users (phone_number, account_id, password_hash, identity_tier, status, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id, created_at, updated_at`
 	return r.db.QueryRowContext(ctx, query,
 		user.PhoneNumber,
 		user.AccountID,
 		user.PasswordHash,
+		user.IdentityTier,
+		user.Status,
 		user.CreatedAt,
 		user.UpdatedAt,
 	).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
@@ -51,12 +55,14 @@ func (r *userRepository) Create(ctx context.Context, user *model.User) error {
 // GetByPhoneNumber retrieves a user by phone number.
 func (r *userRepository) GetByPhoneNumber(ctx context.Context, phoneNumber string) (*model.User, error) {
 	user := &model.User{}
-	query := `SELECT id, phone_number, account_id, password_hash, created_at, updated_at FROM users WHERE phone_number = $1`
+	query := `SELECT id, phone_number, account_id, password_hash, identity_tier, status, created_at, updated_at FROM users WHERE phone_number = $1`
 	err := r.db.QueryRowContext(ctx, query, phoneNumber).Scan(
 		&user.ID,
 		&user.PhoneNumber,
 		&user.AccountID,
 		&user.PasswordHash,
+		&user.IdentityTier,
+		&user.Status,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
@@ -72,12 +78,14 @@ func (r *userRepository) GetByPhoneNumber(ctx context.Context, phoneNumber strin
 // GetByAccountID retrieves a user by account ID.
 func (r *userRepository) GetByAccountID(ctx context.Context, accountID string) (*model.User, error) {
 	user := &model.User{}
-	query := `SELECT id, phone_number, account_id, password_hash, created_at, updated_at FROM users WHERE account_id = $1`
+	query := `SELECT id, phone_number, account_id, password_hash, identity_tier, status, created_at, updated_at FROM users WHERE account_id = $1`
 	err := r.db.QueryRowContext(ctx, query, accountID).Scan(
 		&user.ID,
 		&user.PhoneNumber,
 		&user.AccountID,
 		&user.PasswordHash,
+		&user.IdentityTier,
+		&user.Status,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
@@ -92,7 +100,7 @@ func (r *userRepository) GetByAccountID(ctx context.Context, accountID string) (
 
 func (r *userRepository) GetByEmail(ctx context.Context, email string) (*model.User, error) {
 	user := &model.User{}
-	query := `SELECT id, phone_number, account_id, email, password_hash, mfa_enabled, mfa_secret, last_strong_auth_at, created_at, updated_at, deletion_requested_at, deletion_expires_at, deletion_cancelled_at, deletion_deleted_at FROM users WHERE email = $1`
+	query := `SELECT id, phone_number, account_id, email, password_hash, mfa_enabled, mfa_secret, last_strong_auth_at, identity_tier, status, created_at, updated_at, deletion_requested_at, deletion_expires_at, deletion_cancelled_at, deletion_deleted_at FROM users WHERE email = $1`
 	err := r.db.QueryRowContext(ctx, query, email).Scan(
 		&user.ID,
 		&user.PhoneNumber,
@@ -102,6 +110,8 @@ func (r *userRepository) GetByEmail(ctx context.Context, email string) (*model.U
 		&user.MFAEnabled,
 		&user.MFASecret,
 		&user.LastStrongAuthAt,
+		&user.IdentityTier,
+		&user.Status,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 		&user.DeletionRequestedAt,
@@ -138,12 +148,14 @@ func (r *userRepository) ExistsByAccountID(ctx context.Context, accountID string
 func (r *userRepository) GetByID(ctx context.Context, userID string) (*model.User, error) {
 	var id int64
 	user := &model.User{}
-	query := `SELECT id, phone_number, account_id, password_hash, created_at, updated_at FROM users WHERE id = $1`
+	query := `SELECT id, phone_number, account_id, password_hash, identity_tier, status, created_at, updated_at FROM users WHERE id = $1`
 	err := r.db.QueryRowContext(ctx, query, userID).Scan(
 		&id,
 		&user.PhoneNumber,
 		&user.AccountID,
 		&user.PasswordHash,
+		&user.IdentityTier,
+		&user.Status,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
@@ -205,4 +217,20 @@ func (r *userRepository) PermanentDelete(ctx context.Context, userID int64) erro
 	query := `DELETE FROM users WHERE id = $1`
 	_, err := r.db.ExecContext(ctx, query, userID)
 	return err
+}
+
+func (r *userRepository) UpdateIdentityTier(ctx context.Context, userID int64, tier int) error {
+	query := `UPDATE users SET identity_tier = $2, updated_at = NOW() WHERE id = $1`
+	_, err := r.db.ExecContext(ctx, query, userID, tier)
+	return err
+}
+
+func (r *userRepository) GetIdentityTier(ctx context.Context, userID int64) (int, error) {
+	var tier int
+	query := `SELECT identity_tier FROM users WHERE id = $1`
+	err := r.db.QueryRowContext(ctx, query, userID).Scan(&tier)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	return tier, err
 }

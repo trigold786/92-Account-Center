@@ -2,7 +2,10 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -31,6 +34,8 @@ type AuthService interface {
 	RefreshToken(ctx context.Context, refreshToken string) (*model.LoginResponse, error)
 	VerifyPassword(password, storedHash string) bool
 	Logout(ctx context.Context, accessToken string) error
+	RegisterBiometric(ctx context.Context, req *model.BiometricRegisterRequest) error
+	LoginWithBiometric(ctx context.Context, req *model.BiometricLoginRequest) (*model.LoginResponse, error)
 }
 
 type authService struct {
@@ -151,17 +156,26 @@ func (s *authService) Login(ctx context.Context, req *model.LoginRequest) (*mode
 
 	s.resetFailedAttempts(req.Credential)
 
-	accessToken, refreshToken, err := s.jwtMgr.GenerateTokenPair(user.ID, user.AccountID)
+	var tokenResp *jwt.TokenResponse
+	if req.DeviceFingerprintID != "" {
+		tokenResp, err = s.jwtMgr.GenerateTokenPairWithDevice(user.ID, user.AccountID, req.DeviceFingerprintID)
+	} else {
+		tokenResp, err = s.jwtMgr.GenerateTokenPairWithDevice(user.ID, user.AccountID, "")
+	}
 	if err != nil {
 		return nil, err
 	}
 
 	return &model.LoginResponse{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-		ExpiresIn:    int64(24 * time.Hour.Seconds()),
-		UserID:       user.ID,
-		AccountID:    user.AccountID,
+		AccessToken:       tokenResp.AccessToken,
+		RefreshToken:      tokenResp.RefreshToken,
+		ExpiresIn:         tokenResp.ExpiresIn,
+		UserID:            user.ID,
+		AccountID:         user.AccountID,
+		TokenID:           tokenResp.TokenID,
+		DeviceBindingInfo: tokenResp.DeviceBindingInfo,
+		IsTrusted:         true,
+		IsTrustedDevice:   req.DeviceFingerprintID != "",
 	}, nil
 }
 
@@ -170,22 +184,27 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (*m
 		return nil, errors.New("token has been revoked")
 	}
 
-	accessToken, err := s.jwtMgr.RefreshAccessToken(refreshToken)
+	tokenResp, err := s.jwtMgr.RefreshTokenPair(refreshToken)
 	if err != nil {
 		return nil, err
 	}
 
+	s.rdb.Set(ctx, "blacklist:"+refreshToken, "1", 30*24*time.Hour)
 	claims, err := s.jwtMgr.ValidateToken(refreshToken)
 	if err != nil {
 		return nil, err
 	}
 
 	return &model.LoginResponse{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-		ExpiresIn:    int64(24 * time.Hour.Seconds()),
-		UserID:       claims.UserID,
-		AccountID:    claims.AccountID,
+		AccessToken:       tokenResp.AccessToken,
+		RefreshToken:      tokenResp.RefreshToken,
+		ExpiresIn:         tokenResp.ExpiresIn,
+		UserID:            claims.UserID,
+		AccountID:         claims.AccountID,
+		TokenID:           tokenResp.TokenID,
+		DeviceBindingInfo: tokenResp.DeviceBindingInfo,
+		IsTrusted:         true,
+		IsTrustedDevice:   claims.DeviceFingerprint != "",
 	}, nil
 }
 
@@ -244,6 +263,60 @@ func splitHash(stored string) []string {
 		}
 	}
 	return nil
+}
+
+func (s *authService) RegisterBiometric(ctx context.Context, req *model.BiometricRegisterRequest) error {
+	key := fmt.Sprintf("biometric:%s:%s", req.UserID, req.DeviceFingerprint)
+	hash := crypto.SM3Hash([]byte(req.BiometricToken))
+	data, _ := json.Marshal(model.BiometricCredential{
+		UserID:           req.UserID,
+		DeviceFingerprint: req.DeviceFingerprint,
+		BiometricType:    req.BiometricType,
+		BiometricTokenHash: hash,
+		IsActive:         true,
+		CreatedAt:        time.Now(),
+	})
+	return s.rdb.Set(ctx, key, data, 0).Err()
+}
+
+func (s *authService) LoginWithBiometric(ctx context.Context, req *model.BiometricLoginRequest) (*model.LoginResponse, error) {
+	pattern := fmt.Sprintf("biometric:*:%s", req.DeviceFingerprint)
+	keys, err := s.rdb.Keys(ctx, pattern).Result()
+	if err != nil || len(keys) == 0 {
+		return nil, errors.New("未找到生物识别凭证")
+	}
+
+	for _, key := range keys {
+		data, _ := s.rdb.Get(ctx, key).Result()
+		var cred model.BiometricCredential
+		if err := json.Unmarshal([]byte(data), &cred); err == nil {
+			hash := crypto.SM3Hash([]byte(req.BiometricToken))
+			if hash == cred.BiometricTokenHash && cred.IsActive {
+				var user model.User
+				user.ID, _ = strconv.ParseInt(cred.UserID, 10, 64)
+				user.AccountID = cred.UserID
+				tokenResp, err := s.jwtMgr.GenerateTokenPairWithDevice(user.ID, user.AccountID, req.DeviceFingerprint)
+				if err != nil {
+					return nil, err
+				}
+				now := time.Now()
+				cred.LastUsedAt = &now
+				newData, _ := json.Marshal(cred)
+				s.rdb.Set(ctx, key, newData, 0)
+				return &model.LoginResponse{
+					UserID:            user.ID,
+					AccessToken:       tokenResp.AccessToken,
+					RefreshToken:      tokenResp.RefreshToken,
+					ExpiresIn:         tokenResp.ExpiresIn,
+					TokenID:           tokenResp.TokenID,
+					DeviceBindingInfo: tokenResp.DeviceBindingInfo,
+					IsTrustedDevice:   true,
+					IsTrusted:         true,
+				}, nil
+			}
+		}
+	}
+	return nil, errors.New("生物识别验证失败")
 }
 
 func subtleCompare(a, b string) bool {

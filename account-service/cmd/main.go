@@ -8,8 +8,10 @@ import (
 	"syscall"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis/v8"
 	_ "github.com/lib/pq"
 
+	"github.com/trigold786/92-Account-Center/account-service/internal/cache"
 	"github.com/trigold786/92-Account-Center/account-service/internal/handler"
 	"github.com/trigold786/92-Account-Center/account-service/internal/repository"
 	"github.com/trigold786/92-Account-Center/account-service/internal/service"
@@ -35,13 +37,33 @@ func main() {
 	}
 	log.Println("Connected to database")
 
+	redisURL := getEnv("REDIS_URL", "redis://localhost:6379")
+	opt, err := redis.ParseURL(redisURL)
+	if err != nil {
+		log.Fatalf("Failed to parse REDIS_URL: %v", err)
+	}
+	rdb := redis.NewClient(opt)
+	defer rdb.Close()
+
+	log.Println("Connected to Redis")
+
 	userRepo := repository.NewUserRepository(db)
+	entitlementRepo := repository.NewEntitlementRepository(db)
+	subscriptionRepo := repository.NewSubscriptionRepository(db)
 	smsClient := sms.NewClient(getEnv("SMS_SERVICE_URL", "http://localhost:8083"))
+
+	entitlementCache := cache.NewEntitlementCache(rdb)
+
 	userService := service.NewUserService(userRepo, smsClient)
+	entitlementService := service.NewEntitlementService(entitlementRepo, entitlementCache)
+	subscriptionService := service.NewSubscriptionService(subscriptionRepo, userRepo, entitlementService)
 
 	registerHandler := handler.NewRegisterHandler(userService)
 	passwordHandler := handler.NewPasswordHandler(userService)
 	deletionHandler := handler.NewDeletionHandler(userService)
+	tierHandler := handler.NewTierHandler(userRepo)
+	entitlementHandler := handler.NewEntitlementHandler(entitlementService)
+	subscriptionHandler := handler.NewSubscriptionHandler(subscriptionService)
 
 	r := gin.Default()
 
@@ -55,6 +77,32 @@ func main() {
 		accountGroup.POST("/deletion/request", deletionHandler.RequestDeletion)
 		accountGroup.POST("/deletion/cancel", deletionHandler.CancelDeletion)
 		accountGroup.GET("/deletion/status", deletionHandler.GetDeletionStatus)
+
+		accountGroup.GET("/:user_id/tier", tierHandler.GetTier)
+	}
+
+	internalAccountGroup := r.Group("/internal/v1/account")
+	{
+		internalAccountGroup.PUT("/:user_id/tier", tierHandler.UpdateTier)
+	}
+
+	entitlementGroup := r.Group("/api/v1/entitlements")
+	{
+		entitlementGroup.GET("/:user_id", entitlementHandler.GetUserEntitlements)
+	}
+
+	internalEntitlementGroup := r.Group("/internal/v1/entitlements")
+	{
+		internalEntitlementGroup.POST("/consume", entitlementHandler.Consume)
+		internalEntitlementGroup.POST("/grant", entitlementHandler.Grant)
+	}
+
+	subscriptionGroup := r.Group("/api/v1/subscriptions")
+	{
+		subscriptionGroup.POST("/purchase", subscriptionHandler.Purchase)
+		subscriptionGroup.POST("/upgrade", subscriptionHandler.Upgrade)
+		subscriptionGroup.POST("/renew", subscriptionHandler.Renew)
+		subscriptionGroup.GET("/:user_id", subscriptionHandler.GetUserSubscriptions)
 	}
 
 	r.Any("/health", func(c *gin.Context) {
