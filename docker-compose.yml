@@ -293,8 +293,18 @@ services:
     container_name: data-product-service
     ports:
       - "30314:30314"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: account_center
+      PORT: "30314"
     networks:
       - app_network
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:30314/health"]
       interval: 30s
@@ -308,6 +318,28 @@ services:
           memory: 256M
     restart: always
 
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:latest
+    container_name: victoriametrics
+    ports:
+      - "20010:8428"
+    volumes:
+      - vm_data:/victoria-metrics-data
+      - ./monitoring/promscrape.yml:/etc/promscrape.yml
+    command:
+      - "--promscrape.config=/etc/promscrape.yml"
+      - "--storageDataPath=/victoria-metrics-data"
+      - "--retentionPeriod=30d"
+    networks:
+      - app_network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+    restart: always
+
 volumes:
   postgres_data:
   redis_data:
+  vm_data:

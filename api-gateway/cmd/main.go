@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
@@ -13,12 +15,14 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"regexp"
+	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
-	"context"
 	"github.com/gin-gonic/gin"
 )
 
@@ -211,12 +215,14 @@ func main() {
 				return
 			}
 		}
-		if c.Request.URL.Path == "/health" {
+		if c.Request.URL.Path == "/health" || c.Request.URL.Path == "/metrics" {
 			c.Next()
 			return
 		}
 		jwtAuthMiddleware(getEnv("JWT_SECRET", "default-secret"))(c)
 	})
+
+	r.Use(desensitizeMiddleware())
 
 	r.Any("/api/v1/account/*path", proxyHandler(config.AccountServiceURL))
 	r.Any("/api/v1/entitlements/*path", proxyHandler(config.AccountServiceURL))
@@ -234,6 +240,17 @@ func main() {
 	r.Any("/api/v1/audit/*path", proxyHandler(config.ComplianceServiceURL))
 	r.Any("/api/v1/kyb/*path", proxyHandler(config.ComplianceServiceURL))
 	r.Any("/api/v1/data/*path", proxyHandler(config.DataProductServiceURL))
+
+	r.GET("/metrics", func(c *gin.Context) {
+		var buf bytes.Buffer
+		fmt.Fprintf(&buf, "# HELP http_requests_total Total HTTP requests\n")
+		fmt.Fprintf(&buf, "# TYPE http_requests_total counter\n")
+		fmt.Fprintf(&buf, "http_requests_total{service=\"api-gateway\"} %d\n", atomic.LoadUint64(&gatewayRequestCount))
+		fmt.Fprintf(&buf, "# HELP go_goroutines Number of goroutines\n")
+		fmt.Fprintf(&buf, "# TYPE go_goroutines gauge\n")
+		fmt.Fprintf(&buf, "go_goroutines{service=\"api-gateway\"} %d\n", runtime.NumGoroutine())
+		c.Data(http.StatusOK, "text/plain; version=0.0.4", buf.Bytes())
+	})
 
 	r.Any("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
@@ -310,6 +327,77 @@ func (w *responseWriter) Write(b []byte) (int, error) {
 
 func wrapWriter(c *gin.Context) http.ResponseWriter {
 	return &responseWriter{ResponseWriter: c.Writer}
+}
+
+type responseCaptureWriter struct {
+	gin.ResponseWriter
+	body []byte
+	code int
+}
+
+func (w *responseCaptureWriter) Write(b []byte) (int, error) {
+	w.body = append(w.body, b...)
+	return len(b), nil
+}
+
+func (w *responseCaptureWriter) WriteHeader(code int) {
+	w.code = code
+	w.ResponseWriter.WriteHeader(code)
+}
+
+var gatewayRequestCount uint64
+
+var phoneRegex = regexp.MustCompile(`"phone_number"\s*:\s*"(\d{3})\d{4}(\d{4})"`)
+var emailRegex = regexp.MustCompile(`"email"\s*:\s*"([a-zA-Z0-9])[a-zA-Z0-9._%+\-]*@([^"]+)"`)
+var ipAddrRegex = regexp.MustCompile(`"ip_address"\s*:\s*"(\d{1,3}\.)\d{1,3}\.\d{1,3}(\.\d{1,3})"`)
+
+func desensitizeMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		path := c.Request.URL.Path
+		if path == "/health" || path == "/metrics" || strings.HasPrefix(path, "/internal/") {
+			c.Next()
+			return
+		}
+
+		captureWriter := &responseCaptureWriter{ResponseWriter: c.Writer}
+		c.Writer = captureWriter
+
+		c.Next()
+
+		if c.Writer.Status() < 200 || c.Writer.Status() >= 300 {
+			w := c.Writer.(*responseCaptureWriter)
+			w.ResponseWriter.Write(w.body)
+			return
+		}
+
+		contentType := c.Writer.Header().Get("Content-Type")
+		if !strings.Contains(contentType, "application/json") {
+			return
+		}
+
+		if len(captureWriter.body) > 1048576 {
+			return
+		}
+
+		accountID, _ := c.Get("user_id")
+		if accountIDStr, ok := accountID.(string); ok && strings.HasPrefix(accountIDStr, "admin_") {
+			w := c.Writer.(*responseCaptureWriter)
+			w.ResponseWriter.Write(w.body)
+			return
+		}
+
+		body := string(captureWriter.body)
+		masked := phoneRegex.ReplaceAllString(body, `"phone_number":"$1****$2"`)
+		masked = emailRegex.ReplaceAllString(masked, `"email":"$1***@$2"`)
+		masked = ipAddrRegex.ReplaceAllString(masked, `"ip_address":"$1*.*$2"`)
+
+		if masked != body {
+			c.Header("X-Desensitized", "true")
+			captureWriter.ResponseWriter.Write([]byte(masked))
+		} else {
+			captureWriter.ResponseWriter.Write(captureWriter.body)
+		}
+	}
 }
 
 func getEnv(key, defaultValue string) string {

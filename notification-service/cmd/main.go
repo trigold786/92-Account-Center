@@ -1,12 +1,16 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"strconv"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -18,6 +22,8 @@ import (
 	"github.com/trigold786/92-Account-Center/notification-service/internal/service"
 	"github.com/trigold786/92-Account-Center/notification-service/pkg/circuitbreaker"
 )
+
+var requestCount uint64
 
 func main() {
 	redisAddr := getEnv("REDIS_URL", "localhost:6379")
@@ -110,6 +116,17 @@ func main() {
 	pushHandler := handler.NewPushHandler(pushService)
 
 	r := gin.Default()
+
+	r.GET("/metrics", func(c *gin.Context) {
+		var buf bytes.Buffer
+		fmt.Fprintf(&buf, "# HELP http_requests_total Total HTTP requests\n")
+		fmt.Fprintf(&buf, "# TYPE http_requests_total counter\n")
+		fmt.Fprintf(&buf, "http_requests_total{service=\"notification-service\"} %d\n", atomic.LoadUint64(&requestCount))
+		fmt.Fprintf(&buf, "# HELP go_goroutines Number of goroutines\n")
+		fmt.Fprintf(&buf, "# TYPE go_goroutines gauge\n")
+		fmt.Fprintf(&buf, "go_goroutines{service=\"notification-service\"} %d\n", runtime.NumGoroutine())
+		c.Data(http.StatusOK, "text/plain; version=0.0.4", buf.Bytes())
+	})
 
 	r.Any("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
