@@ -25,5 +25,12 @@
         <key>NSAllowsArbitraryLoads</key>
         <true/>
     </dict>
-</dict>
+    <key>UIAppFonts</key>
+    <array>
+        <string>Inter-Regular.otf</string>
+        <string>Inter-SemiBold.otf</string>
+        <string>Inter-Bold.otf</string>
+        <string>SpaceGrotesk-SemiBold.otf</string>
+        <string>SpaceGrotesk-Bold.otf</string>
+    </array>
 </plist>

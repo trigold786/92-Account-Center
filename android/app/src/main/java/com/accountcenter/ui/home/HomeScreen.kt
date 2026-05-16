@@ -1,120 +1,164 @@
 package com.accountcenter.ui.home
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CreditCard
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.ShoppingCart
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.accountcenter.ui.components.AppCard
+import com.accountcenter.ui.theme.*
 
 @Composable
 fun HomeScreen(
     homeViewModel: HomeViewModel = hiltViewModel(),
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onNavigateToSubscription: () -> Unit = {},
+    onNavigateToCredits: () -> Unit = {},
+    onNavigateToSecurity: () -> Unit = {},
+    onNavigateToAbout: () -> Unit = {}
 ) {
     val userDisplay by homeViewModel.userDisplay.collectAsStateWithLifecycle()
+    val rfmScore by homeViewModel.rfmScore.collectAsStateWithLifecycle()
 
-    Scaffold(topBar = { TopAppBar(title = { Text("用户中心") }) }) { padding ->
+    Box(modifier = Modifier.fillMaxSize().background(BgPrimary)) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp)
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.Top
         ) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+            CenterAlignedTopAppBar(
+                title = { Text("用户中心", color = TextPrimary) },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = BgPrimary.copy(alpha = 0.9f)
+                )
+            )
+
+            Column(
+                modifier = Modifier.fillMaxSize().padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(64.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary)
+                // User card
+                AppCard(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            (userDisplay.accountId.firstOrNull()?.uppercase() ?: "U"),
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.align(Alignment.Center)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text(
-                            userDisplay.accountId.ifEmpty { "用户" },
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            userDisplay.phoneNumber.ifEmpty { "未绑定手机号" },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(64.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    Brush.horizontalGradient(listOf(BrandPrimary, BrandSecondary))
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                userDisplay.accountId.firstOrNull()?.uppercase() ?: "U",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+                        Spacer().width(16.dp)
+                        Column {
+                            Text(
+                                userDisplay.accountId.ifEmpty { "用户" },
+                                style = MaterialTheme.typography.titleMedium,
+                                color = TextPrimary
+                            )
+                            Text(
+                                userDisplay.phoneNumber.ifEmpty { "未绑定手机号" },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary
+                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier.size(6.dp).clip(CircleShape).background(BrandSecondary)
+                                )
+                                Spacer().width(4.dp)
+                                Text("Lv.2", style = MaterialTheme.typography.labelSmall, color = BrandSecondary)
+                            }
+                        }
                     }
                 }
-            }
-            Spacer(modifier = Modifier.height(24.dp))
-            Text("功能", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(modifier = Modifier.height(8.dp))
-            FeatureItem(Icons.Default.ShoppingCart, "订阅管理") { }
-            FeatureItem(Icons.Default.CreditCard, "积分中心") { }
-            FeatureItem(Icons.Default.Lock, "安全设置") { }
-            FeatureItem(Icons.Default.Info, "关于") { }
-            Spacer(modifier = Modifier.height(24.dp))
-            Button(onClick = { homeViewModel.logout(onLogout) }, modifier = Modifier.fillMaxWidth()) {
-                Text("退出登录")
+
+                // RFM card
+                rfmScore?.let { score ->
+                    AppCard(
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("\uD83C\uDFAF", style = MaterialTheme.typography.titleMedium)
+                            Spacer().width(12.dp)
+                            Column {
+                                Text(score.rfmSegmentCn, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                Text("RFM ${score.rfmSegment}", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                            }
+                        }
+                    }
+                }
+
+                // Feature list
+                Text("功能", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = BgCard),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column {
+                        FeatureRow(Icons.Default.ShoppingCart, "订阅管理", onNavigateToSubscription)
+                        HorizontalDivider(color = Divider)
+                        FeatureRow(Icons.Default.CreditCard, "积分中心", onNavigateToCredits)
+                        HorizontalDivider(color = Divider)
+                        FeatureRow(Icons.Default.Lock, "安全设置", onNavigateToSecurity)
+                        HorizontalDivider(color = Divider)
+                        FeatureRow(Icons.Default.Info, "关于", onNavigateToAbout)
+                    }
+                }
+
+                // Logout
+                Button(
+                    onClick = { homeViewModel.logout(onLogout) },
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = BgCard),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("退出登录", color = Danger)
+                }
             }
         }
     }
 }
 
 @Composable
-fun FeatureItem(icon: ImageVector, title: String, onClick: () -> Unit) {
-    ListItem(
-        leadingContent = { Icon(icon, contentDescription = title, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
-        headlineContent = { Text(title) },
-        modifier = Modifier.fillMaxWidth(),
-        onClick = onClick
-    )
-}
-
-data class UserDisplay(
-    val accountId: String = "",
-    val phoneNumber: String = ""
-)
-
-private fun phoneDesensitized(phone: String): String {
-    return if (phone.length == 11) "${phone.take(3)}****${phone.takeLast(4)}" else "未绑定手机号"
+private fun FeatureRow(icon: ImageVector, label: String, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        color = Color.Transparent,
+        modifier = Modifier.fillMaxWidth().height(56.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(icon, contentDescription = label, tint = BrandPrimary, modifier = Modifier.size(24.dp))
+            Spacer().width(12.dp)
+            Text(label, style = MaterialTheme.typography.bodyLarge, color = TextPrimary, modifier = Modifier.weight(1f))
+            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(16.dp))
+        }
+    }
 }

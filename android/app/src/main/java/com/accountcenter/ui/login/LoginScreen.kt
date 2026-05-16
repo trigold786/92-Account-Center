@@ -1,33 +1,21 @@
 package com.accountcenter.ui.login
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.accountcenter.ui.components.GradientButton
+import com.accountcenter.ui.theme.*
 
 @Composable
 fun LoginScreen(
@@ -35,24 +23,34 @@ fun LoginScreen(
     onNavigateToRegister: () -> Unit,
     onLoginSuccess: () -> Unit
 ) {
-    val uiState = viewModel.uiState.collectAsState().value
+    val uiState by viewModel.uiState.collectAsState()
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        if (uiState.isLoading) {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-        }
-
+    Box(
+        modifier = Modifier.fillMaxSize().background(BgPrimary)
+    ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(32.dp),
+            modifier = Modifier.fillMaxSize().padding(32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Column(modifier = Modifier.padding(bottom = 48.dp)) {
-                Text("账户中心", style = MaterialTheme.typography.headlineMedium)
-                Text("登录您的账户", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+            Icon(
+                imageVector = Icons.Default.Person,
+                contentDescription = null,
+                modifier = Modifier.size(56.dp),
+                tint = Brush.horizontalGradient(listOf(BrandPrimary, BrandSecondary))
+            )
+            Spacer().height(12.dp)
+            Text(
+                "账户中心",
+                style = MaterialTheme.typography.headlineLarge,
+                color = TextPrimary
+            )
+            Text(
+                "登录您的账户",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextSecondary
+            )
+            Spacer().height(48.dp)
 
             OutlinedTextField(
                 value = uiState.phoneNumber,
@@ -60,25 +58,35 @@ fun LoginScreen(
                 label = { Text("手机号") },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = BrandSecondary,
+                    unfocusedBorderColor = Divider,
+                    focusedLabelColor = BrandSecondary,
+                    unfocusedLabelColor = TextSecondary,
+                    cursorColor = BrandSecondary
+                )
             )
-
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer().height(16.dp)
 
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                 SegmentedButton(
                     selected = uiState.loginMode == LoginMode.PASSWORD,
                     onClick = { viewModel.onLoginModeChange(LoginMode.PASSWORD) },
                     shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                ) { Text("密码登录") }
+                ) {
+                    Text("密码登录", color = TextPrimary)
+                }
                 SegmentedButton(
                     selected = uiState.loginMode == LoginMode.VERIFICATION_CODE,
                     onClick = { viewModel.onLoginModeChange(LoginMode.VERIFICATION_CODE) },
                     shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                ) { Text("验证码登录") }
+                ) {
+                    Text("验证码登录", color = TextPrimary)
+                }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer().height(16.dp)
 
             if (uiState.loginMode == LoginMode.PASSWORD) {
                 OutlinedTextField(
@@ -87,57 +95,67 @@ fun LoginScreen(
                     label = { Text("密码") },
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = BrandSecondary,
+                        unfocusedBorderColor = Divider,
+                        focusedLabelColor = BrandSecondary,
+                        unfocusedLabelColor = TextSecondary,
+                        cursorColor = BrandSecondary
+                    )
                 )
             } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = uiState.verificationCode,
                         onValueChange = viewModel::onVerificationCodeChange,
                         label = { Text("验证码") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = BrandSecondary,
+                            unfocusedBorderColor = Divider,
+                            focusedLabelColor = BrandSecondary,
+                            unfocusedLabelColor = TextSecondary,
+                            cursorColor = BrandSecondary
+                        )
                     )
-                    val buttonText = if (uiState.countdownSeconds > 0) "${uiState.countdownSeconds}s" else "发送验证码"
+                    val btnText = if (uiState.countdownSeconds > 0) "${uiState.countdownSeconds}s" else "发送验证码"
                     OutlinedButton(
                         onClick = viewModel::sendVerificationCode,
-                        enabled = !uiState.isLoading && uiState.countdownSeconds == 0 && uiState.phoneNumber.isNotEmpty(),
-                        modifier = Modifier.height(56.dp)
+                        enabled = !uiState.isLoading && uiState.countdownSeconds == 0 && uiState.phoneNumber.isNotEmpty()
                     ) {
-                        Text(buttonText)
+                        Text(btnText, color = BrandSecondary)
                     }
                 }
             }
 
             uiState.errorMessage?.let {
-                Text(text = it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                Text(it, color = Danger, style = MaterialTheme.typography.bodySmall)
             }
+            Spacer().height(16.dp)
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Button(
+            GradientButton(
+                text = "登录",
                 onClick = { viewModel.login(onLoginSuccess) },
-                enabled = !uiState.isLoading,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("登录")
-            }
+                enabled = !uiState.isLoading
+            )
 
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Text("还没有账号？", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer().height(24.dp)
+            Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
+                Text("还没有账号？", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                 TextButton(onClick = onNavigateToRegister) {
-                    Text("立即注册", style = MaterialTheme.typography.bodySmall)
+                    Text("立即注册", color = BrandSecondary)
                 }
             }
+        }
+
+        if (uiState.isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.align(Alignment.Center),
+                color = BrandSecondary
+            )
         }
     }
 }

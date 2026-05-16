@@ -4,6 +4,7 @@ import SwiftUI
 class HomeViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published var rfmScore: RFMScore?
     private let authManager: AuthManager
     
     init(authManager: AuthManager = .shared) {
@@ -14,5 +15,10 @@ class HomeViewModel: ObservableObject {
     
     func logout() async {
         await authManager.logout()
+    }
+    
+    func loadRFM() async {
+        guard let userId = authManager.currentUser?.id else { return }
+        rfmScore = try? await APIClient.shared.getRFMScore(userId: userId)
     }
 }
