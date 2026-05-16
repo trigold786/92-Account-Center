@@ -14,13 +14,7 @@ extension View {
             .foregroundColor(.white)
             .frame(maxWidth: .infinity)
             .frame(height: 52)
-            .background(
-                LinearGradient(
-                    colors: [.brandPrimary, .brandSecondary],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
+            .background(Color.brandGradient)
             .cornerRadius(12)
     }
 
@@ -29,10 +23,6 @@ extension View {
             .padding()
             .background(Color.bgInput)
             .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.brandSecondary.opacity(0.0), lineWidth: 1)
-            )
     }
 
     func sectionTitle() -> some View {
