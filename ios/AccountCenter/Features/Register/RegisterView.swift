@@ -24,6 +24,7 @@ struct RegisterView: View {
 
                     TextField("手机号", text: $viewModel.phoneNumber)
                         .keyboardType(.numberPad)
+                        .textContentType(.telephoneNumber)
                         .font(.custom("Inter-Regular", size: 15))
                         .glowingInput()
 
@@ -42,14 +43,17 @@ struct RegisterView: View {
                     }
 
                     TextField("账户ID", text: $viewModel.accountId)
+                        .textContentType(.username)
                         .font(.custom("Inter-Regular", size: 15))
                         .glowingInput()
 
                     SecureField("密码", text: $viewModel.password)
+                        .textContentType(.newPassword)
                         .font(.custom("Inter-Regular", size: 15))
                         .glowingInput()
 
                     SecureField("确认密码", text: $viewModel.confirmPassword)
+                        .textContentType(.newPassword)
                         .font(.custom("Inter-Regular", size: 15))
                         .glowingInput()
 

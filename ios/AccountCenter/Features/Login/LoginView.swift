@@ -26,6 +26,7 @@ struct LoginView: View {
                 VStack(spacing: 16) {
                     TextField("手机号", text: $viewModel.phoneNumber)
                         .keyboardType(.numberPad)
+                        .textContentType(.telephoneNumber)
                         .font(.custom("Inter-Regular", size: 15))
                         .glowingInput()
 
@@ -37,6 +38,7 @@ struct LoginView: View {
 
                     if viewModel.loginMode == .password {
                         SecureField("密码", text: $viewModel.password)
+                            .textContentType(.password)
                             .font(.custom("Inter-Regular", size: 15))
                             .glowingInput()
                     } else {
