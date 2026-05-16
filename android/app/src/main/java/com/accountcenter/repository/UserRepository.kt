@@ -16,7 +16,7 @@ class UserRepository @Inject constructor(
         token?.let {
             User(
                 id = it.userId,
-                phoneNumber = "138****1234",
+                phoneNumber = null,
                 accountId = it.accountId
             )
         }

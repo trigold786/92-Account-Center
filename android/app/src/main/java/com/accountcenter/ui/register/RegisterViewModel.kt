@@ -75,6 +75,7 @@ class RegisterViewModel @Inject constructor(
             val state = _uiState.value
             val request = RegisterRequest(
                 phoneNumber = state.phoneNumber,
+                code = state.verificationCode,
                 accountId = state.accountId,
                 password = state.password,
                 agreeToTerms = state.agreeToTerms,

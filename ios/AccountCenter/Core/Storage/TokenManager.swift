@@ -7,12 +7,17 @@ class TokenManager {
     private let service = "com.accountcenter.app"
     private let accessTokenKey = "access_token"
     private let refreshTokenKey = "refresh_token"
+    private let tokenDataKey = "token_data"
     
     private init() {}
     
     func save(token: Token) {
         set(token.accessToken, forKey: accessTokenKey)
         set(token.refreshToken, forKey: refreshTokenKey)
+        if let jsonData = try? JSONEncoder().encode(token),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            set(jsonString, forKey: tokenDataKey)
+        }
     }
     
     func getAccessToken() -> String? {
@@ -23,17 +28,35 @@ class TokenManager {
         get(forKey: refreshTokenKey)
     }
     
+    func getUserId() -> Int64? {
+        getTokenData()?.userId
+    }
+    
+    func getAccountId() -> String? {
+        getTokenData()?.accountId
+    }
+    
+    private func getTokenData() -> Token? {
+        guard let json = get(forKey: tokenDataKey),
+              let data = json.data(using: .utf8) else { return nil }
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return try? decoder.decode(Token.self, from: data)
+    }
+    
     func clear() {
         delete(forKey: accessTokenKey)
         delete(forKey: refreshTokenKey)
+        delete(forKey: tokenDataKey)
     }
     
     private func set(_ value: String, forKey key: String) {
+        guard let data = value.data(using: .utf8) else { return }
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: service,
             kSecAttrAccount: key,
-            kSecValueData: value.data(using: .utf8)!
+            kSecValueData: data
         ]
         
         SecItemDelete(query as CFDictionary)

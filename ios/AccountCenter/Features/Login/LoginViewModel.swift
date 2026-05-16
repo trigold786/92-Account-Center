@@ -16,7 +16,11 @@ class LoginViewModel: ObservableObject {
     }
     
     private var countdownTimer: Timer?
-    @EnvironmentObject var authManager: AuthManager
+    private let authManager: AuthManager
+    
+    init(authManager: AuthManager = .shared) {
+        self.authManager = authManager
+    }
     
     func login() async {
         guard !isLoading else { return }

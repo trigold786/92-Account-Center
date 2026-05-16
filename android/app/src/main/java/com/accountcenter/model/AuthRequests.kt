@@ -23,6 +23,7 @@ data class RefreshTokenRequest(
 
 data class RegisterRequest(
     @SerializedName("phone_number") val phoneNumber: String,
+    val code: String,
     @SerializedName("account_id") val accountId: String,
     val password: String,
     @SerializedName("agree_to_terms") val agreeToTerms: Boolean,

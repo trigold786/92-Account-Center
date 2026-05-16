@@ -2,7 +2,6 @@ import SwiftUI
 
 struct LoginView: View {
     @StateObject private var viewModel = LoginViewModel()
-    @EnvironmentObject var authManager: AuthManager
     @Environment(\.presentationMode) var presentationMode
     
     var body: some View {
@@ -106,6 +105,5 @@ struct LoginView: View {
 struct LoginView_Previews: PreviewProvider {
     static var previews: some View {
         LoginView()
-            .environmentObject(AuthManager.shared)
     }
 }

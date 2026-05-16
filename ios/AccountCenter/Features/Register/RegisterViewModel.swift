@@ -15,7 +15,11 @@ class RegisterViewModel: ObservableObject {
     @Published var errorMessage: String?
     
     private var countdownTimer: Timer?
-    @EnvironmentObject var authManager: AuthManager
+    private let authManager: AuthManager
+    
+    init(authManager: AuthManager = .shared) {
+        self.authManager = authManager
+    }
     
     func register() async {
         guard !isLoading, validateInputs() else { return }
@@ -25,6 +29,7 @@ class RegisterViewModel: ObservableObject {
         do {
             let request = RegisterRequest(
                 phoneNumber: phoneNumber,
+                code: verificationCode,
                 accountId: accountId,
                 password: password,
                 agreeToTerms: agreeToTerms,

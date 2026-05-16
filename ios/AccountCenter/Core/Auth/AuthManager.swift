@@ -2,8 +2,7 @@ import Foundation
 import SwiftUI
 
 @MainActor
-@Observable
-class AuthManager {
+class AuthManager: ObservableObject {
     static let shared = AuthManager()
     
     private init() {
@@ -14,15 +13,26 @@ class AuthManager {
         accessToken != nil
     }
     
-    var currentUser: User?
+    @Published var currentUser: User?
     
-    private(set) var accessToken: String?
-    private(set) var refreshToken: String?
-    private(set) var userId: Int64?
+    @Published private(set) var accessToken: String?
+    @Published private(set) var refreshToken: String?
+    @Published private(set) var userId: Int64?
     
     private func loadToken() {
         accessToken = TokenManager.shared.getAccessToken()
         refreshToken = TokenManager.shared.getRefreshToken()
+        currentUser = accessToken.map { _ in
+            User(
+                id: TokenManager.shared.getUserId() ?? 0,
+                phoneNumber: nil,
+                accountId: TokenManager.shared.getAccountId() ?? "",
+                email: nil,
+                mfaEnabled: nil,
+                createdAt: nil,
+                updatedAt: nil
+            )
+        }
     }
     
     func login(token: Token) {
@@ -33,7 +43,7 @@ class AuthManager {
         
         currentUser = User(
             id: token.userId,
-            phoneNumber: "138****1234",
+            phoneNumber: nil,
             accountId: token.accountId,
             email: nil,
             mfaEnabled: nil,
@@ -54,16 +64,18 @@ class AuthManager {
         currentUser = nil
     }
     
-    func refreshIfNeeded() async {
-        guard let refreshToken = refreshToken else {
-            return
+    func refreshIfNeeded() async -> Bool {
+        guard let currentRefreshToken = refreshToken else {
+            return false
         }
         
         do {
-            let newToken = try await APIClient.shared.refresh(refreshToken: refreshToken)
+            let newToken = try await APIClient.shared.refresh(refreshToken: currentRefreshToken)
             login(token: newToken)
+            return true
         } catch {
             await logout()
+            return false
         }
     }
 }

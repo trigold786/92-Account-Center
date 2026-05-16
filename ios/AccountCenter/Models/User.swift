@@ -2,7 +2,7 @@ import Foundation
 
 struct User: Codable, Identifiable {
     let id: Int64
-    let phoneNumber: String
+    let phoneNumber: String?
     let accountId: String
     let email: String?
     let mfaEnabled: Bool?

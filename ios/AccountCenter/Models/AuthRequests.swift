@@ -42,6 +42,7 @@ struct RefreshTokenRequest: Codable {
 
 struct RegisterRequest: Codable {
     let phoneNumber: String
+    let code: String
     let accountId: String
     let password: String
     let agreeToTerms: Bool
@@ -49,10 +50,20 @@ struct RegisterRequest: Codable {
     
     enum CodingKeys: String, CodingKey {
         case phoneNumber = "phone_number"
+        case code
         case accountId = "account_id"
         case password
         case agreeToTerms = "agree_to_terms"
         case referralCode = "referral_code"
+    }
+    
+    init(phoneNumber: String, code: String, accountId: String, password: String, agreeToTerms: Bool, referralCode: String? = nil) {
+        self.phoneNumber = phoneNumber
+        self.code = code
+        self.accountId = accountId
+        self.password = password
+        self.agreeToTerms = agreeToTerms
+        self.referralCode = referralCode
     }
 }
 

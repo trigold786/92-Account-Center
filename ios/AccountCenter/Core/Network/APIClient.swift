@@ -38,18 +38,28 @@ class APIClient {
             
             switch httpResponse.statusCode {
             case 200...299:
-                do {
-                    let decoder = JSONDecoder()
-                    decoder.keyDecodingStrategy = .convertFromSnakeCase
-                    let dateFormatter = DateFormatter()
-                    dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'"
-                    dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
-                    decoder.dateDecodingStrategy = .formatted(dateFormatter)
-                    return try decoder.decode(T.self, from: data)
-                } catch {
-                    throw APIError.decodingError(error)
-                }
+                return try decodeResponse(data: data)
             case 401:
+                // Attempt token refresh and retry once
+                if await AuthManager.shared.refreshIfNeeded() {
+                    var retryRequest = URLRequest(url: url)
+                    retryRequest.httpMethod = method
+                    retryRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    if let newToken = AuthManager.shared.accessToken {
+                        retryRequest.setValue("Bearer \(newToken)", forHTTPHeaderField: "Authorization")
+                    }
+                    if let body = body {
+                        retryRequest.httpBody = try JSONEncoder().encode(body)
+                    }
+                    let (retryData, retryResponse) = try await session.data(for: retryRequest)
+                    guard let retryHttpResponse = retryResponse as? HTTPURLResponse else {
+                        throw APIError.unknown(NSError(domain: "APIClient", code: -1))
+                    }
+                    if retryHttpResponse.statusCode == 401 {
+                        throw APIError.unauthorized
+                    }
+                    return try decodeResponse(data: retryData)
+                }
                 throw APIError.unauthorized
             default:
                 let decoder = JSONDecoder()
@@ -62,6 +72,16 @@ class APIClient {
         } catch {
             throw APIError.networkError(error)
         }
+    }
+    
+    private func decodeResponse<T: Decodable>(data: Data) throws -> T {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'"
+        dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+        decoder.dateDecodingStrategy = .formatted(dateFormatter)
+        return try decoder.decode(T.self, from: data)
     }
     
     func login(request: LoginRequest) async throws -> Token {

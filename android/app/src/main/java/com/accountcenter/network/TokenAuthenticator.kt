@@ -15,29 +15,32 @@ class TokenAuthenticator @Inject constructor(
     private val tokenManager: TokenManager,
     private val apiClient: ApiClient
 ) : Authenticator {
-    override fun authenticate(route: Route?, response: Response): Request? {
-        if (response.request.header("Authorization") != null) {
-            return null
-        }
+    private val lock = Any()
 
-        return runBlocking {
-            val refreshToken = tokenManager.getRefreshToken()
-            if (refreshToken != null) {
+    override fun authenticate(route: Route?, response: Response): Request? {
+        if (response.request.url.encodedPath.contains("/auth/refresh")) return null
+        if (route == null) return null
+
+        synchronized(lock) {
+            val refreshToken = runBlocking { tokenManager.getRefreshToken() } ?: return null
+
+            return runBlocking {
                 try {
-                    val newToken = apiClient.refresh(RefreshTokenRequest(refreshToken))
-                    if (newToken.isSuccessful && newToken.body() != null) {
-                        tokenManager.saveToken(newToken.body()!!)
-                        return@runBlocking response.request.newBuilder()
-                            .header("Authorization", "Bearer ${newToken.body()!!.accessToken}")
+                    val newTokenResponse = apiClient.refresh(RefreshTokenRequest(refreshToken))
+                    if (newTokenResponse.isSuccessful && newTokenResponse.body() != null) {
+                        val newToken = newTokenResponse.body()!!
+                        tokenManager.saveToken(newToken)
+                        response.request.newBuilder()
+                            .header("Authorization", "Bearer ${newToken.accessToken}")
                             .build()
+                    } else {
+                        tokenManager.clearTokens()
+                        null
                     }
                 } catch (e: Exception) {
-                    tokenManager.clearTokens()
+                    null
                 }
             }
-
-            tokenManager.clearTokens()
-            null
         }
     }
 }

@@ -1,5 +1,7 @@
 package com.accountcenter.ui.home
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,20 +27,23 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
 fun HomeScreen(
     homeViewModel: HomeViewModel = hiltViewModel(),
     onLogout: () -> Unit
 ) {
+    val userDisplay by homeViewModel.userDisplay.collectAsStateWithLifecycle()
+
     Scaffold(topBar = { TopAppBar(title = { Text("用户中心") }) }) { padding ->
         Column(
             modifier = Modifier
@@ -51,18 +56,32 @@ fun HomeScreen(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
             ) {
                 Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    androidx.compose.foundation.layout.Box(
+                    Box(
                         modifier = Modifier
                             .size(64.dp)
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.primary)
                     ) {
-                        Text("U", color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Center))
+                        Text(
+                            (userDisplay.accountId.firstOrNull()?.uppercase() ?: "U"),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.align(Alignment.Center)
+                        )
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
-                        Text("用户", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text("138****1234", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            userDisplay.accountId.ifEmpty { "用户" },
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            userDisplay.phoneNumber.ifEmpty { "未绑定手机号" },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
@@ -91,7 +110,11 @@ fun FeatureItem(icon: ImageVector, title: String, onClick: () -> Unit) {
     )
 }
 
+data class UserDisplay(
+    val accountId: String = "",
+    val phoneNumber: String = ""
+)
+
 private fun phoneDesensitized(phone: String): String {
     return if (phone.length == 11) "${phone.take(3)}****${phone.takeLast(4)}" else "未绑定手机号"
 }
-

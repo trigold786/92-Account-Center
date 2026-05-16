@@ -4,7 +4,13 @@ import SwiftUI
 class HomeViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
-    @EnvironmentObject var authManager: AuthManager
+    private let authManager: AuthManager
+    
+    init(authManager: AuthManager = .shared) {
+        self.authManager = authManager
+    }
+    
+    var currentUser: User? { authManager.currentUser }
     
     func logout() async {
         await authManager.logout()

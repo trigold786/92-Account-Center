@@ -3,7 +3,6 @@ package com.accountcenter.ui.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -22,7 +21,7 @@ sealed class Screen(val route: String) {
 @Composable
 fun NavGraph(
     navController: NavHostController = rememberNavController(),
-    authRepository: AuthRepository = hiltViewModel()
+    authRepository: AuthRepository
 ) {
     val isAuthenticated by authRepository.isAuthenticated.collectAsState(initial = false)
 
@@ -60,4 +59,3 @@ fun NavGraph(
         }
     }
 }
-
