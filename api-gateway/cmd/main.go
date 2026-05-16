@@ -191,8 +191,11 @@ func main() {
 	r := gin.Default()
 
 	r.Use(func(c *gin.Context) {
-		atomic.AddUint64(&gatewayRequestCount, 1)
+		start := time.Now()
 		c.Next()
+		atomic.AddUint64(&gatewayRequestCount, 1)
+		atomic.AddUint64(&durationSumNano, uint64(time.Since(start).Nanoseconds()))
+		atomic.AddUint64(&durationCount, 1)
 	})
 
 	r.Use(requestIDMiddleware())
@@ -246,11 +249,17 @@ func main() {
 	r.Any("/api/v1/kyb/*path", proxyHandler(config.ComplianceServiceURL))
 	r.Any("/api/v1/data/*path", proxyHandler(config.DataProductServiceURL))
 
-	r.GET("/metrics", func(c *gin.Context) {
+	r.Any("/metrics", func(c *gin.Context) {
 		var buf bytes.Buffer
 		fmt.Fprintf(&buf, "# HELP http_requests_total Total HTTP requests\n")
 		fmt.Fprintf(&buf, "# TYPE http_requests_total counter\n")
 		fmt.Fprintf(&buf, "http_requests_total{service=\"api-gateway\"} %d\n", atomic.LoadUint64(&gatewayRequestCount))
+		fmt.Fprintf(&buf, "# HELP http_request_duration_seconds_sum Total request duration in seconds\n")
+		fmt.Fprintf(&buf, "# TYPE http_request_duration_seconds_sum counter\n")
+		fmt.Fprintf(&buf, "http_request_duration_seconds_sum{service=\"api-gateway\"} %f\n", time.Duration(atomic.LoadUint64(&durationSumNano)).Seconds())
+		fmt.Fprintf(&buf, "# HELP http_request_duration_seconds_count Total request count for duration\n")
+		fmt.Fprintf(&buf, "# TYPE http_request_duration_seconds_count counter\n")
+		fmt.Fprintf(&buf, "http_request_duration_seconds_count{service=\"api-gateway\"} %d\n", atomic.LoadUint64(&durationCount))
 		fmt.Fprintf(&buf, "# HELP go_goroutines Number of goroutines\n")
 		fmt.Fprintf(&buf, "# TYPE go_goroutines gauge\n")
 		fmt.Fprintf(&buf, "go_goroutines{service=\"api-gateway\"} %d\n", runtime.NumGoroutine())
@@ -340,6 +349,10 @@ type responseCaptureWriter struct {
 	code int
 }
 
+func (w *responseCaptureWriter) Status() int {
+	return w.code
+}
+
 func (w *responseCaptureWriter) Write(b []byte) (int, error) {
 	w.body = append(w.body, b...)
 	return len(b), nil
@@ -347,10 +360,13 @@ func (w *responseCaptureWriter) Write(b []byte) (int, error) {
 
 func (w *responseCaptureWriter) WriteHeader(code int) {
 	w.code = code
-	w.ResponseWriter.WriteHeader(code)
 }
 
-var gatewayRequestCount uint64
+var (
+	gatewayRequestCount uint64
+	durationSumNano     uint64
+	durationCount       uint64
+)
 
 var phoneRegex = regexp.MustCompile(`"phone_number"\s*:\s*"(\d{3})\d{4}(\d{4})"`)
 var emailRegex = regexp.MustCompile(`"email"\s*:\s*"([a-zA-Z0-9])[a-zA-Z0-9._%+\-]*@([^"]+)"`)
@@ -369,26 +385,32 @@ func desensitizeMiddleware() gin.HandlerFunc {
 
 		c.Next()
 
-		if c.Writer.Status() < 200 || c.Writer.Status() >= 300 {
-			w := c.Writer.(*responseCaptureWriter)
-			w.ResponseWriter.Write(w.body)
+		status := captureWriter.code
+
+		flush := func(data []byte) {
+			captureWriter.ResponseWriter.WriteHeader(status)
+			captureWriter.ResponseWriter.Write(data)
+		}
+
+		if status < 200 || status >= 300 {
+			flush(captureWriter.body)
 			return
 		}
 
 		contentType := c.Writer.Header().Get("Content-Type")
 		if !strings.Contains(contentType, "application/json") {
+			flush(captureWriter.body)
 			return
 		}
 
 		if len(captureWriter.body) > 1048576 {
-			captureWriter.ResponseWriter.Write(captureWriter.body)
+			flush(captureWriter.body)
 			return
 		}
 
 		accountID, _ := c.Get("user_id")
 		if accountIDStr, ok := accountID.(string); ok && strings.HasPrefix(accountIDStr, "admin_") {
-			w := c.Writer.(*responseCaptureWriter)
-			w.ResponseWriter.Write(w.body)
+			flush(captureWriter.body)
 			return
 		}
 
@@ -399,9 +421,11 @@ func desensitizeMiddleware() gin.HandlerFunc {
 
 		if masked != body {
 			c.Header("X-Desensitized", "true")
+			captureWriter.ResponseWriter.Header().Del("Content-Length")
+			captureWriter.ResponseWriter.WriteHeader(status)
 			captureWriter.ResponseWriter.Write([]byte(masked))
 		} else {
-			captureWriter.ResponseWriter.Write(captureWriter.body)
+			flush(captureWriter.body)
 		}
 	}
 }

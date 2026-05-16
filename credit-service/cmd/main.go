@@ -24,7 +24,11 @@ import (
 	"github.com/trigold786/92-Account-Center/credit-service/internal/worker"
 )
 
-var requestCount uint64
+var (
+	requestCount    uint64
+	durationSumNano uint64
+	durationCount   uint64
+)
 
 func main() {
 	dbHost := getEnv("DB_HOST", "localhost")
@@ -69,8 +73,11 @@ func main() {
 	r := gin.Default()
 
 	r.Use(func(c *gin.Context) {
-		atomic.AddUint64(&requestCount, 1)
+		start := time.Now()
 		c.Next()
+		atomic.AddUint64(&requestCount, 1)
+		atomic.AddUint64(&durationSumNano, uint64(time.Since(start).Nanoseconds()))
+		atomic.AddUint64(&durationCount, 1)
 	})
 
 	creditsGroup := r.Group("/api/v1/credits")
@@ -94,11 +101,17 @@ func main() {
 		referralGroup.GET("/:user_id/summary", referralHandler.GetSummary)
 	}
 
-	r.GET("/metrics", func(c *gin.Context) {
+	r.Any("/metrics", func(c *gin.Context) {
 		var buf bytes.Buffer
 		fmt.Fprintf(&buf, "# HELP http_requests_total Total HTTP requests\n")
 		fmt.Fprintf(&buf, "# TYPE http_requests_total counter\n")
 		fmt.Fprintf(&buf, "http_requests_total{service=\"credit-service\"} %d\n", atomic.LoadUint64(&requestCount))
+		fmt.Fprintf(&buf, "# HELP http_request_duration_seconds_sum Total request duration in seconds\n")
+		fmt.Fprintf(&buf, "# TYPE http_request_duration_seconds_sum counter\n")
+		fmt.Fprintf(&buf, "http_request_duration_seconds_sum{service=\"credit-service\"} %f\n", time.Duration(atomic.LoadUint64(&durationSumNano)).Seconds())
+		fmt.Fprintf(&buf, "# HELP http_request_duration_seconds_count Total request count for duration\n")
+		fmt.Fprintf(&buf, "# TYPE http_request_duration_seconds_count counter\n")
+		fmt.Fprintf(&buf, "http_request_duration_seconds_count{service=\"credit-service\"} %d\n", atomic.LoadUint64(&durationCount))
 		fmt.Fprintf(&buf, "# HELP go_goroutines Number of goroutines\n")
 		fmt.Fprintf(&buf, "# TYPE go_goroutines gauge\n")
 		fmt.Fprintf(&buf, "go_goroutines{service=\"credit-service\"} %d\n", runtime.NumGoroutine())

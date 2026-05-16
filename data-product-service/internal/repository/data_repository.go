@@ -87,8 +87,8 @@ func (r *dataRepository) GetActiveBlacklistCount(ctx context.Context) (int, erro
 }
 
 func (r *dataRepository) GetRegistrationTrend(ctx context.Context, days int) ([]model.DailyCount, error) {
-	query := fmt.Sprintf(`SELECT TO_CHAR(created_at, 'YYYY-MM-DD') AS d, COUNT(*) FROM users WHERE created_at >= NOW() - interval '%d days' GROUP BY d ORDER BY d DESC`, days)
-	rows, err := r.db.QueryContext(ctx, query)
+	query := `SELECT TO_CHAR(created_at, 'YYYY-MM-DD') AS d, COUNT(*) FROM users WHERE created_at >= NOW() - $1::interval GROUP BY d ORDER BY d DESC`
+	rows, err := r.db.QueryContext(ctx, query, fmt.Sprintf("%d days", days))
 	if err != nil {
 		return nil, err
 	}
