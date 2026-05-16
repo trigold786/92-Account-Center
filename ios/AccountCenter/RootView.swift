@@ -1,10 +1,18 @@
 import SwiftUI
 
 struct RootView: View {
+    @StateObject private var authManager = AuthManager.shared
+    
     var body: some View {
-        Text("Sprint4: Coming soon!")
-            .font(.title)
-            .padding()
+        NavigationStack {
+            if authManager.isAuthenticated {
+                HomeView()
+                    .environmentObject(authManager)
+            } else {
+                LoginView()
+                    .environmentObject(authManager)
+            }
+        }
     }
 }
 
