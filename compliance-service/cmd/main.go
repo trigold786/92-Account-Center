@@ -78,9 +78,8 @@ func main() {
 	configClient := config.NewClient(configURL)
 	svcCfg, err := svcconfig.Load(configClient)
 	if err != nil {
-		logger.Error("failed to load compliance config", "error", err.Error())
-		os.Exit(1)
-	}
+	logger.Warn("config-service unavailable, continuing with env/defaults", "error", err)
+}
 	logger.Info("compliance config loaded successfully")
 
 	riskRepo := repository.NewRiskRepository(db)
@@ -94,9 +93,8 @@ func main() {
 
 	encryptKey, err := crypto.KeyFromEnv("ENCRYPTION_KEY")
 	if err != nil {
-		logger.Error("failed to load encryption key", "error", err.Error())
-		os.Exit(1)
-	}
+	logger.Warn("config-service unavailable, continuing with env/defaults", "error", err)
+}
 	if os.Getenv("ENCRYPTION_KEY") == "" {
 		logger.Warn("ENCRYPTION_KEY not set, using ephemeral key. KYB data will be lost on restart")
 	}

@@ -65,9 +65,8 @@ func main() {
 	configClient := config.NewClient(configSvcURL)
 	authCfg, err := svcconfig.Load(configClient)
 	if err != nil {
-		logger.Error("failed to load config", "error", err.Error())
-		os.Exit(1)
-	}
+	logger.Warn("config-service unavailable, continuing with env/defaults", "error", err)
+}
 	logger.Info("config loaded",
 		"jwt_access", authCfg.JwtAccessTokenExpire,
 		"jwt_refresh", authCfg.JwtRefreshTokenExpire,

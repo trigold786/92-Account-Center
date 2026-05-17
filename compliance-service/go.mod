@@ -1,6 +1,6 @@
 module github.com/trigold786/92-Account-Center/compliance-service
 
-go 1.23
+go 1.24
 
 require (
 	github.com/IBM/sarama v1.42.1

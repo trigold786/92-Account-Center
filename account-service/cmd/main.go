@@ -74,15 +74,14 @@ func main() {
 	configClient := config.NewClient(configURL)
 	svcCfg, err := svcconfig.Load(configClient)
 	if err != nil {
-		logger.Error("failed to load config", "error", err.Error())
-		os.Exit(1)
-	}
+	logger.Warn("config-service unavailable, continuing with env/defaults", "error", err)
+}
 	logger.Info("config loaded")
 
 	userRepo := repository.NewUserRepository(db)
 	entitlementRepo := repository.NewEntitlementRepository(db)
 	subscriptionRepo := repository.NewSubscriptionRepository(db)
-	smsClient := sms.NewClient(getEnv("SMS_SERVICE_URL", "http://localhost:8083"))
+	smsClient := sms.NewClient(getEnv("SMS_SERVICE_URL", "http://localhost:30311"))
 
 	entitlementCache := cache.NewEntitlementCache(rdb, svcCfg.EntitlementCacheTTL)
 

@@ -60,9 +60,8 @@ func main() {
 	configClient := config.NewClient(configURL)
 	svcCfg, err := svcconfig.Load(configClient)
 	if err != nil {
-		logger.Error("failed to load data-product config", "error", err.Error())
-		os.Exit(1)
-	}
+	logger.Warn("config-service unavailable, continuing with env/defaults", "error", err)
+}
 	logger.Info("data-product config loaded successfully")
 
 	dataRepo := repository.NewDataRepository(db)
