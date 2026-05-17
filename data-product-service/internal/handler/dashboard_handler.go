@@ -19,7 +19,7 @@ func NewDashboardHandler(dashSvc service.DashboardService) *DashboardHandler {
 func (h *DashboardHandler) GetOverview(c *gin.Context) {
 	overview, err := h.dashSvc.GetOverview(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "internal error"})
 		return
 	}
 

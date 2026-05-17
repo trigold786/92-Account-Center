@@ -19,5 +19,3 @@ type Deletion struct {
 type DeletionResponse struct {
 	Message string `json:"message"`
 }
-
-const FreezePeriod = 7 * 24 * time.Hour

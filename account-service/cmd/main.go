@@ -2,9 +2,10 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -14,14 +15,17 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 	_ "github.com/lib/pq"
 
 	"github.com/trigold786/92-Account-Center/account-service/internal/cache"
 	"github.com/trigold786/92-Account-Center/account-service/internal/handler"
 	"github.com/trigold786/92-Account-Center/account-service/internal/repository"
 	"github.com/trigold786/92-Account-Center/account-service/internal/service"
+	"github.com/trigold786/92-Account-Center/account-service/internal/svcconfig"
 	"github.com/trigold786/92-Account-Center/account-service/pkg/sms"
+	"github.com/trigold786/92-Account-Center/pkg/config"
+	"github.com/trigold786/92-Account-Center/pkg/logging"
 )
 
 var (
@@ -30,45 +34,61 @@ var (
 	durationCount   uint64
 )
 
+var logger = logging.NewLogger("account-service")
+
+
 func main() {
+	slog.SetDefault(logger)
 	dbHost := getEnv("DB_HOST", "localhost")
 	dbPort := getEnv("DB_PORT", "5432")
 	dbUser := getEnv("DB_USER", "postgres")
-	dbPassword := getEnv("DB_PASSWORD", "postgres")
+	dbPassword := getEnvSecret("DB_PASSWORD", "postgres")
 	dbName := getEnv("DB_NAME", "account_center")
 
 	dsn := "host=" + dbHost + " port=" + dbPort + " user=" + dbUser + " password=" + dbPassword + " dbname=" + dbName + " sslmode=disable"
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		logger.Error("failed to connect to database", "error", err.Error())
+		os.Exit(1)
 	}
 	defer db.Close()
 
 	if err := db.Ping(); err != nil {
-		log.Fatalf("Failed to ping database: %v", err)
+		logger.Error("failed to ping database", "error", err.Error())
+		os.Exit(1)
 	}
-	log.Println("Connected to database")
+	logger.Info("connected to database")
 
 	redisURL := getEnv("REDIS_URL", "redis://localhost:6379")
 	opt, err := redis.ParseURL(redisURL)
 	if err != nil {
-		log.Fatalf("Failed to parse REDIS_URL: %v", err)
+		logger.Error("failed to parse REDIS_URL", "error", err.Error())
+		os.Exit(1)
 	}
 	rdb := redis.NewClient(opt)
 	defer rdb.Close()
 
-	log.Println("Connected to Redis")
+	logger.Info("connected to redis")
+
+	configURL := getEnv("CONFIG_SERVICE_URL", "http://localhost:30315")
+	configClient := config.NewClient(configURL)
+	svcCfg, err := svcconfig.Load(configClient)
+	if err != nil {
+		logger.Error("failed to load config", "error", err.Error())
+		os.Exit(1)
+	}
+	logger.Info("config loaded")
 
 	userRepo := repository.NewUserRepository(db)
 	entitlementRepo := repository.NewEntitlementRepository(db)
 	subscriptionRepo := repository.NewSubscriptionRepository(db)
 	smsClient := sms.NewClient(getEnv("SMS_SERVICE_URL", "http://localhost:8083"))
 
-	entitlementCache := cache.NewEntitlementCache(rdb)
+	entitlementCache := cache.NewEntitlementCache(rdb, svcCfg.EntitlementCacheTTL)
 
-	userService := service.NewUserService(userRepo, smsClient)
+	userService := service.NewUserService(userRepo, smsClient, svcCfg)
 	entitlementService := service.NewEntitlementService(entitlementRepo, entitlementCache)
-	subscriptionService := service.NewSubscriptionService(subscriptionRepo, userRepo, entitlementService)
+	subscriptionService := service.NewSubscriptionService(subscriptionRepo, userRepo, entitlementService, svcCfg)
 
 	var referralBinder handler.ReferralBinder
 	creditServiceURL := getEnv("CREDIT_SERVICE_URL", "")
@@ -83,7 +103,11 @@ func main() {
 	entitlementHandler := handler.NewEntitlementHandler(entitlementService)
 	subscriptionHandler := handler.NewSubscriptionHandler(subscriptionService)
 
-	r := gin.Default()
+	r := gin.New()
+	r.Use(gin.RecoveryWithWriter(os.Stderr, func(c *gin.Context, err any) {
+		logger.Error("panic recovered", "error", fmt.Sprintf("%v", err))
+	}))
+	r.Use(logging.Middleware(logger))
 
 	r.Use(func(c *gin.Context) {
 		start := time.Now()
@@ -153,18 +177,27 @@ func main() {
 	})
 
 	port := getEnv("PORT", "30301")
-	log.Printf("Account service starting on :%s", port)
+	logger.Info("starting server", "port", port)
+
+	srv := &http.Server{
+		Addr:    ":" + port,
+		Handler: r,
+	}
 
 	go func() {
+		defer logging.RecoverGoroutine(logger, "shutdown-listener")
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 		<-sigChan
-		log.Println("Shutting down...")
-		os.Exit(0)
+		logger.Info("shutting down")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		srv.Shutdown(shutdownCtx)
 	}()
 
-	if err := r.Run(":" + port); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		logger.Error("failed to start server", "error", err.Error())
+		os.Exit(1)
 	}
 }
 
@@ -172,5 +205,13 @@ func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
 	}
+	return defaultValue
+}
+
+func getEnvSecret(key, defaultValue string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	logger.Warn("environment variable not set, using insecure default", "key", key)
 	return defaultValue
 }

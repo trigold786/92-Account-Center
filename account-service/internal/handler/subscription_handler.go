@@ -21,13 +21,13 @@ func NewSubscriptionHandler(svc service.SubscriptionService) *SubscriptionHandle
 func (h *SubscriptionHandler) Purchase(c *gin.Context) {
 	var req model.PurchaseRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
 	sub, err := h.svc.PurchaseSubscription(c.Request.Context(), &req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "internal error"})
 		return
 	}
 
@@ -37,13 +37,13 @@ func (h *SubscriptionHandler) Purchase(c *gin.Context) {
 func (h *SubscriptionHandler) Upgrade(c *gin.Context) {
 	var req model.UpgradeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
 	sub, err := h.svc.UpgradeSubscription(c.Request.Context(), &req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "internal error"})
 		return
 	}
 
@@ -53,13 +53,13 @@ func (h *SubscriptionHandler) Upgrade(c *gin.Context) {
 func (h *SubscriptionHandler) Renew(c *gin.Context) {
 	var req model.RenewRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
 	sub, err := h.svc.RenewSubscription(c.Request.Context(), &req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "internal error"})
 		return
 	}
 
@@ -76,7 +76,7 @@ func (h *SubscriptionHandler) GetUserSubscriptions(c *gin.Context) {
 
 	subs, err := h.svc.GetUserSubscriptions(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 

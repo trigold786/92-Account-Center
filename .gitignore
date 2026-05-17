@@ -18,4 +18,26 @@ Thumbs.db
 *.test
 *.out
 
+# Node.js
+node_modules/
+dist/
+
+# Java / Android
+.gradle/
+build/
+*.apk
+*.aab
+local.properties
+
+# iOS
+*.xcworkspace
+*.xcuserdata
+DerivedData/
+Pods/
+
+# WeChat Mini Program
+weapp/miniprogram_npm/
+
+# Temp files
+*.log
 nul

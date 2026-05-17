@@ -1,4 +1,3 @@
-
 package jwt
 
 import (
@@ -33,12 +32,12 @@ type TokenResponse struct {
 	DeviceBindingInfo string `json:"device_binding_info,omitempty"`
 }
 
-func NewJWTManager(accessSecret, refreshSecret string) *JWTManager {
+func NewJWTManager(accessSecret, refreshSecret string, accessExpiry, refreshExpiry time.Duration) *JWTManager {
 	return &JWTManager{
 		accessSecret:  accessSecret,
 		refreshSecret: refreshSecret,
-		accessExpiry:  30 * time.Minute,
-		refreshExpiry: 7 * 24 * time.Hour,
+		accessExpiry:  accessExpiry,
+		refreshExpiry: refreshExpiry,
 	}
 }
 
@@ -47,7 +46,6 @@ func generateTokenID() string {
 	rand.Read(b)
 	return base64.URLEncoding.EncodeToString(b)
 }
-
 
 func (m *JWTManager) GenerateTokenPair(userID int64, accountID string) (string, string, error) {
 	tokenID := generateTokenID()

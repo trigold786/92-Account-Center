@@ -9,7 +9,7 @@ services:
     environment:
       POSTGRES_DB: account_center
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
       - "5432:5432"
     volumes:
@@ -56,7 +56,7 @@ services:
     container_name: db-migrate
     environment:
       GOOSE_DRIVER: postgres
-      GOOSE_DBSTRING: "postgres://postgres:postgres@postgres:5432/account_center?sslmode=disable"
+      GOOSE_DBSTRING: "postgres://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-account_center}?sslmode=disable"
     networks:
       - app_network
     depends_on:
@@ -64,6 +64,38 @@ services:
         condition: service_healthy
     command: ["up"]
     restart: "no"
+
+  config-service:
+    build:
+      context: .
+      dockerfile: config-service/Dockerfile
+    container_name: config-service
+    ports:
+      - "30315:30315"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: postgres
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-account_center}
+      PORT: "30315"
+    networks:
+      - app_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:30315/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+    restart: always
 
   api-gateway:
     build:
@@ -79,7 +111,8 @@ services:
       CREDIT_SERVICE_URL: "http://credit-service:30312"
       COMPLIANCE_SERVICE_URL: "http://compliance-service:30313"
       DATA_PRODUCT_SERVICE_URL: "http://data-product-service:30314"
-      JWT_SECRET: ${JWT_SECRET:-dev-access-secret}
+      CONFIG_SERVICE_URL: "http://config-service:30315"
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET required}
       PORT: "30300"
     networks:
       - app_network
@@ -120,10 +153,11 @@ services:
       DB_HOST: postgres
       DB_PORT: "5432"
       DB_USER: postgres
-      DB_PASSWORD: postgres
-      DB_NAME: account_center
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-account_center}
       REDIS_URL: "redis:6379"
       CREDIT_SERVICE_URL: "http://credit-service:30312"
+      CONFIG_SERVICE_URL: "http://config-service:30315"
       PORT: "30301"
     networks:
       - app_network
@@ -156,11 +190,12 @@ services:
       DB_HOST: postgres
       DB_PORT: "5432"
       DB_USER: postgres
-      DB_PASSWORD: postgres
-      DB_NAME: account_center
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-account_center}
       REDIS_URL: "redis:6379"
-      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-dev-access-secret}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev-refresh-secret}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET required}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET required}
+      CONFIG_SERVICE_URL: "http://config-service:30315"
       PORT: "30302"
     networks:
       - app_network
@@ -197,6 +232,7 @@ services:
       SMTP_PORT: ${SMTP_PORT:-"465"}
       SMTP_USERNAME: ${SMTP_USERNAME:-""}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-""}
+      CONFIG_SERVICE_URL: "http://config-service:30315"
       PORT: "30311"
     networks:
       - app_network
@@ -227,8 +263,8 @@ services:
       DB_HOST: postgres
       DB_PORT: "5432"
       DB_USER: postgres
-      DB_PASSWORD: postgres
-      DB_NAME: account_center
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-account_center}
       REDIS_URL: "redis:6379"
       PORT: "30312"
     networks:
@@ -262,8 +298,9 @@ services:
       DB_HOST: postgres
       DB_PORT: "5432"
       DB_USER: postgres
-      DB_PASSWORD: postgres
-      DB_NAME: account_center
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-account_center}
+      CONFIG_SERVICE_URL: "http://config-service:30315"
       REDIS_URL: "redis:6379"
       PORT: "30313"
     networks:
@@ -297,8 +334,8 @@ services:
       DB_HOST: postgres
       DB_PORT: "5432"
       DB_USER: postgres
-      DB_PASSWORD: postgres
-      DB_NAME: account_center
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-account_center}
       PORT: "30314"
     networks:
       - app_network
@@ -337,6 +374,60 @@ services:
         limits:
           cpus: '0.25'
           memory: 256M
+    restart: always
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - app_network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+    restart: always
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:-admin}
+      GF_INSTALL_PLUGINS: grafana-lokiexplore-app
+    networks:
+      - app_network
+    depends_on:
+      loki:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+    restart: always
+
+  web-ui:
+    image: nginx:alpine
+    container_name: web-ui
+    ports:
+      - "30317:80"
+    volumes:
+      - ./web-ui/dist:/usr/share/nginx/html:ro
+    networks:
+      - app_network
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 64M
     restart: always
 
 volumes:

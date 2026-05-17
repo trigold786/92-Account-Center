@@ -15,14 +15,19 @@ import (
 )
 
 type QRCodeService struct {
-	rdb    *redis.Client
-	jwtMgr *jwt.JWTManager
+	rdb       *redis.Client
+	jwtMgr    *jwt.JWTManager
+	qrcodeTTL time.Duration
 }
 
-func NewQRCodeService(rdb *redis.Client, jwtMgr *jwt.JWTManager) *QRCodeService {
+func NewQRCodeService(rdb *redis.Client, jwtMgr *jwt.JWTManager, qrcodeTTL time.Duration) *QRCodeService {
+	if qrcodeTTL <= 0 {
+		qrcodeTTL = 5 * time.Minute
+	}
 	return &QRCodeService{
-		rdb:    rdb,
-		jwtMgr: jwtMgr,
+		rdb:       rdb,
+		jwtMgr:    jwtMgr,
+		qrcodeTTL: qrcodeTTL,
 	}
 }
 
@@ -46,13 +51,13 @@ func (s *QRCodeService) Generate(ctx context.Context) (*model.QRCodeGenerateResp
 	}
 
 	key := fmt.Sprintf("qrcode:%s", codeID)
-	if err := s.rdb.Set(ctx, key, jsonData, time.Duration(model.QRCodeTTL)*time.Second).Err(); err != nil {
+	if err := s.rdb.Set(ctx, key, jsonData, s.qrcodeTTL).Err(); err != nil {
 		return nil, err
 	}
 
 	return &model.QRCodeGenerateResponse{
 		CodeID:    codeID,
-		ExpiresIn: model.QRCodeTTL,
+		ExpiresIn: int(s.qrcodeTTL.Seconds()),
 	}, nil
 }
 
@@ -118,7 +123,7 @@ func (s *QRCodeService) Scan(ctx context.Context, codeID string, userID int64) e
 		return err
 	}
 	if ttl <= 0 {
-		ttl = time.Duration(model.QRCodeTTL) * time.Second
+		ttl = s.qrcodeTTL
 	}
 
 	return s.rdb.Set(ctx, key, jsonData, ttl).Err()
@@ -170,7 +175,7 @@ func (s *QRCodeService) Confirm(ctx context.Context, codeID string, userID int64
 		return nil, err
 	}
 	if ttl <= 0 {
-		ttl = time.Duration(model.QRCodeTTL) * time.Second
+		ttl = s.qrcodeTTL
 	}
 
 	if err := s.rdb.Set(ctx, key, jsonData, ttl).Err(); err != nil {

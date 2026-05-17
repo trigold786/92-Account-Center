@@ -51,7 +51,7 @@ func (h *DeletionHandler) RequestDeletion(c *gin.Context) {
 
 	var req DeletionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
@@ -64,7 +64,7 @@ func (h *DeletionHandler) RequestDeletion(c *gin.Context) {
 		VerificationType: req.VerificationType,
 	})
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "internal error"})
 		return
 	}
 
@@ -87,7 +87,7 @@ func (h *DeletionHandler) CancelDeletion(c *gin.Context) {
 
 	resp, err := h.userService.CancelAccountDeletion(c.Request.Context(), userIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "internal error"})
 		return
 	}
 
@@ -110,7 +110,7 @@ func (h *DeletionHandler) GetDeletionStatus(c *gin.Context) {
 
 	deletion, err := h.userService.GetDeletionStatus(c.Request.Context(), userIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "internal error"})
 		return
 	}
 

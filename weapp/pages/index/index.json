@@ -1,0 +1,4 @@
+{
+  "navigationBarTitleText": "首页",
+  "usingComponents": { "app-card": "/components/app-card/app-card" }
+}

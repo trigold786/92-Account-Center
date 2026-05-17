@@ -21,12 +21,12 @@ func NewBlacklistHandler(blacklistSvc service.BlacklistService) *BlacklistHandle
 func (h *BlacklistHandler) AddEntry(c *gin.Context) {
 	var req model.BlacklistEntryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	entry, err := h.blacklistSvc.AddEntry(c.Request.Context(), &req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"code": 0, "data": entry})
@@ -35,12 +35,12 @@ func (h *BlacklistHandler) AddEntry(c *gin.Context) {
 func (h *BlacklistHandler) CheckEntry(c *gin.Context) {
 	var req model.BlacklistCheckRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	blocked, reason, err := h.blacklistSvc.CheckBlocked(c.Request.Context(), req.EntryType, req.EntryValue)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": gin.H{"blocked": blocked, "reason": reason}})
@@ -50,7 +50,7 @@ func (h *BlacklistHandler) RemoveEntry(c *gin.Context) {
 	entryType := c.Param("type")
 	entryValue := c.Param("value")
 	if err := h.blacklistSvc.RemoveEntry(c.Request.Context(), entryType, entryValue); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "removed"})
@@ -62,7 +62,7 @@ func (h *BlacklistHandler) ListEntries(c *gin.Context) {
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	entries, err := h.blacklistSvc.ListEntries(c.Request.Context(), entryType, limit, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": entries})

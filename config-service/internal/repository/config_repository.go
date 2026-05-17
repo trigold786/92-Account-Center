@@ -142,7 +142,7 @@ func (r *configRepository) ListItems(ctx context.Context, filter model.ConfigIte
 	offset := (filter.Page - 1) * filter.PageSize
 
 	dataQuery := fmt.Sprintf(`SELECT id, group_id, code, name, description, data_type, current_value,
-		default_value, min_value, max_value, allowed_values, is_sensitive, is_enabled, created_at, updated_at
+		default_value, COALESCE(min_value,''), COALESCE(max_value,''), COALESCE(allowed_values,''), is_sensitive, is_enabled, created_at, updated_at
 		FROM config_items%s ORDER BY group_id, code LIMIT $%d OFFSET $%d`, whereClause, argIdx, argIdx+1)
 	args = append(args, filter.PageSize, offset)
 
@@ -168,7 +168,7 @@ func (r *configRepository) ListItems(ctx context.Context, filter model.ConfigIte
 func (r *configRepository) GetItemByID(ctx context.Context, id int64) (*model.ConfigItem, error) {
 	item := &model.ConfigItem{}
 	query := `SELECT id, group_id, code, name, description, data_type, current_value,
-		default_value, min_value, max_value, allowed_values, is_sensitive, is_enabled, created_at, updated_at
+		default_value, COALESCE(min_value,''), COALESCE(max_value,''), COALESCE(allowed_values,''), is_sensitive, is_enabled, created_at, updated_at
 		FROM config_items WHERE id = $1`
 	err := r.db.QueryRowContext(ctx, query, id).Scan(&item.ID, &item.GroupID, &item.Code, &item.Name,
 		&item.Description, &item.DataType, &item.CurrentValue, &item.DefaultValue, &item.MinValue,
@@ -182,7 +182,7 @@ func (r *configRepository) GetItemByID(ctx context.Context, id int64) (*model.Co
 func (r *configRepository) GetItemByCode(ctx context.Context, code string) (*model.ConfigItem, error) {
 	item := &model.ConfigItem{}
 	query := `SELECT id, group_id, code, name, description, data_type, current_value,
-		default_value, min_value, max_value, allowed_values, is_sensitive, is_enabled, created_at, updated_at
+		default_value, COALESCE(min_value,''), COALESCE(max_value,''), COALESCE(allowed_values,''), is_sensitive, is_enabled, created_at, updated_at
 		FROM config_items WHERE code = $1`
 	err := r.db.QueryRowContext(ctx, query, code).Scan(&item.ID, &item.GroupID, &item.Code, &item.Name,
 		&item.Description, &item.DataType, &item.CurrentValue, &item.DefaultValue, &item.MinValue,

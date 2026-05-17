@@ -19,10 +19,7 @@ type DeviceFingerprintService struct {
 
 func NewDeviceFingerprintService(repo repository.DeviceRepository, trustDays int, riskThreshold float64) *DeviceFingerprintService {
 	if trustDays <= 0 {
-		trustDays = 3
-	}
-	if trustDays > 60 {
-		trustDays = 60
+		trustDays = 30
 	}
 	if riskThreshold < 0.0 || riskThreshold > 1.0 {
 		riskThreshold = 0.3

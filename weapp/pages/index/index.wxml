@@ -1,0 +1,35 @@
+<view class="home-container">
+  <view wx:if="{{!loggedIn}}" class="welcome-section">
+    <text class="welcome-title">Account Center</text>
+    <text class="welcome-desc">安全·高效·智能的账号管理平台</text>
+    <view class="login-btn" bindtap="goLogin">登录 / 注册</view>
+  </view>
+
+  <view wx:else>
+    <view class="rfm-hero" wx:if="{{rfm}}">
+      <text class="rfm-score">{{rfm.total_score}}</text>
+      <text class="rfm-label">RFM 综合评分</text>
+      <text class="rfm-segment">{{rfmSegment}}</text>
+      <view class="rfm-details">
+        <view class="rfm-item"><text class="val">{{rfm.recency_score}}</text><text class="lbl">Recency</text></view>
+        <view class="rfm-item"><text class="val">{{rfm.frequency_score}}</text><text class="lbl">Frequency</text></view>
+        <view class="rfm-item"><text class="val">{{rfm.monetary_score}}</text><text class="lbl">Monetary</text></view>
+      </view>
+    </view>
+
+    <view class="quick-actions">
+      <view class="action-card" bindtap="goCredits">
+        <text class="action-icon">💰</text>
+        <text class="action-name">积分</text>
+      </view>
+      <view class="action-card" bindtap="goSubscription">
+        <text class="action-icon">📋</text>
+        <text class="action-name">订阅</text>
+      </view>
+      <view class="action-card" bindtap="goCredits">
+        <text class="action-icon">🎁</text>
+        <text class="action-name">推荐</text>
+      </view>
+    </view>
+  </view>
+</view>

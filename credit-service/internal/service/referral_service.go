@@ -9,6 +9,7 @@ import (
 
 	"github.com/trigold786/92-Account-Center/credit-service/internal/model"
 	"github.com/trigold786/92-Account-Center/credit-service/internal/repository"
+	"github.com/trigold786/92-Account-Center/credit-service/internal/svcconfig"
 	"github.com/trigold786/92-Account-Center/credit-service/pkg/crypto"
 )
 
@@ -26,10 +27,11 @@ type ReferralService interface {
 
 type referralService struct {
 	referralRepo repository.ReferralRepository
+	cfg          *svcconfig.CreditConfig
 }
 
-func NewReferralService(referralRepo repository.ReferralRepository) ReferralService {
-	return &referralService{referralRepo: referralRepo}
+func NewReferralService(referralRepo repository.ReferralRepository, cfg *svcconfig.CreditConfig) ReferralService {
+	return &referralService{referralRepo: referralRepo, cfg: cfg}
 }
 
 func (s *referralService) BindReferral(ctx context.Context, referrerCode, refereeID string) error {
@@ -61,7 +63,7 @@ func (s *referralService) BindReferral(ctx context.Context, referrerCode, refere
 
 func (s *referralService) GenerateLink(ctx context.Context, userID int64) (*model.GenerateLinkResponse, error) {
 	code := encodeReferralCode(userID)
-	link := fmt.Sprintf("https://app.example.com/referral?code=%s", code)
+	link := fmt.Sprintf(s.cfg.ReferralLinkTemplate, code)
 	return &model.GenerateLinkResponse{
 		ReferralCode: code,
 		ReferralLink: link,

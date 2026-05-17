@@ -185,7 +185,7 @@ INSERT INTO config_items (group_id, code, name, description, data_type, current_
 (1, 'LOGIN_MAX_ATTEMPTS', '登录最大失败次数', '账户锁定前允许的最大连续失败登录次数', 'INTEGER', '5', '5', '3', '10', NULL, false, true),
 (1, 'LOGIN_LOCKOUT_DURATION', '登录锁定时长', '账户锁定后的自动解锁时长', 'DURATION', '30m', '30m', '5m', '2h', '5m,10m,15m,30m,1h,2h', false, true);
 
--- notification-service (15 items: SMS 11 + Email 4)
+-- notification-service (20 items: SMS 12 + Email 5 + OTP 3)
 INSERT INTO config_items (group_id, code, name, description, data_type, current_value, default_value, min_value, max_value, allowed_values, is_sensitive, is_enabled) VALUES
 (2, 'SMS_PROVIDER', '短信提供商', '短信服务提供商', 'ENUM', 'aliyun', 'aliyun', NULL, NULL, 'aliyun,twilio,vonage', false, true),
 (2, 'SMS_TEMPLATE_LOGIN', '登录短信模板ID', '登录验证码短信模板ID', 'STRING', 'SMS_LOGIN_TEMPLATE', 'SMS_LOGIN_TEMPLATE', NULL, NULL, NULL, false, true),
@@ -202,6 +202,12 @@ INSERT INTO config_items (group_id, code, name, description, data_type, current_
 (2, 'EMAIL_OTP_EXPIRE', '邮件OTP有效期', '邮件一次性密码有效时长', 'DURATION', '5m', '5m', '1m', '30m', '1m,3m,5m,10m,15m,30m', false, true),
 (2, 'EMAIL_MAGIC_LINK_EXPIRE', 'Magic Link有效期', '邮件魔法链接有效时长', 'DURATION', '15m', '15m', '5m', '2h', '5m,10m,15m,30m,1h,2h', false, true),
 (2, 'EMAIL_RATE_LIMIT_PER_USER', '单用户邮件频率限制', '每个用户每小时允许发送的最大邮件数', 'RATE_LIMIT', '5/1h', '5/1h', '1/1h', '20/1h', NULL, false, true);
+
+-- notification-service (3 more: SMS daily limit, email daily limit, OTP code length)
+INSERT INTO config_items (group_id, code, name, description, data_type, current_value, default_value, min_value, max_value, allowed_values, is_sensitive, is_enabled) VALUES
+(2, 'SMS_DAILY_LIMIT', '短信每日上限', '每个手机号每天允许发送的最大短信数量', 'INTEGER', '10', '10', '1', '100', NULL, false, true),
+(2, 'EMAIL_DAILY_LIMIT', '邮件每日上限', '每个邮箱每天允许发送的最大邮件数量', 'INTEGER', '10', '10', '1', '100', NULL, false, true),
+(2, 'OTP_CODE_LENGTH', 'OTP验证码长度', 'OTP一次性密码的位数', 'INTEGER', '6', '6', '4', '8', NULL, false, true);
 
 -- account-service (8 items: Account 3 + Device 2 + KYB 3 + Referral 5 duplicated but in group account)
 INSERT INTO config_items (group_id, code, name, description, data_type, current_value, default_value, min_value, max_value, allowed_values, is_sensitive, is_enabled) VALUES
@@ -298,7 +304,92 @@ INSERT INTO config_items (group_id, code, name, description, data_type, current_
 INSERT INTO config_items (group_id, code, name, description, data_type, current_value, default_value, min_value, max_value, allowed_values, is_sensitive, is_enabled) VALUES
 (7, 'SESSION_MAX_PER_USER', '单用户最大会话数', '每个用户允许的最大并发会话数', 'INTEGER', '5', '5', '1', '20', NULL, false, true),
 (7, 'SESSION_SLIDING_WINDOW_ENABLED', '会话滑动窗口开关', '是否启用会话滑动窗口续期', 'BOOLEAN', 'true', 'true', NULL, NULL, 'true,false', false, true),
-(7, 'SESSION_RENEWAL_ADVANCE_TIME', '会话续期提前期', '会话过期前多久自动续期', 'DURATION', '5m', '5m', '1m', '30m', NULL, false, true);
+(7, 'SESSION_RENEWAL_ADVANCE_TIME', '会话续期提前期', '会话过期前多久自动续期', 'DURATION', '5m', '5m', '1m', '30m', NULL, false, true),
+(7, 'SESSION_IDLE_TIMEOUT', '会话空闲超时', '用户无操作后会话自动过期的时长', 'DURATION', '30m', '30m', '5m', '2h', '5m,10m,15m,30m,1h,2h', false, true),
+(7, 'SESSION_MAX_CONCURRENT_DEVICES', '最大并发设备数', '同一用户允许的最大并发登录设备数', 'INTEGER', '3', '3', '1', '10', NULL, false, true);
+
+-- Additional config items (11 items to reach 106 total)
+-- auth-service (2 more: password history + expiry)
+INSERT INTO config_items (group_id, code, name, description, data_type, current_value, default_value, min_value, max_value, allowed_values, is_sensitive, is_enabled) VALUES
+(1, 'PASSWORD_HISTORY_SIZE', '密码历史记录数', '禁止重复使用的历史密码数量', 'INTEGER', '5', '5', '3', '10', NULL, false, true),
+(1, 'PASSWORD_EXPIRY_DAYS', '密码有效期', '强制更换密码的间隔天数', 'INTEGER', '90', '90', '30', '365', NULL, false, true);
+
+-- notification-service (2 more: phone/email change templates)
+INSERT INTO config_items (group_id, code, name, description, data_type, current_value, default_value, min_value, max_value, allowed_values, is_sensitive, is_enabled) VALUES
+(2, 'SMS_TEMPLATE_CHANGE_PHONE', '换绑手机短信模板ID', '更换手机号验证码的短信模板ID', 'STRING', 'SMS_CHANGE_PHONE_TEMPLATE', 'SMS_CHANGE_PHONE_TEMPLATE', NULL, NULL, NULL, false, true),
+(2, 'SMS_TEMPLATE_CHANGE_EMAIL', '换绑邮箱短信模板ID', '更换邮箱验证码的短信模板ID', 'STRING', 'SMS_CHANGE_EMAIL_TEMPLATE', 'SMS_CHANGE_EMAIL_TEMPLATE', NULL, NULL, NULL, false, true);
+
+-- credit-service (2 more: signup/referral bonus)
+INSERT INTO config_items (group_id, code, name, description, data_type, current_value, default_value, min_value, max_value, allowed_values, is_sensitive, is_enabled) VALUES
+(4, 'CREDIT_SIGNUP_BONUS', '注册赠送积分', '新用户注册时赠送的积分数', 'INTEGER', '100', '100', '0', '10000', NULL, false, true),
+(4, 'CREDIT_REFERRAL_BONUS', '推荐赠送积分', '推荐新用户注册时赠送的积分数', 'INTEGER', '50', '50', '0', '5000', NULL, false, true);
+
+-- compliance-service (1 more: device fingerprint)
+INSERT INTO config_items (group_id, code, name, description, data_type, current_value, default_value, min_value, max_value, allowed_values, is_sensitive, is_enabled) VALUES
+(6, 'DEVICE_FINGERPRINT_ENABLED', '设备指纹校验开关', '是否启用设备指纹识别与校验', 'BOOLEAN', 'true', 'true', NULL, NULL, 'true,false', false, true);
+
+-- account-service (1 more: permanent deletion delay)
+INSERT INTO config_items (group_id, code, name, description, data_type, current_value, default_value, min_value, max_value, allowed_values, is_sensitive, is_enabled) VALUES
+(3, 'ACCOUNT_DELETION_PERMANENT_DAYS', '永久删除等待期', '冻结期结束后多少天执行永久删除', 'INTEGER', '7', '7', '1', '90', NULL, false, true);
+
+-- data-product-service (1 more: RFM data retention)
+INSERT INTO config_items (group_id, code, name, description, data_type, current_value, default_value, min_value, max_value, allowed_values, is_sensitive, is_enabled) VALUES
+(5, 'RFM_DATA_RETENTION_DAYS', 'RFM数据保留期', 'RFM评分数据的保留天数', 'INTEGER', '730', '730', '90', '3650', NULL, false, true);
+
+-- shared (1 more: referral code length)
+INSERT INTO config_items (group_id, code, name, description, data_type, current_value, default_value, min_value, max_value, allowed_values, is_sensitive, is_enabled) VALUES
+(10, 'REFERRAL_CODE_LENGTH', '推荐码长度', '用户推荐码的字符长度', 'INTEGER', '8', '8', '4', '16', NULL, false, true);
+
+-- Missing config items from code audit (9 items)
+-- api-gateway group (1 more: QR code TTL)
+INSERT INTO config_items (group_id, code, name, description, data_type, current_value, default_value, min_value, max_value, allowed_values, is_sensitive, is_enabled) VALUES
+(7, 'QR_CODE_EXPIRE', '二维码过期时间', '二维码登录的有效时长', 'DURATION', '5m', '5m', '1m', '30m', '1m,3m,5m,10m,15m,30m', false, true);
+
+-- account-service (3 more: subscription duration, cache TTL, KYB face threshold)
+INSERT INTO config_items (group_id, code, name, description, data_type, current_value, default_value, min_value, max_value, allowed_values, is_sensitive, is_enabled) VALUES
+(3, 'SUBSCRIPTION_DEFAULT_DURATION', '默认订阅时长', '新订阅的默认有效时长', 'DURATION', '720h', '720h', '24h', '8760h', '24h,168h,720h,2160h,8760h', false, true),
+(3, 'ENTITLEMENT_CACHE_TTL', '权益缓存有效期', '用户权益数据的缓存时长', 'DURATION', '24h', '24h', '1m', '168h', NULL, false, true),
+(3, 'KYB_FACE_SCORE_THRESHOLD', '人脸评分阈值', '企业认证人脸识别的通过分数阈值', 'DECIMAL', '0.8', '0.8', '0', '1', NULL, false, true);
+
+-- compliance-service (2 more: registration/referral rate limits)
+INSERT INTO config_items (group_id, code, name, description, data_type, current_value, default_value, min_value, max_value, allowed_values, is_sensitive, is_enabled) VALUES
+(6, 'RISK_REGISTRATION_RATE_LIMIT', '注册频率限制', '每IP每小时允许的最大注册次数', 'INTEGER', '3', '3', '1', '20', NULL, false, true),
+(6, 'RISK_MAX_SCORE', '风险最高分值', '风险评分的上限值', 'INTEGER', '100', '100', '1', '1000', NULL, false, true);
+
+-- credit-service (1 more: page size)
+INSERT INTO config_items (group_id, code, name, description, data_type, current_value, default_value, min_value, max_value, allowed_values, is_sensitive, is_enabled) VALUES
+(4, 'CREDIT_PAGE_SIZE', '积分分页大小', '积分列表查询的默认每页条数', 'INTEGER', '20', '20', '5', '100', NULL, false, true);
+
+-- Additional credit-service config items (from code audit)
+INSERT INTO config_items (group_id, code, name, description, data_type, current_value, default_value, min_value, max_value, allowed_values, is_sensitive, is_enabled) VALUES
+(4, 'CREDIT_DEFAULT_REBATE_RATE', '默认返利比例', '订阅返利的默认百分比（小数表示）', 'DECIMAL', '0.1', '0.1', '0', '1', NULL, false, true),
+(4, 'CREDIT_WORKER_POLL_INTERVAL', '工作者轮询间隔', '订阅工作者轮询Redis Stream的间隔', 'DURATION', '2s', '2s', '100ms', '60s', NULL, false, true),
+(4, 'CREDIT_WORKER_BATCH_SIZE', '工作者批量大小', '工作者每次批量处理的订阅事件数', 'INTEGER', '10', '10', '1', '100', NULL, false, true);
+
+-- shared (1 more: referral link domain)
+INSERT INTO config_items (group_id, code, name, description, data_type, current_value, default_value, min_value, max_value, allowed_values, is_sensitive, is_enabled) VALUES
+(10, 'REFERRAL_LINK_DOMAIN', '推荐链接域名', '用户推荐链接的基础域名', 'STRING', 'https://app.example.com', 'https://app.example.com', NULL, NULL, NULL, false, true);
+
+-- data-product-service (1 more: dashboard trend days)
+INSERT INTO config_items (group_id, code, name, description, data_type, current_value, default_value, min_value, max_value, allowed_values, is_sensitive, is_enabled) VALUES
+(5, 'DASHBOARD_TREND_DAYS', '仪表盘趋势天数', '仪表盘注册趋势统计的天数范围', 'INTEGER', '30', '30', '1', '365', NULL, false, true);
+
+-- Default admin user role (system_owner)
+INSERT INTO user_roles (user_id, role_id) VALUES ('admin', 1) ON CONFLICT DO NOTHING;
+
+-- compliance-service (7 more: cache TTL, sliding window params, page sizes)
+INSERT INTO config_items (group_id, code, name, description, data_type, current_value, default_value, min_value, max_value, allowed_values, is_sensitive, is_enabled) VALUES
+(6, 'BLACKLIST_CACHE_TTL', '黑名单缓存有效期', '黑名单数据的内存缓存时长', 'DURATION', '24h', '24h', '1m', '168h', NULL, false, true),
+(6, 'SLIDING_WINDOW_REG_LIMIT', '滑动窗口注册上限', '滑动窗口时间内允许的最大注册数', 'INTEGER', '3', '3', '1', '100', NULL, false, true),
+(6, 'SLIDING_WINDOW_REG_WINDOW', '注册滑动窗口时长', '注册频率统计的滑动窗口时长', 'DURATION', '1h', '1h', '1m', '24h', NULL, false, true),
+(6, 'SLIDING_WINDOW_REF_ABUSE_LIMIT', '返佣滥用上限', '滑动窗口内允许的最大返佣操作数', 'INTEGER', '50', '50', '1', '1000', NULL, false, true),
+(6, 'SLIDING_WINDOW_REF_ABUSE_WINDOW', '返佣滥用窗口时长', '返佣滥用检测的滑动窗口时长', 'DURATION', '1h', '1h', '1m', '24h', NULL, false, true),
+(6, 'AUDIT_LOG_DEFAULT_PAGE_SIZE', '审计日志默认分页大小', '审计日志列表查询的默认每页条数', 'INTEGER', '100', '100', '10', '500', NULL, false, true),
+(6, 'RISK_HISTORY_DEFAULT_LIMIT', '风险历史默认分页大小', '风险事件历史查询的默认每页条数', 'INTEGER', '100', '100', '10', '500', NULL, false, true);
+
+-- auth-service (1 more: login rate limit)
+INSERT INTO config_items (group_id, code, name, description, data_type, current_value, default_value, min_value, max_value, allowed_values, is_sensitive, is_enabled) VALUES
+(1, 'LOGIN_RATE_LIMIT_PER_IP', '登录频率限制', '每IP每分钟允许的最大登录尝试次数', 'INTEGER', '10', '10', '1', '100', NULL, false, true);
 
 -- +goose Down
 DROP TABLE IF EXISTS user_roles;

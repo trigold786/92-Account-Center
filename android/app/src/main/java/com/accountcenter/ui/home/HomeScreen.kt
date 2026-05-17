@@ -21,6 +21,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.accountcenter.ui.components.AppCard
 import com.accountcenter.ui.theme.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     homeViewModel: HomeViewModel = hiltViewModel(),
@@ -73,7 +74,7 @@ fun HomeScreen(
                                 color = Color.White
                             )
                         }
-                        Spacer().width(16.dp)
+                        Spacer(modifier = Modifier.width(16.dp))
                         Column {
                             Text(
                                 userDisplay.accountId.ifEmpty { "用户" },
@@ -89,7 +90,7 @@ fun HomeScreen(
                                 Box(
                                     modifier = Modifier.size(6.dp).clip(CircleShape).background(BrandSecondary)
                                 )
-                                Spacer().width(4.dp)
+                                Spacer(modifier = Modifier.width(4.dp))
                                 Text("Lv.2", style = MaterialTheme.typography.labelSmall, color = BrandSecondary)
                             }
                         }
@@ -103,7 +104,7 @@ fun HomeScreen(
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("\uD83C\uDFAF", style = MaterialTheme.typography.titleMedium)
-                            Spacer().width(12.dp)
+                            Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(score.rfmSegmentCn, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = TextPrimary)
                                 Text("RFM ${score.rfmSegment}", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
@@ -122,7 +123,7 @@ fun HomeScreen(
                     Column {
                         FeatureRow(Icons.Default.ShoppingCart, "订阅管理", onNavigateToSubscription)
                         HorizontalDivider(color = Divider)
-                        FeatureRow(Icons.Default.CreditCard, "积分中心", onNavigateToCredits)
+                        FeatureRow(Icons.Default.AccountBalanceWallet, "积分中心", onNavigateToCredits)
                         HorizontalDivider(color = Divider)
                         FeatureRow(Icons.Default.Lock, "安全设置", onNavigateToSecurity)
                         HorizontalDivider(color = Divider)
@@ -156,9 +157,9 @@ private fun FeatureRow(icon: ImageVector, label: String, onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(icon, contentDescription = label, tint = BrandPrimary, modifier = Modifier.size(24.dp))
-            Spacer().width(12.dp)
+            Spacer(modifier = Modifier.width(12.dp))
             Text(label, style = MaterialTheme.typography.bodyLarge, color = TextPrimary, modifier = Modifier.weight(1f))
-            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(16.dp))
+            Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(16.dp))
         }
     }
 }

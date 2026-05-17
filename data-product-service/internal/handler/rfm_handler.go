@@ -28,7 +28,7 @@ func (h *RFMHandler) GetRFM(c *gin.Context) {
 
 	rfm, err := h.rfmSvc.GetRFM(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "internal error"})
 		return
 	}
 
@@ -38,13 +38,13 @@ func (h *RFMHandler) GetRFM(c *gin.Context) {
 func (h *RFMHandler) GetRFMBatch(c *gin.Context) {
 	var req model.RFMBatchRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid request: " + err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid request body"})
 		return
 	}
 
 	results, err := h.rfmSvc.GetRFMBatch(c.Request.Context(), req.UserIDs)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "internal error"})
 		return
 	}
 

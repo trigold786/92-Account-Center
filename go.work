@@ -1,4 +1,4 @@
-go 1.21
+go 1.24
 
 use (
 	./account-service
@@ -10,4 +10,5 @@ use (
 	./data-product-service
 	./config-service
 	./pkg/config
+	./pkg/logging
 )

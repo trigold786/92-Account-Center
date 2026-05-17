@@ -1,0 +1,4 @@
+{
+  "navigationBarTitleText": "登录",
+  "usingComponents": { "gradient-button": "/components/gradient-button/gradient-button" }
+}

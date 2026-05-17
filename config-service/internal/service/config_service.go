@@ -24,6 +24,7 @@ type ConfigService interface {
 	ResetItemToDefault(ctx context.Context, id int64, operator string) error
 
 	ListVersionsByItemID(ctx context.Context, itemID int64) ([]model.ConfigVersion, error)
+	GetTotalCount(ctx context.Context) (int, error)
 }
 
 type configService struct {
@@ -157,4 +158,8 @@ func (s *configService) ResetItemToDefault(ctx context.Context, id int64, operat
 
 func (s *configService) ListVersionsByItemID(ctx context.Context, itemID int64) ([]model.ConfigVersion, error) {
 	return s.configRepo.ListVersionsByItemID(ctx, itemID)
+}
+
+func (s *configService) GetTotalCount(ctx context.Context) (int, error) {
+	return s.configRepo.GetTotalCount(ctx)
 }

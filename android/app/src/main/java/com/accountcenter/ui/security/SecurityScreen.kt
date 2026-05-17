@@ -67,7 +67,7 @@ fun SecurityScreen(
                     }
 
                     item {
-                        Spacer().height(8.dp)
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text("登录设备", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
                     }
                     devices.forEach { device ->
@@ -102,12 +102,12 @@ private fun RiskEventCard(event: RiskEvent) {
             Box(
                 modifier = Modifier.size(12.dp).clip(CircleShape).background(levelColor)
             )
-            Spacer().width(12.dp)
+            Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(event.eventType, style = MaterialTheme.typography.bodyMedium, color = TextPrimary, fontWeight = FontWeight.Bold)
                 Text(event.createdAt, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
             }
-            Spacer().width(8.dp)
+            Spacer(modifier = Modifier.width(8.dp))
             Surface(
                 color = levelColor.copy(alpha = 0.15f),
                 shape = RoundedCornerShape(6.dp)
@@ -140,7 +140,7 @@ private fun DeviceCard(device: PushDevice) {
                 tint = BrandPrimary,
                 modifier = Modifier.size(24.dp)
             )
-            Spacer().width(12.dp)
+            Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(device.deviceName ?: device.platform, style = MaterialTheme.typography.bodyMedium, color = TextPrimary)
                 Text("最近活跃", style = MaterialTheme.typography.bodySmall, color = TextSecondary)

@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/trigold786/92-Account-Center/account-service/internal/model"
 )
@@ -36,10 +36,11 @@ end
 
 type EntitlementCache struct {
 	rdb *redis.Client
+	ttl time.Duration
 }
 
-func NewEntitlementCache(rdb *redis.Client) *EntitlementCache {
-	return &EntitlementCache{rdb: rdb}
+func NewEntitlementCache(rdb *redis.Client, ttl time.Duration) *EntitlementCache {
+	return &EntitlementCache{rdb: rdb, ttl: ttl}
 }
 
 func (c *EntitlementCache) cacheKey(userID int64) string {
@@ -62,7 +63,7 @@ func (c *EntitlementCache) WarmCache(ctx context.Context, entitlements []model.E
 		}
 		pipe.HSet(ctx, key, e.FeatureCode, string(data))
 	}
-	pipe.Expire(ctx, key, 24*time.Hour)
+	pipe.Expire(ctx, key, c.ttl)
 	_, err := pipe.Exec(ctx)
 	return err
 }
@@ -110,7 +111,7 @@ func (c *EntitlementCache) GrantQuota(ctx context.Context, userID int64, feature
 	}
 	pipe := c.rdb.Pipeline()
 	pipe.HSet(ctx, key, featureCode, string(data))
-	pipe.Expire(ctx, key, 24*time.Hour)
+	pipe.Expire(ctx, key, c.ttl)
 	_, err = pipe.Exec(ctx)
 	return err
 }

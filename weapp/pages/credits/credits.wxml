@@ -1,0 +1,38 @@
+<view class="credits-container">
+  <view class="balance-hero">
+    <text class="balance-label">可用积分</text>
+    <text class="balance-value">{{account ? account.balance : '--'}}</text>
+    <view class="balance-extras">
+      <text>累计获得: {{account ? account.total_earned : '--'}}</text>
+      <text>累计消耗: {{account ? account.total_consumed : '--'}}</text>
+    </view>
+  </view>
+
+  <view class="actions-row">
+    <view class="action-btn {{earning ? 'disabled' : ''}}" bindtap="doEarn">
+      <text>{{earning ? '签到中' : '签到领积分'}}</text>
+    </view>
+  </view>
+
+  <app-card title="返佣概况" wx:if="{{referral}}">
+    <view class="referral-grid">
+      <view class="ref-item"><text class="ref-val">{{referral.total_referrals}}</text><text>邀请好友</text></view>
+      <view class="ref-item"><text class="ref-val">{{referral.total_earnings}}</text><text>返佣收益</text></view>
+      <view class="ref-item"><text class="ref-val">{{referral.referral_code}}</text><text>邀请码</text></view>
+    </view>
+    <view class="copy-link" bindtap="copyReferralLink">复制邀请链接</view>
+  </app-card>
+
+  <app-card title="最近交易">
+    <view wx:if="{{transactions.length === 0}}" class="empty">暂无交易记录</view>
+    <view class="txn-item" wx:for="{{transactions}}" wx:key="id">
+      <view class="txn-left">
+        <text class="txn-reason">{{item.reason}}</text>
+        <text class="txn-time">{{item.created_at}}</text>
+      </view>
+      <text class="txn-amount {{item.type === 'earn' ? 'earn' : 'consume'}}">
+        {{item.type === 'earn' ? '+' : '-'}}{{item.amount}}
+      </text>
+    </view>
+  </app-card>
+</view>

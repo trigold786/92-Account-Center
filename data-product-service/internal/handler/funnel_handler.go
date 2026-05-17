@@ -19,7 +19,7 @@ func NewFunnelHandler(dashSvc service.DashboardService) *FunnelHandler {
 func (h *FunnelHandler) GetSubscriptionFunnel(c *gin.Context) {
 	funnel, err := h.dashSvc.GetSubscriptionFunnel(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "internal error"})
 		return
 	}
 

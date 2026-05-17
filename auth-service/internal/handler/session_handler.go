@@ -20,13 +20,13 @@ func NewSessionHandler(sessionService service.SessionService) *SessionHandler {
 func (h *SessionHandler) CreateSession(c *gin.Context) {
 	var req model.CreateSessionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
 	session, err := h.sessionService.CreateSession(c.Request.Context(), &req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 
@@ -40,17 +40,17 @@ func (h *SessionHandler) CreateSession(c *gin.Context) {
 func (h *SessionHandler) ValidateSession(c *gin.Context) {
 	var req model.ValidateSessionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
 	sessionInfo, err := h.sessionService.ValidateSession(c.Request.Context(), req.SessionID)
 	if err != nil {
-		status := http.StatusInternalServerError
 		if err == service.ErrSessionNotFound || err == service.ErrSessionExpired {
-			status = http.StatusUnauthorized
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+			return
 		}
-		c.JSON(status, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 
@@ -72,7 +72,7 @@ func (h *SessionHandler) GetUserSessions(c *gin.Context) {
 
 	sessions, err := h.sessionService.GetUserSessions(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 
@@ -96,7 +96,7 @@ func (h *SessionHandler) GetUserSessions(c *gin.Context) {
 func (h *SessionHandler) InvalidateSession(c *gin.Context) {
 	var req model.InvalidateSessionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
@@ -107,11 +107,11 @@ func (h *SessionHandler) InvalidateSession(c *gin.Context) {
 
 	err := h.sessionService.InvalidateSession(c.Request.Context(), req.SessionID)
 	if err != nil {
-		status := http.StatusInternalServerError
 		if err == service.ErrSessionNotFound {
-			status = http.StatusNotFound
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			return
 		}
-		c.JSON(status, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 
@@ -121,13 +121,13 @@ func (h *SessionHandler) InvalidateSession(c *gin.Context) {
 func (h *SessionHandler) InvalidateAllUserSessions(c *gin.Context) {
 	var req model.InvalidateAllUserSessionsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
 	err := h.sessionService.InvalidateAllUserSessions(c.Request.Context(), req.UserID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 
@@ -137,17 +137,17 @@ func (h *SessionHandler) InvalidateAllUserSessions(c *gin.Context) {
 func (h *SessionHandler) RefreshSession(c *gin.Context) {
 	var req model.RefreshSessionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
 	sessionInfo, err := h.sessionService.RefreshSession(c.Request.Context(), req.SessionID)
 	if err != nil {
-		status := http.StatusInternalServerError
 		if err == service.ErrSessionNotFound || err == service.ErrSessionExpired {
-			status = http.StatusUnauthorized
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+			return
 		}
-		c.JSON(status, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 

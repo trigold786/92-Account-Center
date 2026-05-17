@@ -1,23 +1,57 @@
 # Account Center Microservice
 
-企业级账户中心微服务系统，为 Neuro 系列产品提供统一的用户认证、账户管理、短信服务、设备指纹、企业认证等功能。系统符合**等保三级 (MLPS 3.0)** 安全标准及**Neuro 开发 SOP（L1-L6）**规范。
+企业级账户中心微服务系统，为 Neuro 系列产品提供统一的用户认证、账户管理、风控、信用、数据产品、通知及配置管理。系统符合**等保三级 (MLPS 3.0)** 安全标准及 **Neuro 开发 SOP (L1-L6)** 规范。
 
-## 功能特性
+## 系统架构
 
-### 核心服务
+```
+                         +-------------+
+                         |   Client    |
+                         | (Web/Mobile)|
+                         +------+------+
+                                |
+                         +------v------+
+                         | api-gateway |
+                         |  (30300)    |
+                         +------+------+
+                                |
+          +---------------------+----------------------+
+          |                     |                      |
+   +------v------+      +------v------+      +--------v--------+
+   |auth-service |      |account-svc  |      | compliance-svc  |
+   |  (30302)    |      |  (30301)    |      |   (30304)       |
+   +------+------+      +------+------+      +--------+--------+
+          |                     |                      |
+   +------v------+      +------v------+      +--------v--------+
+   |notification |      |credit-svc   |      | data-product-svc|
+   |  (30303)    |      |  (30305)    |      |   (30306)       |
+   +-------------+      +------+------+      +--------+--------+
+                                |
+                         +------v------+
+                         |config-service|
+                         |  (30315)     |
+                         +------+-------+
+                                |
+                     +----------+---------+
+                     |                    |
+              +------v------+     +-------v--------+
+              | PostgreSQL  |     |     Redis      |
+              |   (20002)   |     |    (20003)     |
+              +-------------+     +----------------+
+```
 
-| 服务 | 端口 (w004) | 容器名 | 功能说明 |
-|------|-------------|--------|----------|
-| [API Gateway](api-gateway/) | 30300 | api-gateway | 请求路由、JWT 认证、限流熔断、CORS |
-| [Account Service](account-service/) | 30301 | account-service | 用户注册、密码修改、账户注销 |
-| [Auth Service](auth-service/) | 30302 | auth-service | 统一登录、JWT 令牌、MFA/TOTP |
-| [SMS/Email Service](sms-email-service/) | 30303 | sms-email-service | 多云短信（阿里云/腾讯/天翼）+ SMTP 邮件 |
-| [KYB Service](kyb-service/) | 30304 | kyb-service | 企业认证、小额打款验证、法人核身 |
-| [Audit Service](audit-log-service/) | 30305 | audit-log-service | 审计日志、SM3 完整性校验、180天保留 |
-| [Risk Service](risk-detection-service/) | 30306 | risk-detection-service | 地理位置异常、设备指纹变化、登录频率检测 |
-| [Session Service](session-service/) | 30307 | session-service | 会话 CRUD、20 分钟超时、5 并发限制 |
-| [Email Service](email-service/) | 30308 | email-service | OTP 验证码、Magic Link JWT |
-| [Device Service](device-fingerprint-service/) | 30309 | device-fingerprint-service | 设备指纹注册、可信设备管理、风险评估 |
+## 核心服务
+
+| 服务 | 端口 | 目录 | 功能说明 |
+|------|------|------|----------|
+| **API Gateway** | 30300 | [api-gateway](api-gateway/) | API 网关、请求路由、JWT 认证、限流熔断、CORS |
+| **Account Service** | 30301 | [account-service](account-service/) | 用户注册、密码修改、账户注销、账户分层、权益、订阅 |
+| **Auth Service** | 30302 | [auth-service](auth-service/) | 统一认证、会话管理、设备管理、QR 码登录 |
+| **Notification Service** | 30303 | [notification-service](notification-service/) | SMS/Email OTP、Magic Link、Push 通知 |
+| **Compliance Service** | 30304 | [compliance-service](compliance-service/) | 风险评估、黑名单管理、KYB、审计追踪 |
+| **Credit Service** | 30305 | [credit-service](credit-service/) | 信用账户、交易管理、推荐奖励 |
+| **Data Product Service** | 30306 | [data-product-service](data-product-service/) | RFM 评分、数据面板、漏斗分析 |
+| **Config Service** | 30315 | [config-service](config-service/) | 配置管理、版本发布、权限管理 |
 
 ### 安全特性
 
@@ -90,15 +124,15 @@ account-center/
 ├── api-gateway/                    # API 网关 (30300)
 ├── account-service/                # 账户管理 (30301)
 ├── auth-service/                   # 认证服务 (30302)
-├── sms-email-service/              # 短信邮件 (30303)
-├── device-fingerprint-service/     # 设备指纹 (30309)
-├── kyb-service/                    # 企业认证 (30304)
-├── audit-log-service/              # 审计日志 (30305)
-├── email-service/                  # 邮件服务 (30308)
-├── risk-detection-service/         # 风险检测 (30306)
-├── session-service/                # 会话管理 (30307)
+├── notification-service/           # 通知服务 (30303)
+├── compliance-service/             # 合规风控 (30304)
+├── credit-service/                 # 信用服务 (30305)
+├── data-product-service/           # 数据产品 (30306)
+├── config-service/                 # 配置管理 (30315)
+├── config-management-ui/           # 配置管理前端
 ├── pkg/                            # 共享包
-├── migrations/                     # 数据库迁移脚本
+├── db-migrations/                  # 数据库迁移脚本
+├── migrations-archived/            # 旧版迁移脚本（已归档）
 ├── docs/                           # 架构、API、部署文档
 ├── docker-compose.yml              # Docker 编排（含资源限制）
 ├── .env.example                    # 环境变量模板

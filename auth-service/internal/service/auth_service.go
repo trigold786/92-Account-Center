@@ -11,17 +11,13 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/trigold786/92-Account-Center/auth-service/internal/model"
+	"github.com/trigold786/92-Account-Center/auth-service/internal/svcconfig"
 	"github.com/trigold786/92-Account-Center/auth-service/internal/util"
 	"github.com/trigold786/92-Account-Center/auth-service/pkg/crypto"
 	"github.com/trigold786/92-Account-Center/auth-service/pkg/jwt"
 )
 
 var ErrAccountLocked = errors.New("account is temporarily locked due to too many failed login attempts")
-
-const (
-	maxFailedAttempts = 5
-	lockoutDuration   = 30 * time.Minute
-)
 
 type UserRepository interface {
 	GetByPhoneNumber(ctx context.Context, phoneNumber string) (*model.User, error)
@@ -39,16 +35,22 @@ type AuthService interface {
 }
 
 type authService struct {
-	userRepo UserRepository
-	jwtMgr   *jwt.JWTManager
-	rdb      *redis.Client
+	userRepo                 UserRepository
+	jwtMgr                   *jwt.JWTManager
+	rdb                      *redis.Client
+	maxAttempts              int
+	lockoutDuration          time.Duration
+	refreshTokenBlacklistTTL time.Duration
 }
 
-func NewAuthService(userRepo UserRepository, jwtMgr *jwt.JWTManager, rdb *redis.Client) AuthService {
+func NewAuthService(userRepo UserRepository, jwtMgr *jwt.JWTManager, rdb *redis.Client, cfg *svcconfig.AuthConfig) AuthService {
 	return &authService{
-		userRepo: userRepo,
-		jwtMgr:   jwtMgr,
-		rdb:      rdb,
+		userRepo:                 userRepo,
+		jwtMgr:                   jwtMgr,
+		rdb:                      rdb,
+		maxAttempts:              cfg.LoginMaxAttempts,
+		lockoutDuration:          cfg.LoginLockoutDuration,
+		refreshTokenBlacklistTTL: cfg.JwtRefreshTokenExpire,
 	}
 }
 
@@ -76,11 +78,11 @@ func (s *authService) recordFailedAttempt(credential string) {
 		return
 	}
 	if count == 1 {
-		s.rdb.Expire(context.Background(), countKey, lockoutDuration)
+		s.rdb.Expire(context.Background(), countKey, s.lockoutDuration)
 	}
 
-	if count >= maxFailedAttempts {
-		s.rdb.Set(context.Background(), key, "1", lockoutDuration)
+	if count >= int64(s.maxAttempts) {
+		s.rdb.Set(context.Background(), key, "1", s.lockoutDuration)
 	}
 }
 
@@ -124,7 +126,7 @@ func (s *authService) Login(ctx context.Context, req *model.LoginRequest) (*mode
 	case util.CredentialTypeAccountID:
 		user, err = s.userRepo.GetByAccountID(ctx, req.Credential)
 	default:
-		return nil, errors.New("invalid credential format")
+		return nil, errors.New("invalid credentials")
 	}
 
 	if err != nil {
@@ -189,7 +191,9 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (*m
 		return nil, err
 	}
 
-	s.rdb.Set(ctx, "blacklist:"+refreshToken, "1", 30*24*time.Hour)
+	if s.rdb != nil {
+		s.rdb.Set(ctx, "blacklist:"+refreshToken, "1", s.refreshTokenBlacklistTTL)
+	}
 	claims, err := s.jwtMgr.ValidateToken(refreshToken)
 	if err != nil {
 		return nil, err

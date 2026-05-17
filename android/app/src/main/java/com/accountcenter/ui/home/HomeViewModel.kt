@@ -3,6 +3,7 @@ package com.accountcenter.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.accountcenter.model.RFMScore
+import com.accountcenter.model.UserDisplay
 import com.accountcenter.network.ApiClient
 import com.accountcenter.repository.AuthRepository
 import com.accountcenter.repository.UserRepository

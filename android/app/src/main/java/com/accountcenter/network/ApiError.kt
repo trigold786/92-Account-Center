@@ -1,6 +1,6 @@
 package com.accountcenter.network
 
-sealed class ApiError(open val message: String) {
+sealed class ApiError(override val message: String) : Throwable(message) {
     data class NetworkError(override val message: String) : ApiError(message)
     data class HttpError(val statusCode: Int, override val message: String) : ApiError(message)
     data object Unauthorized : ApiError("登录已过期，请重新登录")

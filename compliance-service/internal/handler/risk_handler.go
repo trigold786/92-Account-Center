@@ -30,13 +30,13 @@ func (h *RiskHandler) RegisterRoutes(r *gin.Engine) {
 func (h *RiskHandler) AssessRisk(c *gin.Context) {
 	var req model.AssessRiskRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid request body"})
 		return
 	}
 
 	resp, err := h.riskService.AssessRisk(c.Request.Context(), req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "internal error"})
 		return
 	}
 
@@ -86,7 +86,7 @@ func (h *RiskHandler) GetRiskHistory(c *gin.Context) {
 
 	events, err := h.riskService.GetRiskHistory(c.Request.Context(), userID, start, end)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "internal error"})
 		return
 	}
 

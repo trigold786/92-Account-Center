@@ -28,7 +28,7 @@ func (h *CreditHandler) GetAccount(c *gin.Context) {
 
 	account, err := h.creditService.GetAccount(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "internal error"})
 		return
 	}
 
@@ -46,9 +46,9 @@ func (h *CreditHandler) GetTransactions(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 
-	result, err := h.creditService.GetTransactions(c.Request.Context(), userID, page, pageSize)
+		result, err := h.creditService.GetTransactions(c.Request.Context(), userID, page, pageSize)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "internal error"})
 		return
 	}
 
@@ -58,7 +58,7 @@ func (h *CreditHandler) GetTransactions(c *gin.Context) {
 func (h *CreditHandler) EarnCredits(c *gin.Context) {
 	var req model.EarnRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid request: " + err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid request body"})
 		return
 	}
 
@@ -69,7 +69,7 @@ func (h *CreditHandler) EarnCredits(c *gin.Context) {
 	}
 
 	if err := h.creditService.EarnCredits(c.Request.Context(), userID, req.Amount, req.Type, req.ReferenceID, req.Details); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "internal error"})
 		return
 	}
 
@@ -79,7 +79,7 @@ func (h *CreditHandler) EarnCredits(c *gin.Context) {
 func (h *CreditHandler) ConsumeCredits(c *gin.Context) {
 	var req model.ConsumeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid request: " + err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid request body"})
 		return
 	}
 
@@ -91,14 +91,14 @@ func (h *CreditHandler) ConsumeCredits(c *gin.Context) {
 
 	if err := h.creditService.ConsumeCredits(c.Request.Context(), userID, req.Amount, req.ReferenceID, req.Details); err != nil {
 		if err == service.ErrInsufficientBalance {
-			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "insufficient balance"})
 			return
 		}
 		if err == service.ErrAccountFrozen {
-			c.JSON(http.StatusForbidden, gin.H{"code": 403, "message": err.Error()})
+			c.JSON(http.StatusForbidden, gin.H{"code": 403, "message": "account frozen"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "internal error"})
 		return
 	}
 
@@ -108,7 +108,7 @@ func (h *CreditHandler) ConsumeCredits(c *gin.Context) {
 func (h *CreditHandler) RefundCredits(c *gin.Context) {
 	var req model.RefundRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid request: " + err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid request body"})
 		return
 	}
 
@@ -119,7 +119,7 @@ func (h *CreditHandler) RefundCredits(c *gin.Context) {
 	}
 
 	if err := h.creditService.RefundCredits(c.Request.Context(), userID, req.Amount, req.ReferenceID, req.Details); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "internal error"})
 		return
 	}
 
@@ -129,7 +129,7 @@ func (h *CreditHandler) RefundCredits(c *gin.Context) {
 func (h *CreditHandler) CalculateDiscount(c *gin.Context) {
 	var req model.CalculateDiscountRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid request: " + err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid request body"})
 		return
 	}
 
@@ -141,7 +141,7 @@ func (h *CreditHandler) CalculateDiscount(c *gin.Context) {
 
 	result, err := h.creditService.CalculateDiscount(c.Request.Context(), userID, req.SubscriptionPrice)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "internal error"})
 		return
 	}
 

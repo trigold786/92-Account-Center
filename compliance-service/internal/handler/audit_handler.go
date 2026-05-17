@@ -26,13 +26,13 @@ func NewAuditHandler(auditService service.AuditService) *AuditHandler {
 func (h *AuditHandler) RecordLog(c *gin.Context) {
 	var req model.AuditLogEntry
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid request: " + err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid request body"})
 		return
 	}
 
 	log, err := h.auditService.RecordLog(c.Request.Context(), &req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "failed to record log: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "failed to record log"})
 		return
 	}
 
@@ -49,13 +49,13 @@ func (h *AuditHandler) RecordLog(c *gin.Context) {
 func (h *AuditHandler) RecordBatch(c *gin.Context) {
 	var req model.BatchAuditLogRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid request: " + err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid request body"})
 		return
 	}
 
 	response, err := h.auditService.RecordBatch(c.Request.Context(), req.Entries)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "failed to record batch logs: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "failed to record batch logs"})
 		return
 	}
 
@@ -78,7 +78,7 @@ func (h *AuditHandler) GetLogsByUser(c *gin.Context) {
 
 	logs, err := h.auditService.GetLogsByUser(c.Request.Context(), userID, limit, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "failed to get logs: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "failed to get logs"})
 		return
 	}
 
@@ -119,7 +119,7 @@ func (h *AuditHandler) GetLogsByTimeRange(c *gin.Context) {
 
 	logs, err := h.auditService.GetLogsByTimeRange(c.Request.Context(), startTime, endTime, limit, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "failed to get logs: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "failed to get logs"})
 		return
 	}
 
@@ -146,10 +146,10 @@ func (h *AuditHandler) VerifyLogIntegrity(c *gin.Context) {
 	result, err := h.auditService.VerifyLogIntegrity(c.Request.Context(), logID)
 	if err != nil {
 		if err == service.ErrLogNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": err.Error()})
+			c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": "log not found"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "failed to verify log: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "failed to verify log"})
 		return
 	}
 
@@ -174,10 +174,10 @@ func (h *AuditHandler) CleanupOldLogs(c *gin.Context) {
 	result, err := h.auditService.CleanupOldLogs(c.Request.Context(), retentionDays)
 	if err != nil {
 		if err == service.ErrInvalidRetention {
-			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid retention days"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "failed to cleanup logs: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "failed to cleanup logs"})
 		return
 	}
 

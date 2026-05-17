@@ -22,7 +22,7 @@ func (h *PushHandler) SendPush(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, model.PushResponse{
 			Code:    400,
-			Message: "请求参数错误: " + err.Error(),
+			Message: "请求参数错误",
 		})
 		return
 	}
@@ -31,7 +31,7 @@ func (h *PushHandler) SendPush(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, model.PushResponse{
 			Code:    500,
-			Message: "推送发送失败: " + err.Error(),
+			Message: "推送发送失败",
 		})
 		return
 	}
@@ -44,7 +44,7 @@ func (h *PushHandler) RegisterDevice(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, model.PushResponse{
 			Code:    400,
-			Message: "请求参数错误: " + err.Error(),
+			Message: "请求参数错误",
 		})
 		return
 	}
@@ -52,7 +52,7 @@ func (h *PushHandler) RegisterDevice(c *gin.Context) {
 	if err := h.pushService.RegisterDevice(c.Request.Context(), &req); err != nil {
 		c.JSON(http.StatusInternalServerError, model.PushResponse{
 			Code:    500,
-			Message: "设备注册失败: " + err.Error(),
+			Message: "设备注册失败",
 		})
 		return
 	}
@@ -70,7 +70,7 @@ func (h *PushHandler) GetUserDevices(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, model.PushResponse{
 			Code:    500,
-			Message: "获取设备列表失败: " + err.Error(),
+			Message: "获取设备列表失败",
 		})
 		return
 	}

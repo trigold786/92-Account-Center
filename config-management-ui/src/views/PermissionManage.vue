@@ -21,16 +21,34 @@
       <el-col :span="12">
         <el-card v-if="selectedRole">
           <template #header>
-            <span>权限配置 - {{ selectedRole.name }}</span>
+            <div style="display: flex; justify-content: space-between; align-items: center">
+              <span>权限配置 - {{ selectedRole.name }}</span>
+              <el-button size="small" type="primary" @click="showAddPermissionDialog = true">
+                <el-icon><Plus /></el-icon>添加权限
+              </el-button>
+            </div>
           </template>
           <el-table :data="permissions" stripe>
             <el-table-column prop="id" label="ID" width="60" />
             <el-table-column prop="permission" label="权限" />
           </el-table>
         </el-card>
+
         <el-card v-else>
           <el-empty description="请选择一个角色" />
         </el-card>
+
+        <el-dialog v-model="showAddPermissionDialog" title="添加权限" width="400px">
+          <el-form :model="newPermission" label-width="80px">
+            <el-form-item label="权限名称" required>
+              <el-input v-model="newPermission.permission" placeholder="输入权限标识" />
+            </el-form-item>
+          </el-form>
+          <template #footer>
+            <el-button @click="showAddPermissionDialog = false">取消</el-button>
+            <el-button type="primary" @click="doAddPermission">添加</el-button>
+          </template>
+        </el-dialog>
       </el-col>
     </el-row>
 
@@ -75,8 +93,8 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import { listRoles, createRole, getRolePermissions } from '@/api/permission'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { listRoles, createRole, getRolePermissions, addRolePermission } from '@/api/permission'
 import { getUserRoles, setUserRole } from '@/api/permission'
 import type { Role, RolePermission, UserRole } from '@/types'
 
@@ -88,6 +106,8 @@ const showRoleDialog = ref(false)
 const userSearch = ref('')
 
 const newRole = ref({ name: '', description: '' })
+const showAddPermissionDialog = ref(false)
+const newPermission = ref({ permission: '' })
 
 onMounted(() => loadRoles())
 
@@ -129,6 +149,21 @@ async function searchUserRoles() {
   try {
     const res = await getUserRoles(userSearch.value)
     userRoles.value = res.data || []
+  } catch (e: any) { console.warn('permission operation failed', e) }
+}
+
+async function doAddPermission() {
+  if (!newPermission.value.permission || !selectedRole.value) {
+    ElMessage.warning('请输入权限名称')
+    return
+  }
+  try {
+    await addRolePermission(selectedRole.value.id, { permission: newPermission.value.permission })
+    ElMessage.success('权限添加成功')
+    showAddPermissionDialog.value = false
+    newPermission.value = { permission: '' }
+    const res = await getRolePermissions(selectedRole.value.id)
+    permissions.value = res.data || []
   } catch (e: any) { console.warn('permission operation failed', e) }
 }
 </script>

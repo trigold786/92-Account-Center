@@ -1,0 +1,93 @@
+.login-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: var(--spacing-xl);
+}
+.login-header {
+  text-align: center;
+  padding: 80rpx 0 48rpx;
+}
+.app-title {
+  font-size: 56rpx;
+  font-weight: 700;
+  background: linear-gradient(135deg, #6C63FF, #00D4FF);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.app-subtitle {
+  display: block;
+  font-size: var(--font-xl);
+  color: var(--text-secondary);
+  margin-top: var(--spacing-sm);
+}
+.login-tabs {
+  display: flex;
+  background: var(--bg-secondary);
+  border-radius: var(--button-radius);
+  padding: 6rpx;
+  margin-bottom: var(--spacing-lg);
+}
+.tab {
+  flex: 1;
+  text-align: center;
+  padding: 16rpx;
+  font-size: var(--font-base);
+  color: var(--text-secondary);
+  border-radius: var(--button-radius);
+}
+.tab.active {
+  background: var(--brand-primary);
+  color: #fff;
+  font-weight: 600;
+}
+.form { display: flex; flex-direction: column; gap: var(--spacing-md); }
+.input {
+  background: var(--bg-secondary);
+  border: 1rpx solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 24rpx;
+  font-size: var(--font-base);
+  color: var(--text-primary);
+}
+.code-row { display: flex; gap: var(--spacing-sm); }
+.code-input { flex: 1; }
+.code-btn {
+  background: var(--bg-card);
+  border: 1rpx solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 0 24rpx;
+  font-size: var(--font-sm);
+  color: var(--brand-secondary);
+  white-space: nowrap;
+  line-height: 80rpx;
+}
+.code-btn.disabled { color: var(--text-muted); }
+.register-link {
+  text-align: center;
+  color: var(--brand-secondary);
+  font-size: var(--font-sm);
+  padding: var(--spacing-md) 0;
+}
+.wechat-section { margin-top: 48rpx; text-align: center; }
+.divider {
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+  color: var(--text-muted);
+  font-size: var(--font-sm);
+}
+.divider::before, .divider::after {
+  content: '';
+  flex: 1;
+  height: 1rpx;
+  background: var(--border-color);
+  margin: 0 var(--spacing-sm);
+}
+.wechat-btn {
+  background: #07C160;
+  border-radius: var(--button-radius);
+  padding: 24rpx;
+  color: #fff;
+  font-size: var(--font-base);
+}

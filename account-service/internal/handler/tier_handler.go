@@ -31,7 +31,7 @@ func (h *TierHandler) GetTier(c *gin.Context) {
 
 	tier, err := h.repo.GetIdentityTier(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 
@@ -53,12 +53,12 @@ func (h *TierHandler) UpdateTier(c *gin.Context) {
 		Tier int `json:"tier" binding:"required,min=0,max=4"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
 	if err := h.repo.UpdateIdentityTier(c.Request.Context(), userID, req.Tier); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 

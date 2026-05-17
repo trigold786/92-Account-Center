@@ -10,25 +10,27 @@ import (
 
 	"github.com/trigold786/92-Account-Center/compliance-service/internal/model"
 	"github.com/trigold786/92-Account-Center/compliance-service/internal/repository"
+	"github.com/trigold786/92-Account-Center/compliance-service/internal/svcconfig"
 )
 
 const (
-	ImpossibleTravelDistance = 1000.0
-	ImpossibleTravelHours   = 1.0
-	DeviceChangeThreshold   = 0.5
-	VelocityThreshold       = 10
-	VelocityWindowHours     = 1.0
+	impossibleTravelDistance = 1000.0
+	impossibleTravelHours   = 1.0
+	deviceChangeThreshold   = 0.5
+	velocityWindowHours     = 1.0
 )
 
 type RiskService struct {
 	repo       *repository.RiskRepository
 	geoService *GeoService
+	cfg        *svcconfig.ComplianceConfig
 }
 
-func NewRiskService(repo *repository.RiskRepository, geoService *GeoService) *RiskService {
+func NewRiskService(repo *repository.RiskRepository, geoService *GeoService, cfg *svcconfig.ComplianceConfig) *RiskService {
 	return &RiskService{
 		repo:       repo,
 		geoService: geoService,
+		cfg:        cfg,
 	}
 }
 
@@ -122,9 +124,9 @@ func (s *RiskService) DetectGeoAnomaly(ctx context.Context, userID string, newLo
 		newLocation.Latitude, newLocation.Longitude,
 	)
 
-	if distance > ImpossibleTravelDistance {
+	if distance > impossibleTravelDistance {
 		timeDelta := time.Since(lastEvent.CreatedAt).Hours()
-		if timeDelta < ImpossibleTravelHours {
+		if timeDelta < impossibleTravelHours {
 			return true, distance, nil
 		}
 	}
@@ -155,7 +157,7 @@ func (s *RiskService) DetectDeviceAnomaly(ctx context.Context, userID, newFinger
 	similarity := s.calculateFingerprintSimilarity(lastFingerprint, newFingerprint)
 	changeRate := 1.0 - similarity
 
-	return changeRate > DeviceChangeThreshold, similarity, nil
+	return changeRate > deviceChangeThreshold, similarity, nil
 }
 
 func (s *RiskService) DetectVelocityAnomaly(ctx context.Context, userID string) (bool, int, error) {
@@ -163,13 +165,13 @@ func (s *RiskService) DetectVelocityAnomaly(ctx context.Context, userID string) 
 		return false, 0, nil
 	}
 
-	windowStart := time.Now().Add(-time.Hour)
+	windowStart := time.Now().Add(-time.Duration(velocityWindowHours) * time.Hour)
 	count, err := s.repo.CountEventsByUserIDSince(ctx, userID, windowStart)
 	if err != nil {
 		return false, 0, err
 	}
 
-	return count >= VelocityThreshold, int(count), nil
+	return count >= s.cfg.RiskRegistrationRateLimit, int(count), nil
 }
 
 func (s *RiskService) CalculateRiskScore(factors RiskFactors) int {
@@ -191,8 +193,8 @@ func (s *RiskService) CalculateRiskScore(factors RiskFactors) int {
 	multiplier := 1.0 + float64(len(factors)-1)*0.1
 	finalScore := baseScore * int(multiplier)
 
-	if finalScore > 100 {
-		finalScore = 100
+	if finalScore > s.cfg.RiskMaxScore {
+		finalScore = s.cfg.RiskMaxScore
 	}
 
 	return finalScore
@@ -248,5 +250,5 @@ func (s *RiskService) RecordRiskEvent(ctx context.Context, event *model.RiskEven
 }
 
 func (s *RiskService) GetRiskHistory(ctx context.Context, userID string, start, end time.Time) ([]*model.RiskEvent, error) {
-	return s.repo.GetByUserID(ctx, userID, start, end, 100)
+	return s.repo.GetByUserID(ctx, userID, start, end, s.cfg.RiskHistoryDefaultLimit)
 }

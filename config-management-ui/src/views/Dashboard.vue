@@ -68,10 +68,11 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { listAuditLogs } from '@/api/audit'
+import { getStats } from '@/api/config'
 
 const stats = ref({
-  total_config: 95,
-  enabled_config: 90,
+  total_config: 0,
+  enabled_config: 0,
   pending_releases: 0,
   today_changes: 0,
   alert_count: 0,
@@ -88,11 +89,19 @@ function typeTag(type: string) {
 
 onMounted(async () => {
   try {
+    const statsRes = await getStats()
+    if (statsRes.code === 0) {
+      stats.value = { ...stats.value, ...statsRes.data }
+    }
+  } catch (e) {
+    console.warn('Failed to load dashboard stats:', e)
+  }
+
+  try {
     const res = await listAuditLogs({ page: 1, page_size: 10 })
     recentChanges.value = (res as any).data || []
-    stats.value.today_changes = recentChanges.value.length
-  } catch {
-    // ignore
+  } catch (e) {
+    console.warn('Failed to load recent audit logs:', e)
   }
 })
 </script>

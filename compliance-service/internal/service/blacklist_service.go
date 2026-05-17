@@ -9,6 +9,7 @@ import (
 
 	"github.com/trigold786/92-Account-Center/compliance-service/internal/model"
 	"github.com/trigold786/92-Account-Center/compliance-service/internal/repository"
+	"github.com/trigold786/92-Account-Center/compliance-service/internal/svcconfig"
 )
 
 type BlacklistService interface {
@@ -21,10 +22,11 @@ type BlacklistService interface {
 type blacklistService struct {
 	repo *repository.BlacklistRepository
 	rdb  *redis.Client
+	cfg  *svcconfig.ComplianceConfig
 }
 
-func NewBlacklistService(repo *repository.BlacklistRepository, rdb *redis.Client) BlacklistService {
-	return &blacklistService{repo: repo, rdb: rdb}
+func NewBlacklistService(repo *repository.BlacklistRepository, rdb *redis.Client, cfg *svcconfig.ComplianceConfig) BlacklistService {
+	return &blacklistService{repo: repo, rdb: rdb, cfg: cfg}
 }
 
 func (s *blacklistService) AddEntry(ctx context.Context, req *model.BlacklistEntryRequest) (*model.BlacklistEntry, error) {
@@ -92,7 +94,7 @@ func (s *blacklistService) cacheBlocked(ctx context.Context, entryType, entryVal
 		return
 	}
 	key := fmt.Sprintf("blacklist:%s:%s", entryType, entryValue)
-	ttl := time.Hour * 24
+	ttl := s.cfg.BlacklistCacheTTL
 	if entry.ExpiresAt != nil {
 		ttl = time.Until(*entry.ExpiresAt)
 		if ttl <= 0 {

@@ -5,7 +5,6 @@ const (
 	QRCodeStatusScanned   = "scanned"
 	QRCodeStatusConfirmed = "confirmed"
 	QRCodeStatusExpired   = "expired"
-	QRCodeTTL             = 300
 )
 
 type QRCodeGenerateResponse struct {

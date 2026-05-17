@@ -33,6 +33,16 @@ struct CreditsView: View {
                         .frame(maxWidth: .infinity)
                     }
 
+                    // MARK: - Quick Actions
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("快捷操作").sectionTitle().padding(.bottom, 8)
+                        Button("签到领积分") {
+                            Task { await viewModel.earnCredits(amount: 1, reason: "daily_checkin") }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .frame(maxWidth: .infinity)
+                    }
+
                     if let referral = viewModel.referral {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("邀请推广").font(.custom("Inter-Semibold", size: 15)).foregroundColor(.textPrimary)

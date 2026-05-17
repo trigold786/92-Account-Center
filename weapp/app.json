@@ -1,0 +1,38 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/login/login",
+    "pages/register/register",
+    "pages/credits/credits",
+    "pages/subscription/subscription",
+    "pages/security/security",
+    "pages/about/about"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#0D1117",
+    "navigationBarTitleText": "Account Center",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#0D1117",
+    "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "color": "#8B949E",
+    "selectedColor": "#6C63FF",
+    "backgroundColor": "#161B22",
+    "borderStyle": "black",
+    "list": [
+      { "pagePath": "pages/index/index", "iconPath": "styles/icons/home.png", "selectedIconPath": "styles/icons/home-active.png", "text": "首页" },
+      { "pagePath": "pages/credits/credits", "iconPath": "styles/icons/credits.png", "selectedIconPath": "styles/icons/credits-active.png", "text": "积分" },
+      { "pagePath": "pages/subscription/subscription", "iconPath": "styles/icons/subscription.png", "selectedIconPath": "styles/icons/subscription-active.png", "text": "订阅" },
+      { "pagePath": "pages/security/security", "iconPath": "styles/icons/security.png", "selectedIconPath": "styles/icons/security-active.png", "text": "安全" },
+      { "pagePath": "pages/about/about", "iconPath": "styles/icons/about.png", "selectedIconPath": "styles/icons/about-active.png", "text": "关于" }
+    ]
+  },
+  "usingComponents": {
+    "app-card": "/components/app-card/app-card",
+    "gradient-button": "/components/gradient-button/gradient-button",
+    "loading-overlay": "/components/loading-overlay/loading-overlay"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

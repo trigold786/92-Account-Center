@@ -1,0 +1,21 @@
+.gradient-btn {
+  background: linear-gradient(135deg, #6C63FF 0%, #00D4FF 100%);
+  border-radius: var(--button-radius);
+  padding: 24rpx 48rpx;
+  text-align: center;
+  font-size: var(--font-lg);
+  font-weight: 600;
+  color: #FFFFFF;
+  transition: opacity 0.2s;
+}
+.gradient-btn:active { opacity: 0.85; }
+.gradient-btn.disabled { opacity: 0.4; }
+.btn-loading {
+  width: 32rpx; height: 32rpx;
+  border: 3rpx solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto;
+}
+@keyframes spin { to { transform: rotate(360deg); } }

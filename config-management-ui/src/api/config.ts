@@ -1,5 +1,5 @@
 import request from './request'
-import type { ConfigGroup, ConfigItem, ConfigVersion, ApiResponse } from '@/types'
+import type { ConfigGroup, ConfigItem, ConfigVersion, DashboardStats, ApiResponse } from '@/types'
 
 export function listGroups(): Promise<ApiResponse<ConfigGroup[]>> {
   return request.get('/config/groups')
@@ -54,4 +54,8 @@ export function resetItemToDefault(id: number): Promise<ApiResponse<void>> {
 
 export function listVersions(itemId: number): Promise<ApiResponse<ConfigVersion[]>> {
   return request.get(`/config/items/${itemId}/versions`)
+}
+
+export function getStats(): Promise<ApiResponse<DashboardStats>> {
+  return request.get('/config/stats')
 }

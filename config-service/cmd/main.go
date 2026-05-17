@@ -5,7 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -18,9 +18,15 @@ import (
 	_ "github.com/lib/pq"
 
 	"github.com/trigold786/92-Account-Center/config-service/internal/handler"
+	"github.com/trigold786/92-Account-Center/config-service/internal/model"
 	"github.com/trigold786/92-Account-Center/config-service/internal/repository"
 	"github.com/trigold786/92-Account-Center/config-service/internal/service"
+	"github.com/trigold786/92-Account-Center/pkg/logging"
 )
+
+var logger *slog.Logger
+
+func init() { slog.SetDefault(logger) }
 
 var (
 	requestCount    uint64
@@ -29,23 +35,27 @@ var (
 )
 
 func main() {
+	logger = logging.NewLogger("config-service")
+
 	dbHost := getEnv("DB_HOST", "localhost")
 	dbPort := getEnv("DB_PORT", "5432")
 	dbUser := getEnv("DB_USER", "postgres")
-	dbPassword := getEnv("DB_PASSWORD", "postgres")
+	dbPassword := getEnvSecret("DB_PASSWORD", "postgres")
 	dbName := getEnv("DB_NAME", "account_center")
 
 	dsn := "host=" + dbHost + " port=" + dbPort + " user=" + dbUser + " password=" + dbPassword + " dbname=" + dbName + " sslmode=disable"
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		logger.Error("failed to connect to database", "error", err.Error())
+		os.Exit(1)
 	}
 	defer db.Close()
 
 	if err := db.Ping(); err != nil {
-		log.Fatalf("Failed to ping database: %v", err)
+		logger.Error("failed to ping database", "error", err.Error())
+		os.Exit(1)
 	}
-	log.Println("Connected to database")
+	logger.Info("connected to database")
 
 	// Repositories
 	configRepo := repository.NewConfigRepository(db)
@@ -65,9 +75,12 @@ func main() {
 	auditH := handler.NewAuditHandler(auditSvc)
 	permH := handler.NewPermissionHandler(permSvc)
 
-	r := gin.Default()
+	r := gin.New()
+	r.Use(gin.RecoveryWithWriter(os.Stderr, func(c *gin.Context, err any) {
+		logger.Error("panic recovered", "error", fmt.Sprintf("%v", err))
+	}))
+	r.Use(logging.Middleware(logger))
 
-	// Metrics middleware
 	r.Use(func(c *gin.Context) {
 		start := time.Now()
 		c.Next()
@@ -151,6 +164,28 @@ func main() {
 		permGroup.POST("/users/:userId/roles", permH.SetUserRole)
 	}
 
+	// Stats route
+	r.GET("/api/v1/config/stats", authMiddleware("config.read"), func(c *gin.Context) {
+		ctx := c.Request.Context()
+		totalConfig, _ := configSvc.GetTotalCount(ctx)
+
+		pendingReleases, pendingTotal, _ := releaseSvc.ListReleases(ctx, "pending", 1, 1)
+		_ = pendingReleases
+
+		now := time.Now()
+		startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+		todayFilter := model.AuditLogFilter{StartTime: &startOfDay, Page: 1, PageSize: 1}
+		_, todayTotal, _ := auditSvc.ListLogs(ctx, todayFilter)
+
+		c.JSON(http.StatusOK, gin.H{"code": 0, "message": "ok", "data": gin.H{
+			"total_config":    totalConfig,
+			"enabled_config":  totalConfig,
+			"pending_releases": pendingTotal,
+			"today_changes":   todayTotal,
+			"alert_count":     0,
+		}})
+	})
+
 	// Internal routes for service integration (no auth - service-to-service)
 	internalGroup := r.Group("/internal/v1/config")
 	{
@@ -179,7 +214,7 @@ func main() {
 	})
 
 	port := getEnv("PORT", "30315")
-	log.Printf("Config service starting on :%s", port)
+	logger.Info("starting server", "port", port)
 
 	srv := &http.Server{
 		Addr:    ":" + port,
@@ -187,10 +222,11 @@ func main() {
 	}
 
 	go func() {
+		defer logging.RecoverGoroutine(logger, "signal-handler")
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 		<-sigChan
-		log.Println("Shutting down gracefully...")
+		logger.Info("shutting down gracefully")
 		db.Close()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -198,7 +234,8 @@ func main() {
 	}()
 
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatalf("Failed to start server: %v", err)
+		logger.Error("failed to start server", "error", err.Error())
+		os.Exit(1)
 	}
 }
 
@@ -206,5 +243,13 @@ func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
 	}
+	return defaultValue
+}
+
+func getEnvSecret(key, defaultValue string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	logger.Warn("environment variable not set, using an insecure default", "key", key)
 	return defaultValue
 }

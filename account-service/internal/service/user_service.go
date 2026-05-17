@@ -14,6 +14,7 @@ import (
 
 	"github.com/trigold786/92-Account-Center/account-service/internal/model"
 	"github.com/trigold786/92-Account-Center/account-service/internal/repository"
+	"github.com/trigold786/92-Account-Center/account-service/internal/svcconfig"
 	"github.com/trigold786/92-Account-Center/account-service/pkg/crypto"
 	"github.com/trigold786/92-Account-Center/account-service/pkg/sms"
 )
@@ -53,10 +54,11 @@ type UserService interface {
 type userService struct {
 	repo      repository.UserRepository
 	smsClient *sms.Client
+	cfg       *svcconfig.AccountConfig
 }
 
-func NewUserService(repo repository.UserRepository, smsClient *sms.Client) UserService {
-	return &userService{repo: repo, smsClient: smsClient}
+func NewUserService(repo repository.UserRepository, smsClient *sms.Client, cfg *svcconfig.AccountConfig) UserService {
+	return &userService{repo: repo, smsClient: smsClient, cfg: cfg}
 }
 
 func (s *userService) Register(ctx context.Context, phoneNumber, accountID, password string, agreeToTerms bool) (*model.User, error) {
@@ -193,7 +195,7 @@ func (s *userService) RequestAccountDeletion(ctx context.Context, userID string,
 	}
 
 	now := time.Now()
-	freezePeriod := model.FreezePeriod
+	freezePeriod := time.Duration(s.cfg.DeletionFreezeDays) * 24 * time.Hour
 	user.DeletionRequestedAt = &now
 	expiresAt := now.Add(freezePeriod)
 	user.DeletionExpiresAt = &expiresAt

@@ -1,0 +1,25 @@
+.overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(13, 17, 23, 0.85);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9999;
+  transition: opacity 0.3s;
+}
+.overlay.hidden { display: none; }
+.loading-box {
+  background: var(--bg-card);
+  border-radius: var(--card-radius);
+  padding: 48rpx 64rpx;
+  text-align: center;
+  border: 1rpx solid var(--border-color);
+}
+.spinner {
+  width: 48rpx; height: 48rpx;
+  border: 4rpx solid var(--border-color);
+  border-top-color: var(--brand-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 16rpx;
+}
+.loading-text { font-size: var(--font-sm); color: var(--text-secondary); }
+@keyframes spin { to { transform: rotate(360deg); } }

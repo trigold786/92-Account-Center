@@ -21,14 +21,14 @@ func NewDeviceHandler(deviceService *service.DeviceFingerprintService) *DeviceHa
 func (h *DeviceHandler) RegisterDevice(c *gin.Context) {
 	var req model.DeviceFingerprintRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
 	userID := parseDeviceUserID(c)
 	resp, err := h.deviceService.RegisterDevice(c.Request.Context(), userID, &req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 
@@ -38,14 +38,14 @@ func (h *DeviceHandler) RegisterDevice(c *gin.Context) {
 func (h *DeviceHandler) VerifyDevice(c *gin.Context) {
 	var req model.DeviceFingerprintRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
 	userID := parseDeviceUserID(c)
 	resp, err := h.deviceService.VerifyDevice(c.Request.Context(), userID, &req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 
@@ -57,13 +57,13 @@ func (h *DeviceHandler) TrustDevice(c *gin.Context) {
 		FingerprintID string `json:"fingerprint_id" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
 	userID := parseDeviceUserID(c)
 	if err := h.deviceService.TrustDevice(c.Request.Context(), userID, req.FingerprintID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 
@@ -80,7 +80,7 @@ func (h *DeviceHandler) GetUserDevices(c *gin.Context) {
 
 	devices, err := h.deviceService.GetUserDevices(c.Request.Context(), uid)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 
@@ -96,7 +96,7 @@ func (h *DeviceHandler) RemoveDevice(c *gin.Context) {
 	}
 
 	if err := h.deviceService.RemoveDevice(c.Request.Context(), deviceID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 

@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -91,7 +92,7 @@ fun CreditsScreen(
                     }
 
                     item {
-                        Spacer().height(8.dp)
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text("交易记录", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
                     }
 
@@ -124,12 +125,12 @@ private fun BalanceCard(balance: Double) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text("当前积分", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
-            Spacer().height(8.dp)
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
-                "%.2f".format(balance),
+                text = "%.2f".format(balance),
                 fontSize = 36.sp,
                 fontWeight = FontWeight.Bold,
-                brush = Brush.horizontalGradient(listOf(BrandPrimary, BrandSecondary))
+                style = TextStyle(brush = Brush.horizontalGradient(listOf(BrandPrimary, BrandSecondary)))
             )
         }
     }
@@ -141,11 +142,11 @@ private fun ReferralCard(summary: ReferralSummary, onShare: () -> Unit) {
         modifier = Modifier.fillMaxWidth()
     ) {
         Text("邀请推广", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = TextPrimary)
-        Spacer().height(8.dp)
+        Spacer(modifier = Modifier.height(8.dp))
         Text("邀请人数：${summary.totalReferees}", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
         Text("活跃邀请：${summary.activeReferees}", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
         Text("累计获得：${summary.totalEarned} 积分", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-        Spacer().height(8.dp)
+        Spacer(modifier = Modifier.height(8.dp))
         Button(
             onClick = onShare,
             modifier = Modifier.fillMaxWidth(),

@@ -88,9 +88,35 @@ func (c *Client) GetConfigDuration(code string) (time.Duration, error) {
 	if err != nil {
 		return 0, err
 	}
-	d, err := time.ParseDuration(val)
+	d, err := parseDuration(val)
 	if err != nil {
 		return 0, fmt.Errorf("config client: failed to parse %s as duration: %w", code, err)
 	}
 	return d, nil
+}
+
+func parseDuration(s string) (time.Duration, error) {
+	if len(s) < 2 {
+		return 0, fmt.Errorf("invalid duration: %q", s)
+	}
+	if s[len(s)-1] == 'd' {
+		var days int
+		if _, err := fmt.Sscanf(s, "%dd", &days); err != nil {
+			return 0, fmt.Errorf("invalid duration: %q", s)
+		}
+		return time.Duration(days) * 24 * time.Hour, nil
+	}
+	return time.ParseDuration(s)
+}
+
+func (c *Client) GetConfigFloat(code string) (float64, error) {
+	val, err := c.GetConfig(code)
+	if err != nil {
+		return 0, err
+	}
+	var result float64
+	if _, err := fmt.Sscanf(val, "%f", &result); err != nil {
+		return 0, fmt.Errorf("config client: failed to parse %s as float: %w", code, err)
+	}
+	return result, nil
 }

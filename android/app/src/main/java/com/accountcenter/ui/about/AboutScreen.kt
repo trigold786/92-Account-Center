@@ -6,14 +6,13 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -57,18 +56,18 @@ fun AboutScreen(onNavigateBack: () -> Unit) {
                 modifier = Modifier.fillMaxSize().padding(32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Spacer().height(24.dp)
+                Spacer(modifier = Modifier.height(24.dp))
 
                 Icon(
                     imageVector = Icons.Default.Person,
                     contentDescription = null,
                     modifier = Modifier.size(56.dp),
-                    tint = Brush.horizontalGradient(listOf(BrandPrimary, BrandSecondary))
+                    tint = BrandPrimary
                 )
-                Spacer().height(12.dp)
+                Spacer(modifier = Modifier.height(12.dp))
                 Text("账户中心", style = MaterialTheme.typography.headlineLarge, color = TextPrimary)
                 Text("Version $versionName Build $versionCode", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                Spacer().height(32.dp)
+                Spacer(modifier = Modifier.height(32.dp))
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -81,7 +80,7 @@ fun AboutScreen(onNavigateBack: () -> Unit) {
                         InfoRow("构建号", versionCode.toString())
                     }
                 }
-                Spacer().height(12.dp)
+                Spacer(modifier = Modifier.height(12.dp))
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -95,7 +94,7 @@ fun AboutScreen(onNavigateBack: () -> Unit) {
                     }
                 }
 
-                Spacer().height(32.dp)
+                Spacer(modifier = Modifier.height(32.dp))
                 Text("© 2024 Account Center", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
             }
         }
@@ -128,7 +127,7 @@ private fun LegalRow(label: String) {
         ) {
             Text(label, style = MaterialTheme.typography.bodyMedium, color = BrandSecondary)
             Icon(
-                Icons.Default.ChevronRight,
+                Icons.Default.KeyboardArrowRight,
                 contentDescription = null,
                 tint = TextSecondary,
                 modifier = Modifier.size(16.dp)

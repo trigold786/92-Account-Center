@@ -7,6 +7,7 @@ import (
 
 	"github.com/trigold786/92-Account-Center/credit-service/internal/model"
 	"github.com/trigold786/92-Account-Center/credit-service/internal/repository"
+	"github.com/trigold786/92-Account-Center/credit-service/internal/svcconfig"
 )
 
 type RebateService interface {
@@ -18,17 +19,20 @@ type rebateService struct {
 	creditRepo   repository.CreditRepository
 	referralRepo repository.ReferralRepository
 	creditSvc    CreditService
+	cfg          *svcconfig.CreditConfig
 }
 
 func NewRebateService(
 	creditRepo repository.CreditRepository,
 	referralRepo repository.ReferralRepository,
 	creditSvc CreditService,
+	cfg *svcconfig.CreditConfig,
 ) RebateService {
 	return &rebateService{
 		creditRepo:   creditRepo,
 		referralRepo: referralRepo,
 		creditSvc:    creditSvc,
+		cfg:          cfg,
 	}
 }
 
@@ -73,7 +77,7 @@ func (s *rebateService) GetRebateRate(ctx context.Context, subscriptionCount int
 		return 0, err
 	}
 	if cfg == nil {
-		return 0.10, nil
+		return s.cfg.DefaultRebateRate, nil
 	}
 	return cfg.RebatePercentage, nil
 }

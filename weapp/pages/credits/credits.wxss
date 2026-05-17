@@ -1,0 +1,41 @@
+.credits-container { padding-bottom: var(--spacing-xl); }
+.balance-hero {
+  background: linear-gradient(135deg, #1C2333, #242D3D);
+  margin: var(--spacing-md);
+  border-radius: var(--card-radius);
+  padding: var(--spacing-lg);
+  text-align: center;
+  border: 1rpx solid var(--border-color);
+}
+.balance-label { font-size: var(--font-sm); color: var(--text-secondary); }
+.balance-value {
+  font-size: 96rpx; font-weight: 700;
+  background: linear-gradient(135deg, #6C63FF, #00D4FF);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: block;
+}
+.balance-extras { display: flex; justify-content: center; gap: var(--spacing-md); font-size: var(--font-xs); color: var(--text-muted); margin-top: var(--spacing-sm); }
+.actions-row { padding: var(--spacing-sm) var(--spacing-md); }
+.action-btn {
+  background: linear-gradient(135deg, #6C63FF, #00D4FF);
+  border-radius: var(--button-radius);
+  padding: 20rpx;
+  text-align: center;
+  color: #fff;
+  font-weight: 600;
+}
+.action-btn.disabled { opacity: 0.5; }
+.referral-grid { display: flex; justify-content: space-around; }
+.ref-item { text-align: center; }
+.ref-val { font-size: var(--font-xl); font-weight: 700; color: var(--brand-secondary); display: block; }
+.ref-item text:last-child { font-size: var(--font-xs); color: var(--text-secondary); }
+.copy-link { text-align: center; color: var(--brand-secondary); font-size: var(--font-sm); margin-top: var(--spacing-sm); }
+.txn-item { display: flex; justify-content: space-between; align-items: center; padding: var(--spacing-sm) 0; border-bottom: 1rpx solid var(--border-color); }
+.txn-left { flex: 1; }
+.txn-reason { font-size: var(--font-sm); color: var(--text-primary); display: block; }
+.txn-time { font-size: var(--font-xs); color: var(--text-muted); }
+.txn-amount { font-size: var(--font-lg); font-weight: 600; }
+.txn-amount.earn { color: var(--color-success); }
+.txn-amount.consume { color: var(--color-danger); }
+.empty { text-align: center; color: var(--text-muted); padding: var(--spacing-md); }

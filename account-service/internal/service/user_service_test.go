@@ -3,9 +3,13 @@ package service
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/trigold786/92-Account-Center/account-service/internal/model"
+	"github.com/trigold786/92-Account-Center/account-service/internal/svcconfig"
 )
+
+var testAccountConfig = &svcconfig.AccountConfig{DeletionFreezeDays: 7, SubscriptionDefaultDuration: 720 * time.Hour, EntitlementCacheTTL: 24 * time.Hour}
 
 type MockUserRepository struct {
 	users         map[string]*model.User
@@ -125,7 +129,7 @@ func int64ToString(n int64) string {
 
 func TestUserService_Register_Success(t *testing.T) {
 	repo := NewMockUserRepository()
-	svc := NewUserService(repo, nil)
+	svc := NewUserService(repo, nil, testAccountConfig)
 
 	user, err := svc.Register(context.Background(), "13800138000", "testuser", "Password123!", true)
 	if err != nil {
@@ -141,7 +145,7 @@ func TestUserService_Register_Success(t *testing.T) {
 
 func TestUserService_Register_PhoneExists(t *testing.T) {
 	repo := NewMockUserRepository()
-	svc := NewUserService(repo, nil)
+	svc := NewUserService(repo, nil, testAccountConfig)
 
 	_, _ = svc.Register(context.Background(), "13800138000", "user1", "Password123!", true)
 	_, err := svc.Register(context.Background(), "13800138000", "user2", "Password123!", true)
@@ -152,7 +156,7 @@ func TestUserService_Register_PhoneExists(t *testing.T) {
 
 func TestUserService_Register_AccountIDExists(t *testing.T) {
 	repo := NewMockUserRepository()
-	svc := NewUserService(repo, nil)
+	svc := NewUserService(repo, nil, testAccountConfig)
 
 	_, _ = svc.Register(context.Background(), "13800138000", "testuser", "Password123!", true)
 	_, err := svc.Register(context.Background(), "13900139000", "testuser", "Password123!", true)
@@ -163,7 +167,7 @@ func TestUserService_Register_AccountIDExists(t *testing.T) {
 
 func TestUserService_Register_InvalidPhone(t *testing.T) {
 	repo := NewMockUserRepository()
-	svc := NewUserService(repo, nil)
+	svc := NewUserService(repo, nil, testAccountConfig)
 
 	_, err := svc.Register(context.Background(), "invalid", "testuser", "Password123!", true)
 	if err == nil {
@@ -173,7 +177,7 @@ func TestUserService_Register_InvalidPhone(t *testing.T) {
 
 func TestUserService_Register_AccountIDStartsWithDigit(t *testing.T) {
 	repo := NewMockUserRepository()
-	svc := NewUserService(repo, nil)
+	svc := NewUserService(repo, nil, testAccountConfig)
 
 	_, err := svc.Register(context.Background(), "13800138000", "123invalid", "Password123!", true)
 	if err == nil {
@@ -183,7 +187,7 @@ func TestUserService_Register_AccountIDStartsWithDigit(t *testing.T) {
 
 func TestUserService_Register_WeakPassword(t *testing.T) {
 	repo := NewMockUserRepository()
-	svc := NewUserService(repo, nil)
+	svc := NewUserService(repo, nil, testAccountConfig)
 
 	_, err := svc.Register(context.Background(), "13800138000", "testuser", "weak", true)
 	if err == nil {
@@ -193,7 +197,7 @@ func TestUserService_Register_WeakPassword(t *testing.T) {
 
 func TestUserService_Register_NoAgreement(t *testing.T) {
 	repo := NewMockUserRepository()
-	svc := NewUserService(repo, nil)
+	svc := NewUserService(repo, nil, testAccountConfig)
 
 	_, err := svc.Register(context.Background(), "13800138000", "testuser", "Password123!", false)
 	if err == nil {
@@ -203,7 +207,7 @@ func TestUserService_Register_NoAgreement(t *testing.T) {
 
 func TestUserService_ValidatePassword(t *testing.T) {
 	repo := NewMockUserRepository()
-	svc := NewUserService(repo, nil)
+	svc := NewUserService(repo, nil, testAccountConfig)
 
 	tests := []struct {
 		password string

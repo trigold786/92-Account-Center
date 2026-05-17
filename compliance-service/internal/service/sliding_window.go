@@ -6,14 +6,17 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+
+	"github.com/trigold786/92-Account-Center/compliance-service/internal/svcconfig"
 )
 
 type SlidingWindowLimiter struct {
 	rdb *redis.Client
+	cfg *svcconfig.ComplianceConfig
 }
 
-func NewSlidingWindowLimiter(rdb *redis.Client) *SlidingWindowLimiter {
-	return &SlidingWindowLimiter{rdb: rdb}
+func NewSlidingWindowLimiter(rdb *redis.Client, cfg *svcconfig.ComplianceConfig) *SlidingWindowLimiter {
+	return &SlidingWindowLimiter{rdb: rdb, cfg: cfg}
 }
 
 func (l *SlidingWindowLimiter) Allow(ctx context.Context, key string, window time.Duration, maxCount int64) (bool, int64, error) {
@@ -40,10 +43,10 @@ func (l *SlidingWindowLimiter) Allow(ctx context.Context, key string, window tim
 
 func (l *SlidingWindowLimiter) CheckRegistrationLimit(ctx context.Context, ip string) (bool, int64, error) {
 	key := fmt.Sprintf("ratelimit:register:ip:%s", ip)
-	return l.Allow(ctx, key, time.Hour, 3)
+	return l.Allow(ctx, key, l.cfg.SlidingWindowRegWindow, int64(l.cfg.SlidingWindowRegLimit))
 }
 
 func (l *SlidingWindowLimiter) CheckReferralAbuse(ctx context.Context, referrerCode string) (bool, int64, error) {
 	key := fmt.Sprintf("ratelimit:referral:code:%s", referrerCode)
-	return l.Allow(ctx, key, time.Hour, 50)
+	return l.Allow(ctx, key, l.cfg.SlidingWindowRefAbuseWindow, int64(l.cfg.SlidingWindowRefAbuseLimit))
 }

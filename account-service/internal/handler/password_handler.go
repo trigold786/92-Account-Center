@@ -20,12 +20,12 @@ func NewPasswordHandler(userService service.UserService) *PasswordHandler {
 func (h *PasswordHandler) SendVerificationCode(c *gin.Context) {
 	var req model.SendVerificationCodeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
 	if err := h.userService.SendPasswordVerificationCode(c.Request.Context(), req.ContactType, req.ContactValue); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 
@@ -35,7 +35,7 @@ func (h *PasswordHandler) SendVerificationCode(c *gin.Context) {
 func (h *PasswordHandler) ChangePassword(c *gin.Context) {
 	var req model.ChangePasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
@@ -46,7 +46,7 @@ func (h *PasswordHandler) ChangePassword(c *gin.Context) {
 	}
 
 	if err := h.userService.ChangePassword(c.Request.Context(), userID, &req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "internal error"})
 		return
 	}
 

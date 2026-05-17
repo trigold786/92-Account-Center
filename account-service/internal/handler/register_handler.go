@@ -41,13 +41,13 @@ func NewRegisterHandler(userService service.UserService, referralBinder Referral
 func (h *RegisterHandler) Register(c *gin.Context) {
 	var req RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
 	user, err := h.userService.Register(c.Request.Context(), req.PhoneNumber, req.AccountID, req.Password, req.AgreeToTerms)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "internal error"})
 		return
 	}
 

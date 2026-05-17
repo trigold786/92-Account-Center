@@ -61,6 +61,16 @@ class CreditsViewModel: ObservableObject {
         isLoadingMore = false
     }
 
+    func earnCredits(amount: Int, reason: String) async {
+        do {
+            let _ = try await APIClient.shared.request("/api/v1/credits/earn", method: "POST",
+                body: ["user_id": userId, "amount": amount, "reason": reason])
+            await loadCredits()
+        } catch {
+            errorMessage = "签到失败"
+        }
+    }
+
     func generateLink() async {
         guard let userId = userId else { return }
         do {

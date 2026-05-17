@@ -13,6 +13,7 @@ import (
 
 	"github.com/trigold786/92-Account-Center/notification-service/internal/model"
 	"github.com/trigold786/92-Account-Center/notification-service/internal/provider"
+	"github.com/trigold786/92-Account-Center/notification-service/internal/svcconfig"
 )
 
 var (
@@ -22,13 +23,8 @@ var (
 )
 
 const (
-	otpLength           = 6
-	otpTTL              = 5 * time.Minute
-	magicLinkTTL        = 15 * time.Minute
-	rateLimitMax        = 3
-	rateLimitWindow     = time.Hour
-	otpKeyPrefix        = "otp:"
-	rateLimitKeyPrefix  = "email_rate:"
+	otpKeyPrefix       = "otp:"
+	rateLimitKeyPrefix = "email_rate:"
 )
 
 type OTPEmailService interface {
@@ -44,14 +40,16 @@ type otpEmailService struct {
 	provider    provider.EmailProvider
 	jwtSecret   string
 	fromAddress string
+	cfg         *svcconfig.NotificationConfig
 }
 
-func NewOTPEmailService(redisClient *redis.Client, emailProvider provider.EmailProvider, jwtSecret, fromAddress string) OTPEmailService {
+func NewOTPEmailService(redisClient *redis.Client, emailProvider provider.EmailProvider, jwtSecret, fromAddress string, cfg *svcconfig.NotificationConfig) OTPEmailService {
 	return &otpEmailService{
 		redisClient: redisClient,
 		provider:    emailProvider,
 		jwtSecret:   jwtSecret,
 		fromAddress: fromAddress,
+		cfg:         cfg,
 	}
 }
 
@@ -63,20 +61,20 @@ func (s *otpEmailService) SendOTP(ctx context.Context, email string) (*model.OTP
 		return nil, fmt.Errorf("failed to check rate limit: %w", err)
 	}
 
-	if count >= rateLimitMax {
+	if count >= s.cfg.RateLimitMax {
 		return nil, ErrRateLimitExceeded
 	}
 
-	otp := generateOTP()
+	otp := s.generateOTP()
 
 	otpKey := otpKeyPrefix + email
-	err = s.redisClient.Set(ctx, otpKey, otp, otpTTL).Err()
+	err = s.redisClient.Set(ctx, otpKey, otp, s.cfg.EmailOTPTTL).Err()
 	if err != nil {
 		return nil, fmt.Errorf("failed to store OTP: %w", err)
 	}
 
 	if count == 0 {
-		err = s.redisClient.Set(ctx, rateLimitKey, 1, rateLimitWindow).Err()
+		err = s.redisClient.Set(ctx, rateLimitKey, 1, s.cfg.RateLimitWindow).Err()
 	} else {
 		err = s.redisClient.Incr(ctx, rateLimitKey).Err()
 	}
@@ -93,7 +91,7 @@ func (s *otpEmailService) SendOTP(ctx context.Context, email string) (*model.OTP
 	}
 
 	return &model.OTPResponse{
-		ExpiresIn: int(otpTTL.Seconds()),
+		ExpiresIn: int(s.cfg.EmailOTPTTL.Seconds()),
 	}, nil
 }
 
@@ -120,7 +118,7 @@ func (s *otpEmailService) VerifyOTP(ctx context.Context, email, code string) (bo
 func (s *otpEmailService) SendMagicLink(ctx context.Context, email, targetURL string) (*model.MagicLinkResponse, error) {
 	claims := jwt.MapClaims{
 		"email": email,
-		"exp":   time.Now().Add(magicLinkTTL).Unix(),
+		"exp":   time.Now().Add(s.cfg.MagicLinkTTL).Unix(),
 		"iat":   time.Now().Unix(),
 	}
 
@@ -142,7 +140,7 @@ func (s *otpEmailService) SendMagicLink(ctx context.Context, email, targetURL st
 
 	return &model.MagicLinkResponse{
 		MagicLink: magicLink,
-		ExpiresIn: int(magicLinkTTL.Seconds()),
+		ExpiresIn: int(s.cfg.MagicLinkTTL.Seconds()),
 	}, nil
 }
 
@@ -183,9 +181,9 @@ func (s *otpEmailService) SendEmail(ctx context.Context, to, subject, content st
 	return nil
 }
 
-func generateOTP() string {
+func (s *otpEmailService) generateOTP() string {
 	const digits = "0123456789"
-	otp := make([]byte, otpLength)
+	otp := make([]byte, s.cfg.OTPLength)
 	for i := range otp {
 		n, _ := rand.Int(rand.Reader, big.NewInt(int64(len(digits))))
 		otp[i] = digits[n.Int64()]

@@ -83,6 +83,29 @@
             <template #default="{ row }"><code>{{ row.value_after }}</code></template>
           </el-table-column>
         </el-table>
+        <div style="margin-top: 12px; text-align: right">
+          <el-button size="small" type="primary" @click="openAddItemDialog">添加配置项</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="showAddItemDialog" title="添加配置项到发布单" width="500px">
+      <el-form :model="newReleaseItem" label-width="100px">
+        <el-form-item label="配置项" required>
+          <el-select v-model="newReleaseItem.item_id" placeholder="选择配置项" filterable style="width: 100%">
+            <el-option v-for="ci in configItems" :key="ci.id" :label="`${ci.name} (${ci.code})`" :value="ci.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="变更后值" required>
+          <el-input v-model="newReleaseItem.value_after" />
+        </el-form-item>
+        <el-form-item label="变更原因">
+          <el-input v-model="newReleaseItem.change_reason" type="textarea" :rows="2" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showAddItemDialog = false">取消</el-button>
+        <el-button type="primary" @click="doAddReleaseItem">添加</el-button>
       </template>
     </el-dialog>
   </div>
@@ -93,9 +116,10 @@ import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   listReleases, createRelease, submitRelease,
-  approveRelease, rejectRelease, executeRelease, listReleaseItems,
+  approveRelease, rejectRelease, executeRelease, listReleaseItems, addReleaseItem,
 } from '@/api/release'
-import type { ConfigRelease, ConfigReleaseItem } from '@/types'
+import { listItems } from '@/api/config'
+import type { ConfigRelease, ConfigReleaseItem, ConfigItem } from '@/types'
 
 const releases = ref<ConfigRelease[]>([])
 const releaseItems = ref<ConfigReleaseItem[]>([])
@@ -106,7 +130,10 @@ const pageSize = ref(20)
 const statusFilter = ref('')
 const showCreateDialog = ref(false)
 const showDetailDialog = ref(false)
+const showAddItemDialog = ref(false)
 const newRelease = ref({ title: '', description: '' })
+const configItems = ref<ConfigItem[]>([])
+const newReleaseItem = ref({ item_id: null as number | null, value_after: '', change_reason: '' })
 
 function statusTag(s: string) {
   const map: Record<string, string> = { draft: 'info', pending: 'warning', approved: 'success', rejected: 'danger', released: 'primary' }
@@ -186,5 +213,32 @@ async function viewDetail(row: ConfigRelease) {
     releaseItems.value = res.data || []
   } catch (e: any) { console.warn('release operation failed', e) }
   showDetailDialog.value = true
+}
+
+async function openAddItemDialog() {
+  try {
+    const res = await listItems({ page: 1, page_size: 200 })
+    configItems.value = res.data || []
+  } catch (e: any) { console.warn('load config items failed', e) }
+  newReleaseItem.value = { item_id: null, value_after: '', change_reason: '' }
+  showAddItemDialog.value = true
+}
+
+async function doAddReleaseItem() {
+  if (!detail.value || !newReleaseItem.value.item_id || !newReleaseItem.value.value_after) {
+    ElMessage.warning('请选择配置项并填写变更后值')
+    return
+  }
+  try {
+    await addReleaseItem(detail.value.id, {
+      item_id: newReleaseItem.value.item_id,
+      value_after: newReleaseItem.value.value_after,
+      change_reason: newReleaseItem.value.change_reason,
+    })
+    ElMessage.success('配置项已添加')
+    showAddItemDialog.value = false
+    const res = await listReleaseItems(detail.value.id)
+    releaseItems.value = res.data || []
+  } catch (e: any) { console.warn('release operation failed', e) }
 }
 </script>

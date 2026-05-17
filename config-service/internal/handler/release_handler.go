@@ -25,7 +25,7 @@ func (h *ReleaseHandler) ListReleases(c *gin.Context) {
 
 	releases, total, err := h.releaseSvc.ListReleases(c.Request.Context(), status, page, pageSize)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "ok", "data": releases, "total": total})
@@ -40,7 +40,7 @@ func (h *ReleaseHandler) GetReleaseByID(c *gin.Context) {
 	}
 	rel, err := h.releaseSvc.GetReleaseByID(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
 		return
 	}
 	if rel == nil {
@@ -54,12 +54,12 @@ func (h *ReleaseHandler) GetReleaseByID(c *gin.Context) {
 func (h *ReleaseHandler) CreateRelease(c *gin.Context) {
 	var rel model.ConfigRelease
 	if err := c.ShouldBindJSON(&rel); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": "invalid request body"})
 		return
 	}
 	operator := c.GetString("operator")
 	if err := h.releaseSvc.CreateRelease(c.Request.Context(), &rel, operator); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"code": 0, "message": "ok", "data": rel})
@@ -74,7 +74,7 @@ func (h *ReleaseHandler) SubmitRelease(c *gin.Context) {
 	}
 	operator := c.GetString("operator")
 	if err := h.releaseSvc.SubmitRelease(c.Request.Context(), id, operator); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "ok"})
@@ -89,7 +89,7 @@ func (h *ReleaseHandler) ApproveRelease(c *gin.Context) {
 	}
 	operator := c.GetString("operator")
 	if err := h.releaseSvc.ApproveRelease(c.Request.Context(), id, operator); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "ok"})
@@ -104,7 +104,7 @@ func (h *ReleaseHandler) RejectRelease(c *gin.Context) {
 	}
 	operator := c.GetString("operator")
 	if err := h.releaseSvc.RejectRelease(c.Request.Context(), id, operator); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "ok"})
@@ -119,7 +119,7 @@ func (h *ReleaseHandler) ExecuteRelease(c *gin.Context) {
 	}
 	operator := c.GetString("operator")
 	if err := h.releaseSvc.ExecuteRelease(c.Request.Context(), id, operator); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "ok"})
@@ -134,7 +134,7 @@ func (h *ReleaseHandler) ListReleaseItems(c *gin.Context) {
 	}
 	items, err := h.releaseSvc.ListReleaseItems(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "ok", "data": items})
@@ -149,13 +149,13 @@ func (h *ReleaseHandler) AddReleaseItem(c *gin.Context) {
 	}
 	var ri model.ConfigReleaseItem
 	if err := c.ShouldBindJSON(&ri); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": "invalid request body"})
 		return
 	}
 	ri.ReleaseID = id
 	operator := c.GetString("operator")
 	if err := h.releaseSvc.AddReleaseItem(c.Request.Context(), &ri, operator); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"code": 0, "message": "ok", "data": ri})

@@ -11,6 +11,7 @@ import (
 
 	"github.com/trigold786/92-Account-Center/compliance-service/internal/model"
 	"github.com/trigold786/92-Account-Center/compliance-service/internal/repository"
+	"github.com/trigold786/92-Account-Center/compliance-service/internal/svcconfig"
 	"github.com/trigold786/92-Account-Center/compliance-service/pkg/crypto"
 )
 
@@ -30,10 +31,11 @@ type AuditService interface {
 
 type auditService struct {
 	repo repository.AuditRepository
+	cfg  *svcconfig.ComplianceConfig
 }
 
-func NewAuditService(repo repository.AuditRepository) AuditService {
-	return &auditService{repo: repo}
+func NewAuditService(repo repository.AuditRepository, cfg *svcconfig.ComplianceConfig) AuditService {
+	return &auditService{repo: repo, cfg: cfg}
 }
 
 func (s *auditService) RecordLog(ctx context.Context, entry *model.AuditLogEntry) (*model.AuditLog, error) {
@@ -150,7 +152,7 @@ func (s *auditService) RecordBatch(ctx context.Context, entries []model.AuditLog
 
 func (s *auditService) GetLogsByUser(ctx context.Context, userID string, limit, offset int) ([]*model.AuditLog, error) {
 	if limit <= 0 {
-		limit = 100
+		limit = s.cfg.AuditLogDefaultLimit
 	}
 	if offset < 0 {
 		offset = 0
@@ -167,7 +169,7 @@ func (s *auditService) GetLogsByUser(ctx context.Context, userID string, limit, 
 
 func (s *auditService) GetLogsByTimeRange(ctx context.Context, start, end time.Time, limit, offset int) ([]*model.AuditLog, error) {
 	if limit <= 0 {
-		limit = 100
+		limit = s.cfg.AuditLogDefaultLimit
 	}
 	if offset < 0 {
 		offset = 0

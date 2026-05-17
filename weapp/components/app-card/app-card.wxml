@@ -1,0 +1,6 @@
+<view class="app-card">
+  <view class="app-card-header" wx:if="{{title}}">
+    <text class="app-card-title">{{title}}</text>
+  </view>
+  <view class="app-card-body"><slot /></view>
+</view>

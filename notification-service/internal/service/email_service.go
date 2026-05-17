@@ -10,15 +10,12 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/trigold786/92-Account-Center/notification-service/internal/provider"
+	"github.com/trigold786/92-Account-Center/notification-service/internal/svcconfig"
 )
 
 const (
-	emailCodeLength   = 6
-	emailOTPKey       = "otp:email:"
-	emailRateLimit    = "rate_limit:email:"
-	emailDailyLimit   = 10
-	emailRateLimitTTL = 2 * time.Minute
-	emailOTPTTL       = 5 * time.Minute
+	emailOTPKey    = "otp:email:"
+	emailRateLimit = "rate_limit:email:"
 )
 
 var ErrEmailRateLimit = errors.New("email rate limit exceeded")
@@ -31,12 +28,14 @@ type SimpleEmailService interface {
 type simpleEmailService struct {
 	redis    *redis.Client
 	provider provider.VerificationEmailProvider
+	cfg      *svcconfig.NotificationConfig
 }
 
-func NewSimpleEmailService(p provider.VerificationEmailProvider) SimpleEmailService {
+func NewSimpleEmailService(p provider.VerificationEmailProvider, cfg *svcconfig.NotificationConfig) SimpleEmailService {
 	return &simpleEmailService{
 		redis:    globalRedis,
 		provider: p,
+		cfg:      cfg,
 	}
 }
 
@@ -49,18 +48,18 @@ func (s *simpleEmailService) SendVerificationCode(ctx context.Context, email str
 
 	dailyKey := "rate_limit:email:daily:" + email
 	dailyCount, err := s.redis.Get(ctx, dailyKey).Int()
-	if err == nil && dailyCount >= emailDailyLimit {
+	if err == nil && dailyCount >= s.cfg.EmailDailyLimit {
 		return ErrEmailRateLimit
 	}
 
-	code := generateEmailCode(emailCodeLength)
+	code := generateEmailCode(s.cfg.EmailCodeLength)
 
 	if err := s.provider.SendVerificationCode(ctx, email, code); err != nil {
 		return err
 	}
 
-	s.redis.Set(ctx, emailOTPKey+email, code, emailOTPTTL)
-	s.redis.Set(ctx, rlKey, "1", emailRateLimitTTL)
+	s.redis.Set(ctx, emailOTPKey+email, code, s.cfg.EmailOTPTTL)
+	s.redis.Set(ctx, rlKey, "1", s.cfg.EmailRateLimitTTL)
 	s.redis.Incr(ctx, dailyKey)
 	s.redis.Expire(ctx, dailyKey, 24*time.Hour)
 
@@ -68,7 +67,7 @@ func (s *simpleEmailService) SendVerificationCode(ctx context.Context, email str
 }
 
 func (s *simpleEmailService) VerifyCode(ctx context.Context, email, code string) (bool, error) {
-	if code == "" || len(code) != emailCodeLength {
+	if code == "" || len(code) != s.cfg.EmailCodeLength {
 		return false, nil
 	}
 	stored, err := s.redis.Get(ctx, emailOTPKey+email).Result()

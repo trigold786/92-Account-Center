@@ -28,7 +28,7 @@ func (h *EntitlementHandler) GetUserEntitlements(c *gin.Context) {
 
 	entitlements, err := h.svc.GetUserEntitlements(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 
@@ -38,7 +38,7 @@ func (h *EntitlementHandler) GetUserEntitlements(c *gin.Context) {
 func (h *EntitlementHandler) Consume(c *gin.Context) {
 	var req model.ConsumeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
@@ -51,10 +51,10 @@ func (h *EntitlementHandler) Consume(c *gin.Context) {
 	resp, err := h.svc.ConsumeQuota(c.Request.Context(), userID, req.FeatureCode, req.Amount)
 	if err != nil {
 		if err == service.ErrInsufficientQuota || err == service.ErrEntitlementNotFound {
-			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			c.JSON(http.StatusConflict, gin.H{"error": "internal error"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 
@@ -64,7 +64,7 @@ func (h *EntitlementHandler) Consume(c *gin.Context) {
 func (h *EntitlementHandler) Grant(c *gin.Context) {
 	var req model.GrantRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
@@ -75,7 +75,7 @@ func (h *EntitlementHandler) Grant(c *gin.Context) {
 	}
 
 	if err := h.svc.GrantEntitlements(c.Request.Context(), userID, req.TierLevel); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 

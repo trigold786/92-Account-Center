@@ -11,7 +11,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -34,15 +33,15 @@ fun RegisterScreen(
                 .padding(32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer().height(24.dp)
+            Spacer(modifier = Modifier.height(24.dp))
             Column(modifier = Modifier.padding(bottom = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(
                     imageVector = Icons.Default.Person,
                     contentDescription = null,
                     modifier = Modifier.size(56.dp),
-                    tint = Brush.horizontalGradient(listOf(BrandPrimary, BrandSecondary))
+                    tint = BrandPrimary
                 )
-                Spacer().height(12.dp)
+                Spacer(modifier = Modifier.height(12.dp))
                 Text("创建账户", style = MaterialTheme.typography.headlineLarge, color = TextPrimary)
                 Text("注册新账户以使用完整功能", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
             }
@@ -56,7 +55,7 @@ fun RegisterScreen(
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = BrandSecondary, unfocusedBorderColor = Divider, focusedLabelColor = BrandSecondary, unfocusedLabelColor = TextSecondary, cursorColor = BrandSecondary)
             )
-            Spacer().height(16.dp)
+            Spacer(modifier = Modifier.height(16.dp))
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
@@ -74,7 +73,7 @@ fun RegisterScreen(
                     enabled = !uiState.isLoading && uiState.countdownSeconds == 0 && uiState.phoneNumber.isNotEmpty()
                 ) { Text(btnText, color = BrandSecondary) }
             }
-            Spacer().height(16.dp)
+            Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedTextField(
                 value = uiState.accountId,
@@ -84,7 +83,7 @@ fun RegisterScreen(
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = BrandSecondary, unfocusedBorderColor = Divider, focusedLabelColor = BrandSecondary, unfocusedLabelColor = TextSecondary, cursorColor = BrandSecondary)
             )
-            Spacer().height(16.dp)
+            Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedTextField(
                 value = uiState.password,
@@ -95,7 +94,7 @@ fun RegisterScreen(
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = BrandSecondary, unfocusedBorderColor = Divider, focusedLabelColor = BrandSecondary, unfocusedLabelColor = TextSecondary, cursorColor = BrandSecondary)
             )
-            Spacer().height(16.dp)
+            Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedTextField(
                 value = uiState.confirmPassword,
@@ -106,7 +105,7 @@ fun RegisterScreen(
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = BrandSecondary, unfocusedBorderColor = Divider, focusedLabelColor = BrandSecondary, unfocusedLabelColor = TextSecondary, cursorColor = BrandSecondary)
             )
-            Spacer().height(16.dp)
+            Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedTextField(
                 value = uiState.referralCode,
@@ -116,7 +115,7 @@ fun RegisterScreen(
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = BrandSecondary, unfocusedBorderColor = Divider, focusedLabelColor = BrandSecondary, unfocusedLabelColor = TextSecondary, cursorColor = BrandSecondary)
             )
-            Spacer().height(8.dp)
+            Spacer(modifier = Modifier.height(8.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(
@@ -130,7 +129,7 @@ fun RegisterScreen(
             uiState.errorMessage?.let {
                 Text(it, color = Danger, style = MaterialTheme.typography.bodySmall)
             }
-            Spacer().height(16.dp)
+            Spacer(modifier = Modifier.height(16.dp))
 
             GradientButton(
                 text = "注册",
@@ -138,14 +137,14 @@ fun RegisterScreen(
                 enabled = !uiState.isLoading
             )
 
-            Spacer().height(16.dp)
+            Spacer(modifier = Modifier.height(16.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                 Text("已有账号？", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                 TextButton(onClick = onNavigateBack) {
                     Text("立即登录", color = BrandSecondary)
                 }
             }
-            Spacer().height(24.dp)
+            Spacer(modifier = Modifier.height(24.dp))
         }
 
         if (uiState.isLoading) {

@@ -9,6 +9,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/trigold786/92-Account-Center/notification-service/internal/provider"
+	"github.com/trigold786/92-Account-Center/notification-service/internal/svcconfig"
 	"github.com/trigold786/92-Account-Center/notification-service/pkg/circuitbreaker"
 )
 
@@ -18,12 +19,9 @@ var (
 )
 
 const (
-	rateLimitTTL   = 2 * time.Minute
-	dailyLimit     = 10
 	rateLimitKey    = "rate_limit:sms:"
 	dailyKeyPrefix  = "rate_limit:sms:daily:"
 	smsOTPKeyPrefix = "otp:"
-	smsOTPTTL       = 5 * time.Minute
 )
 
 type SMSService interface {
@@ -37,6 +35,7 @@ type smsService struct {
 	providers       []provider.SMSProvider
 	circuitBreakers []*circuitbreaker.CircuitBreaker
 	currentIndex    int64
+	cfg             *svcconfig.NotificationConfig
 }
 
 type ProviderStatus struct {
@@ -50,12 +49,13 @@ func SetRedisClient(client *redis.Client) {
 	globalRedis = client
 }
 
-func NewSMSService(providers []provider.SMSProvider, circuitBreakers []*circuitbreaker.CircuitBreaker) SMSService {
+func NewSMSService(providers []provider.SMSProvider, circuitBreakers []*circuitbreaker.CircuitBreaker, cfg *svcconfig.NotificationConfig) SMSService {
 	return &smsService{
 		redis:           globalRedis,
 		providers:       providers,
 		circuitBreakers: circuitBreakers,
 		currentIndex:    0,
+		cfg:             cfg,
 	}
 }
 
@@ -68,7 +68,7 @@ func (s *smsService) SendCode(ctx context.Context, phoneNumber string) error {
 
 	dailyKey := dailyKeyPrefix + phoneNumber
 	dailyCount, err := s.redis.Get(ctx, dailyKey).Int()
-	if err == nil && dailyCount >= dailyLimit {
+	if err == nil && dailyCount >= s.cfg.SMSDailyLimit {
 		return ErrSMSRateLimit
 	}
 
@@ -91,8 +91,8 @@ func (s *smsService) SendCode(ctx context.Context, phoneNumber string) error {
 
 		atomic.StoreInt64(&s.currentIndex, int64(idx))
 
-		s.redis.Set(ctx, smsOTPKeyPrefix+phoneNumber, code, smsOTPTTL)
-		s.redis.Set(ctx, rlKey, "1", rateLimitTTL)
+		s.redis.Set(ctx, smsOTPKeyPrefix+phoneNumber, code, s.cfg.SMSOTPTTL)
+		s.redis.Set(ctx, rlKey, "1", s.cfg.SMSRateLimitTTL)
 		s.redis.Incr(ctx, dailyKey)
 		s.redis.Expire(ctx, dailyKey, 24*time.Hour)
 

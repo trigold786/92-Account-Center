@@ -21,7 +21,7 @@ func NewPermissionHandler(permSvc service.PermissionService) *PermissionHandler 
 func (h *PermissionHandler) ListRoles(c *gin.Context) {
 	roles, err := h.permSvc.ListRoles(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "ok", "data": roles})
@@ -31,12 +31,12 @@ func (h *PermissionHandler) ListRoles(c *gin.Context) {
 func (h *PermissionHandler) CreateRole(c *gin.Context) {
 	var role model.Role
 	if err := c.ShouldBindJSON(&role); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": "invalid request body"})
 		return
 	}
 	operator := c.GetString("operator")
 	if err := h.permSvc.CreateRole(c.Request.Context(), &role, operator); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"code": 0, "message": "ok", "data": role})
@@ -51,7 +51,7 @@ func (h *PermissionHandler) GetRolePermissions(c *gin.Context) {
 	}
 	perms, err := h.permSvc.GetRolePermissions(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "ok", "data": perms})
@@ -66,13 +66,13 @@ func (h *PermissionHandler) AddRolePermission(c *gin.Context) {
 	}
 	var rp model.RolePermission
 	if err := c.ShouldBindJSON(&rp); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": "invalid request body"})
 		return
 	}
 	rp.RoleID = roleID
 	operator := c.GetString("operator")
 	if err := h.permSvc.AddRolePermission(c.Request.Context(), &rp, operator); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"code": 0, "message": "ok", "data": rp})
@@ -87,7 +87,7 @@ func (h *PermissionHandler) GetUserRoles(c *gin.Context) {
 	}
 	urs, err := h.permSvc.GetUserRoles(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "ok", "data": urs})
@@ -102,13 +102,13 @@ func (h *PermissionHandler) SetUserRole(c *gin.Context) {
 	}
 	var ur model.UserRole
 	if err := c.ShouldBindJSON(&ur); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": "invalid request body"})
 		return
 	}
 	ur.UserID = userID
 	operator := c.GetString("operator")
 	if err := h.permSvc.SetUserRole(c.Request.Context(), &ur, operator); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"code": 0, "message": "ok", "data": ur})

@@ -1,0 +1,21 @@
+<view class="register-container">
+  <view class="header">
+    <text class="title">创建账号</text>
+    <text class="subtitle">注册后即可体验全部功能</text>
+  </view>
+  <view class="form">
+    <input class="input" type="text" placeholder="手机号" value="{{phone}}" bindinput="onPhoneInput" maxlength="11" />
+    <input class="input" type="password" placeholder="设置密码（至少6位）" value="{{password}}" bindinput="onPasswordInput" />
+    <input class="input" type="password" placeholder="确认密码" value="{{confirmPassword}}" bindinput="onConfirmInput" />
+    <view class="code-row">
+      <input class="input code-input" type="text" placeholder="验证码" value="{{code}}" bindinput="onCodeInput" maxlength="6" />
+      <button class="code-btn {{codeBtnDisabled ? 'disabled' : ''}}" disabled="{{codeBtnDisabled}}" bindtap="sendCode">{{codeBtnText}}</button>
+    </view>
+    <view class="agree-row" bindtap="toggleAgree">
+      <view class="checkbox {{agreeTerms ? 'checked' : ''}}"></view>
+      <text class="agree-text">我已阅读并同意<text class="link">服务条款</text>和<text class="link">隐私政策</text></text>
+    </view>
+    <gradient-button text="{{loading ? '注册中...' : '注册'}}" disabled="{{loading}}" bindtap="doRegister" />
+    <view class="login-link" bindtap="goLogin">已有账号？返回登录</view>
+  </view>
+</view>

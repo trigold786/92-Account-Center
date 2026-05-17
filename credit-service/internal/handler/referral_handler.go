@@ -21,16 +21,16 @@ func NewReferralHandler(referralService service.ReferralService) *ReferralHandle
 func (h *ReferralHandler) BindReferral(c *gin.Context) {
 	var req model.ReferralBindRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid request: " + err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid request body"})
 		return
 	}
 
 	if err := h.referralService.BindReferral(c.Request.Context(), req.ReferrerCode, req.RefereeID); err != nil {
 		if err == service.ErrInvalidReferralCode || err == service.ErrAlreadyReferred || err == service.ErrSelfReferral {
-			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid referral"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "internal error"})
 		return
 	}
 
@@ -42,7 +42,7 @@ func (h *ReferralHandler) GenerateLink(c *gin.Context) {
 		UserID string `json:"user_id" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid request: " + err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid request body"})
 		return
 	}
 
@@ -54,7 +54,7 @@ func (h *ReferralHandler) GenerateLink(c *gin.Context) {
 
 	result, err := h.referralService.GenerateLink(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "internal error"})
 		return
 	}
 
@@ -71,7 +71,7 @@ func (h *ReferralHandler) GetSummary(c *gin.Context) {
 
 	result, err := h.referralService.GetSummary(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "internal error"})
 		return
 	}
 

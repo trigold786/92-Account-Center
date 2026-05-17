@@ -17,7 +17,6 @@ var ErrSessionNotFound = errors.New("session not found")
 const (
 	SessionKeyPrefix      = "session:"
 	UserSessionsKeyPrefix = "user_sessions:"
-	SessionTTL            = 20 * time.Minute
 )
 
 type SessionRepository interface {
@@ -33,11 +32,15 @@ type SessionRepository interface {
 }
 
 type sessionRepository struct {
-	rdb *redis.Client
+	rdb        *redis.Client
+	sessionTTL time.Duration
 }
 
-func NewSessionRepository(rdb *redis.Client) SessionRepository {
-	return &sessionRepository{rdb: rdb}
+func NewSessionRepository(rdb *redis.Client, sessionTTL time.Duration) SessionRepository {
+	if sessionTTL <= 0 {
+		sessionTTL = 20 * time.Minute
+	}
+	return &sessionRepository{rdb: rdb, sessionTTL: sessionTTL}
 }
 
 func (r *sessionRepository) sessionKey(sessionID string) string {
@@ -55,9 +58,9 @@ func (r *sessionRepository) Create(ctx context.Context, session *model.Session) 
 	}
 
 	pipe := r.rdb.Pipeline()
-	pipe.Set(ctx, r.sessionKey(session.SessionID), data, SessionTTL)
+	pipe.Set(ctx, r.sessionKey(session.SessionID), data, r.sessionTTL)
 	pipe.SAdd(ctx, r.userSessionsKey(session.UserID), session.SessionID)
-	pipe.Expire(ctx, r.userSessionsKey(session.UserID), SessionTTL*10)
+	pipe.Expire(ctx, r.userSessionsKey(session.UserID), r.sessionTTL*10)
 	_, err = pipe.Exec(ctx)
 	return err
 }
@@ -111,7 +114,7 @@ func (r *sessionRepository) CreateWithEviction(ctx context.Context, session *mod
 		return err
 	}
 
-	ttlSeconds := int64(SessionTTL.Seconds())
+	ttlSeconds := int64(r.sessionTTL.Seconds())
 	if ttlSeconds <= 0 {
 		ttlSeconds = 1200
 	}
@@ -186,7 +189,7 @@ func (r *sessionRepository) UpdateLastAccessed(ctx context.Context, sessionID st
 		return r.rdb.Set(ctx, r.sessionKey(sessionID), data, ttl).Err()
 	}
 
-	return r.rdb.Set(ctx, r.sessionKey(sessionID), data, SessionTTL).Err()
+	return r.rdb.Set(ctx, r.sessionKey(sessionID), data, r.sessionTTL).Err()
 }
 
 func (r *sessionRepository) Delete(ctx context.Context, sessionID string, userID int64) error {

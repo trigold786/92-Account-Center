@@ -1,0 +1,4 @@
+<view class="gradient-btn {{disabled ? 'disabled' : ''}}" bindtap="onClick">
+  <view wx:if="{{loading}}" class="btn-loading"></view>
+  <text wx:else>{{text}}</text>
+</view>

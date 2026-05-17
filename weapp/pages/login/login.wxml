@@ -1,0 +1,32 @@
+<view class="login-container">
+  <view class="login-header">
+    <text class="app-title">Account Center</text>
+    <text class="app-subtitle">欢迎回来</text>
+  </view>
+
+  <view class="login-tabs">
+    <view class="tab {{loginMode === 'password' ? 'active' : ''}}" bindtap="switchMode" data-mode="password">密码登录</view>
+    <view class="tab {{loginMode === 'code' ? 'active' : ''}}" bindtap="switchMode" data-mode="code">验证码登录</view>
+  </view>
+
+  <view class="form">
+    <input class="input" type="text" placeholder="手机号" value="{{phone}}" bindinput="onPhoneInput" maxlength="11" />
+    <input wx:if="{{loginMode === 'password'}}" class="input" type="password" placeholder="密码" value="{{password}}" bindinput="onPasswordInput" />
+    <view wx:if="{{loginMode === 'code'}}" class="code-row">
+      <input class="input code-input" type="text" placeholder="验证码" value="{{code}}" bindinput="onCodeInput" maxlength="6" />
+      <button class="code-btn {{codeBtnDisabled ? 'disabled' : ''}}" disabled="{{codeBtnDisabled}}" bindtap="sendCode">{{codeBtnText}}</button>
+    </view>
+
+    <gradient-button text="{{loading ? '登录中...' : '登录'}}" disabled="{{loading}}" bindtap="doLogin" />
+
+    <view class="register-link" bindtap="goRegister">还没有账号？立即注册</view>
+  </view>
+
+  <view class="wechat-section">
+    <view class="divider"><text>其他方式</text></view>
+    <view class="wechat-btn" bindtap="onWechatLogin">
+      <text class="wechat-icon">微信</text>
+      <text>微信一键登录</text>
+    </view>
+  </view>
+</view>

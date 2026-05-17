@@ -10,23 +10,26 @@ import (
 
 	"github.com/trigold786/92-Account-Center/credit-service/internal/model"
 	"github.com/trigold786/92-Account-Center/credit-service/internal/service"
+	"github.com/trigold786/92-Account-Center/credit-service/internal/svcconfig"
 )
 
 type SubscriptionWorker struct {
 	rdb       *redis.Client
 	rebateSvc service.RebateService
+	cfg       *svcconfig.CreditConfig
 	stream    string
 	group     string
 	consumer  string
 }
 
-func NewSubscriptionWorker(rdb *redis.Client, rebateSvc service.RebateService) *SubscriptionWorker {
+func NewSubscriptionWorker(rdb *redis.Client, rebateSvc service.RebateService, cfg *svcconfig.CreditConfig) *SubscriptionWorker {
 	return &SubscriptionWorker{
 		rdb:       rdb,
 		rebateSvc: rebateSvc,
-		stream:    "subscription:paid",
-		group:     "credit-rebate-group",
-		consumer:  "credit-worker-1",
+		cfg:       cfg,
+		stream:    cfg.SubscriptionStreamKey,
+		group:     cfg.SubscriptionConsumerGroup,
+		consumer:  cfg.SubscriptionConsumerID,
 	}
 }
 
@@ -36,7 +39,7 @@ func (w *SubscriptionWorker) Start(ctx context.Context) {
 		log.Printf("XGroupCreateMkStream (may already exist): %v", err)
 	}
 
-	ticker := time.NewTicker(2 * time.Second)
+	ticker := time.NewTicker(w.cfg.WorkerPollInterval)
 	defer ticker.Stop()
 
 	for {
@@ -54,7 +57,7 @@ func (w *SubscriptionWorker) processBatch(ctx context.Context) {
 		Group:    w.group,
 		Consumer: w.consumer,
 		Streams:  []string{w.stream, ">"},
-		Count:    10,
+		Count:    int64(w.cfg.WorkerBatchSize),
 		Block:    0,
 	}).Result()
 	if err != nil {

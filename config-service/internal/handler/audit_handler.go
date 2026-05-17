@@ -43,7 +43,7 @@ func (h *AuditHandler) ListLogs(c *gin.Context) {
 
 	logs, total, err := h.auditSvc.ListLogs(c.Request.Context(), filter)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "ok", "data": logs, "total": total})
@@ -58,7 +58,7 @@ func (h *AuditHandler) GetLogByID(c *gin.Context) {
 	}
 	log, err := h.auditSvc.GetLogByID(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
 		return
 	}
 	if log == nil {

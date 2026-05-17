@@ -29,7 +29,7 @@ func (h *SMSHandler) SendSMS(c *gin.Context) {
 	}
 
 	if err := h.smsService.SendCode(c.Request.Context(), req.PhoneNumber); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "failed to send SMS"})
 		return
 	}
 
@@ -63,7 +63,7 @@ func (h *SMSHandler) VerifyCode(c *gin.Context) {
 
 	valid, err := h.smsService.VerifyCode(c.Request.Context(), req.PhoneNumber, req.Code)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "internal error"})
 		return
 	}
 

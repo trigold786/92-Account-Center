@@ -9,7 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -24,16 +24,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-)
 
-type GatewayConfig struct {
-	AccountServiceURL       string
-	AuthServiceURL          string
-	NotificationServiceURL  string
-	CreditServiceURL        string
-	ComplianceServiceURL    string
-	DataProductServiceURL   string
-}
+	"github.com/trigold786/92-Account-Center/api-gateway/internal/svcconfig"
+	"github.com/trigold786/92-Account-Center/pkg/config"
+	"github.com/trigold786/92-Account-Center/pkg/logging"
+)
 
 type tokenBucket struct {
 	tokens  float64
@@ -76,10 +71,10 @@ func (l *ipRateLimiter) allow(ip string) bool {
 	return true
 }
 
-func cacheControlMiddleware() gin.HandlerFunc {
+func cacheControlMiddleware(maxAge int) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if c.Request.Method == http.MethodGet {
-			c.Header("Cache-Control", "public, max-age=60")
+			c.Header("Cache-Control", fmt.Sprintf("public, max-age=%d", maxAge))
 		}
 		c.Next()
 	}
@@ -178,17 +173,26 @@ func requestIDMiddleware() gin.HandlerFunc {
 	}
 }
 
-func main() {
-	config := GatewayConfig{
-		AccountServiceURL:      getEnv("ACCOUNT_SERVICE_URL", "http://localhost:30301"),
-		AuthServiceURL:         getEnv("AUTH_SERVICE_URL", "http://localhost:30302"),
-		NotificationServiceURL: getEnv("NOTIFICATION_SERVICE_URL", "http://localhost:30311"),
-		CreditServiceURL:       getEnv("CREDIT_SERVICE_URL", "http://localhost:30312"),
-		ComplianceServiceURL:   getEnv("COMPLIANCE_SERVICE_URL", "http://localhost:30313"),
-		DataProductServiceURL:  getEnv("DATA_PRODUCT_SERVICE_URL", "http://localhost:30314"),
-	}
+var logger *slog.Logger
 
-	r := gin.Default()
+func init() { slog.SetDefault(logger) }
+
+func main() {
+	logger = logging.NewLogger("api-gateway")
+	configURL := getEnv("CONFIG_SERVICE_URL", "http://localhost:30315")
+	configClient := config.NewClient(configURL)
+	svcCfg, err := svcconfig.Load(configClient)
+	if err != nil {
+		logger.Error("failed to load gateway config", "error", err.Error())
+		os.Exit(1)
+	}
+	logger.Info("gateway config loaded successfully")
+
+	r := gin.New()
+	r.Use(gin.RecoveryWithWriter(os.Stderr, func(c *gin.Context, err any) {
+		logger.Error("panic recovered", "error", fmt.Sprintf("%v", err))
+	}))
+	r.Use(logging.Middleware(logger))
 
 	r.Use(func(c *gin.Context) {
 		start := time.Now()
@@ -200,8 +204,8 @@ func main() {
 
 	r.Use(requestIDMiddleware())
 	r.Use(corsMiddleware())
-	r.Use(rateLimitMiddleware(100))
-	r.Use(cacheControlMiddleware())
+	r.Use(rateLimitMiddleware(svcCfg.RateLimitRPS))
+	r.Use(cacheControlMiddleware(svcCfg.CacheMaxAge))
 
 	publicPaths := map[string]bool{
 		"/api/v1/auth/login":              true,
@@ -227,27 +231,27 @@ func main() {
 			c.Next()
 			return
 		}
-		jwtAuthMiddleware(getEnv("JWT_SECRET", "default-secret"))(c)
+		jwtAuthMiddleware(svcCfg.JWTSecret)(c)
 	})
 
-	r.Use(desensitizeMiddleware())
+	r.Use(desensitizeMiddleware(svcCfg.MaxDesensitizeBodySize))
 
-	r.Any("/api/v1/account/*path", proxyHandler(config.AccountServiceURL))
-	r.Any("/api/v1/entitlements/*path", proxyHandler(config.AccountServiceURL))
-	r.Any("/api/v1/subscriptions/*path", proxyHandler(config.AccountServiceURL))
-	r.Any("/api/v1/auth/*path", proxyHandler(config.AuthServiceURL))
-	r.Any("/api/v1/session/*path", proxyHandler(config.AuthServiceURL))
-	r.Any("/api/v1/device/*path", proxyHandler(config.AuthServiceURL))
-	r.Any("/api/v1/qrcode/*path", proxyHandler(config.AuthServiceURL))
-	r.Any("/api/v1/sms/*path", proxyHandler(config.NotificationServiceURL))
-	r.Any("/api/v1/email/*path", proxyHandler(config.NotificationServiceURL))
-	r.Any("/api/v1/push/*path", proxyHandler(config.NotificationServiceURL))
-	r.Any("/api/v1/credits/*path", proxyHandler(config.CreditServiceURL))
-	r.Any("/api/v1/referral/*path", proxyHandler(config.CreditServiceURL))
-	r.Any("/api/v1/risk/*path", proxyHandler(config.ComplianceServiceURL))
-	r.Any("/api/v1/audit/*path", proxyHandler(config.ComplianceServiceURL))
-	r.Any("/api/v1/kyb/*path", proxyHandler(config.ComplianceServiceURL))
-	r.Any("/api/v1/data/*path", proxyHandler(config.DataProductServiceURL))
+	r.Any("/api/v1/account/*path", proxyHandler(svcCfg.AccountServiceURL))
+	r.Any("/api/v1/entitlements/*path", proxyHandler(svcCfg.AccountServiceURL))
+	r.Any("/api/v1/subscriptions/*path", proxyHandler(svcCfg.AccountServiceURL))
+	r.Any("/api/v1/auth/*path", proxyHandler(svcCfg.AuthServiceURL))
+	r.Any("/api/v1/session/*path", proxyHandler(svcCfg.AuthServiceURL))
+	r.Any("/api/v1/device/*path", proxyHandler(svcCfg.AuthServiceURL))
+	r.Any("/api/v1/qrcode/*path", proxyHandler(svcCfg.AuthServiceURL))
+	r.Any("/api/v1/sms/*path", proxyHandler(svcCfg.NotificationServiceURL))
+	r.Any("/api/v1/email/*path", proxyHandler(svcCfg.NotificationServiceURL))
+	r.Any("/api/v1/push/*path", proxyHandler(svcCfg.NotificationServiceURL))
+	r.Any("/api/v1/credits/*path", proxyHandler(svcCfg.CreditServiceURL))
+	r.Any("/api/v1/referral/*path", proxyHandler(svcCfg.CreditServiceURL))
+	r.Any("/api/v1/risk/*path", proxyHandler(svcCfg.ComplianceServiceURL))
+	r.Any("/api/v1/audit/*path", proxyHandler(svcCfg.ComplianceServiceURL))
+	r.Any("/api/v1/kyb/*path", proxyHandler(svcCfg.ComplianceServiceURL))
+	r.Any("/api/v1/data/*path", proxyHandler(svcCfg.DataProductServiceURL))
 
 	r.Any("/metrics", func(c *gin.Context) {
 		var buf bytes.Buffer
@@ -270,37 +274,39 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
-	port := getEnv("PORT", "30300")
 	srv := &http.Server{
-		Addr:    ":" + port,
+		Addr:    ":" + svcCfg.Port,
 		Handler: r,
 	}
 
 	go func() {
+		defer logging.RecoverGoroutine(logger, "shutdown")
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 		<-sigChan
-		log.Println("Shutting down...")
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		logger.Info("shutting down server")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), svcCfg.ShutdownTimeout)
 		defer cancel()
 		srv.Shutdown(shutdownCtx)
 	}()
 
-	log.Printf("API Gateway starting on :%s", port)
+	logger.Info("starting server", "port", svcCfg.Port)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatalf("Failed to start server: %v", err)
+		logger.Error("failed to start server", "error", err.Error())
+		os.Exit(1)
 	}
 }
 
 func proxyHandler(target string) gin.HandlerFunc {
 	targetURL, err := url.Parse(target)
 	if err != nil {
-		log.Fatalf("Invalid target URL: %v", err)
+		logger.Error("invalid target URL", "error", err.Error())
+		os.Exit(1)
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(targetURL)
 	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
-		log.Printf("Proxy error: %v", err)
+		logger.Error("proxy error", "target", target, "error", err.Error())
 		http.Error(w, "Service unavailable", http.StatusServiceUnavailable)
 	}
 
@@ -318,7 +324,17 @@ func proxyHandler(target string) gin.HandlerFunc {
 
 func corsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "*")
+		origin := c.GetHeader("Origin")
+		allowedOrigins := map[string]bool{
+			"http://localhost:30317": true,
+			"http://localhost:30316": true,
+			getEnv("WEB_UI_ORIGIN", ""): true,
+		}
+		if allowedOrigins[origin] {
+			c.Header("Access-Control-Allow-Origin", origin)
+		} else {
+			c.Header("Access-Control-Allow-Origin", "http://localhost:30317")
+		}
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID")
 
@@ -372,7 +388,7 @@ var phoneRegex = regexp.MustCompile(`"phone_number"\s*:\s*"(\d{3})\d{4}(\d{4})"`
 var emailRegex = regexp.MustCompile(`"email"\s*:\s*"([a-zA-Z0-9])[a-zA-Z0-9._%+\-]*@([^"]+)"`)
 var ipAddrRegex = regexp.MustCompile(`"ip_address"\s*:\s*"(\d{1,3}\.)\d{1,3}\.\d{1,3}(\.\d{1,3})"`)
 
-func desensitizeMiddleware() gin.HandlerFunc {
+func desensitizeMiddleware(maxBodySize int64) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		path := c.Request.URL.Path
 		if path == "/health" || path == "/metrics" || strings.HasPrefix(path, "/internal/") {
@@ -403,7 +419,7 @@ func desensitizeMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		if len(captureWriter.body) > 1048576 {
+		if int64(len(captureWriter.body)) > maxBodySize {
 			flush(captureWriter.body)
 			return
 		}
@@ -434,5 +450,13 @@ func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
 	}
+	return defaultValue
+}
+
+func getEnvSecret(key, defaultValue string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	logger.Warn("environment variable not set, using insecure default", "key", key)
 	return defaultValue
 }

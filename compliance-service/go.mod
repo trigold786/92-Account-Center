@@ -8,6 +8,8 @@ require (
 	github.com/google/uuid v1.4.0
 	github.com/lib/pq v1.10.9
 	github.com/redis/go-redis/v9 v9.3.0
+	github.com/trigold786/92-Account-Center/pkg/config v0.0.0-00010101000000-000000000000
+	github.com/trigold786/92-Account-Center/pkg/logging v0.0.0-00010101000000-000000000000
 )
 
 require (
@@ -56,3 +58,7 @@ require (
 	google.golang.org/protobuf v1.30.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/trigold786/92-Account-Center/pkg/config => ../pkg/config
+
+replace github.com/trigold786/92-Account-Center/pkg/logging => ../pkg/logging

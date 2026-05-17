@@ -3,9 +3,12 @@ package crypto
 import (
 	"crypto/cipher"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
+	"os"
 )
 
 var (
@@ -77,4 +80,19 @@ func GenerateKey() ([]byte, error) {
 		return nil, err
 	}
 	return key, nil
+}
+
+func KeyFromEnv(envVar string) ([]byte, error) {
+	encoded := os.Getenv(envVar)
+	if encoded == "" {
+		return GenerateKey()
+	}
+	decoded, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		return nil, fmt.Errorf("crypto: invalid base64 key in %s: %w", envVar, err)
+	}
+	if len(decoded) != 16 {
+		return nil, fmt.Errorf("crypto: key in %s must be 16 bytes (got %d)", envVar, len(decoded))
+	}
+	return decoded, nil
 }

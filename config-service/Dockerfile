@@ -1,13 +1,15 @@
 FROM golang:1.21-alpine AS builder
 
-WORKDIR /app
-COPY go.mod go.sum ./
-RUN go mod download
+WORKDIR /build
+COPY config-service/go.mod config-service/go.sum ./config-service/
+COPY pkg/config/go.mod ./pkg/config/
+RUN cd config-service && go mod download
 
-COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -o /config-service ./cmd/main.go
+COPY config-service/ ./config-service/
+COPY pkg/config/ ./pkg/config/
+RUN cd config-service && CGO_ENABLED=0 GOOS=linux go build -o /config-service ./cmd/main.go
 
-FROM alpine:3.18
+FROM alpine:3.19
 RUN apk --no-cache add wget ca-certificates
 COPY --from=builder /config-service /config-service
 

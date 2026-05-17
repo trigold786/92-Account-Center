@@ -5,7 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -21,7 +21,10 @@ import (
 	"github.com/trigold786/92-Account-Center/auth-service/internal/handler"
 	"github.com/trigold786/92-Account-Center/auth-service/internal/repository"
 	"github.com/trigold786/92-Account-Center/auth-service/internal/service"
+	"github.com/trigold786/92-Account-Center/auth-service/internal/svcconfig"
 	"github.com/trigold786/92-Account-Center/auth-service/pkg/jwt"
+	"github.com/trigold786/92-Account-Center/pkg/config"
+	"github.com/trigold786/92-Account-Center/pkg/logging"
 )
 
 var (
@@ -30,54 +33,82 @@ var (
 	durationCount   uint64
 )
 
+var logger = logging.NewLogger("auth-service")
+
 func main() {
+	slog.SetDefault(logger)
+
 	dbHost := getEnv("DB_HOST", "localhost")
 	dbPort := getEnv("DB_PORT", "5432")
 	dbUser := getEnv("DB_USER", "postgres")
-	dbPassword := getEnv("DB_PASSWORD", "postgres")
+	dbPassword := getEnvSecret("DB_PASSWORD", "postgres")
 	dbName := getEnv("DB_NAME", "account_center")
 
 	dsn := "host=" + dbHost + " port=" + dbPort + " user=" + dbUser + " password=" + dbPassword + " dbname=" + dbName + " sslmode=disable"
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		logger.Error("failed to connect to database", "error", err.Error())
+		os.Exit(1)
 	}
 	defer db.Close()
 
 	if err := db.Ping(); err != nil {
-		log.Fatalf("Failed to ping database: %v", err)
+		logger.Error("failed to ping database", "error", err.Error())
+		os.Exit(1)
 	}
-	log.Println("Connected to database")
+	logger.Info("connected to database")
 
-	accessSecret := getEnv("JWT_ACCESS_SECRET", "access-secret-key-change-in-production")
-	refreshSecret := getEnv("JWT_REFRESH_SECRET", "refresh-secret-key-change-in-production")
-	jwtMgr := jwt.NewJWTManager(accessSecret, refreshSecret)
+	accessSecret := getEnvSecret("JWT_ACCESS_SECRET", "access-secret-key-change-in-production")
+	refreshSecret := getEnvSecret("JWT_REFRESH_SECRET", "refresh-secret-key-change-in-production")
+
+	configSvcURL := getEnv("CONFIG_SERVICE_URL", "http://localhost:30315")
+	configClient := config.NewClient(configSvcURL)
+	authCfg, err := svcconfig.Load(configClient)
+	if err != nil {
+		logger.Error("failed to load config", "error", err.Error())
+		os.Exit(1)
+	}
+	logger.Info("config loaded",
+		"jwt_access", authCfg.JwtAccessTokenExpire,
+		"jwt_refresh", authCfg.JwtRefreshTokenExpire,
+		"max_attempts", authCfg.LoginMaxAttempts,
+		"lockout", authCfg.LoginLockoutDuration,
+		"session_timeout", authCfg.SessionTimeout,
+		"session_max", authCfg.SessionMaxPerUser,
+		"trust_days", authCfg.DeviceTrustDays,
+		"qrcode_ttl", authCfg.QRCodeExpire,
+	)
+
+	jwtMgr := jwt.NewJWTManager(accessSecret, refreshSecret, authCfg.JwtAccessTokenExpire, authCfg.JwtRefreshTokenExpire)
 
 	userRepo := repository.NewUserRepository(db)
 
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     getEnv("REDIS_ADDR", "localhost:6379"),
-		Password: getEnv("REDIS_PASSWORD", ""),
+		Password: getEnvSecret("REDIS_PASSWORD", ""),
 		DB:       0,
 	})
 	defer rdb.Close()
 
-	authService := service.NewAuthService(userRepo, jwtMgr, rdb)
-	loginHandler := handler.NewLoginHandler(authService)
+	authService := service.NewAuthService(userRepo, jwtMgr, rdb, authCfg)
+	loginHandler := handler.NewLoginHandler(authService, authCfg.LoginRateLimitPerIP)
 
-	maxSessions := getEnvInt("MAX_CONCURRENT_SESSIONS", 5)
-	sessionRepo := repository.NewSessionRepository(rdb)
-	sessionSvc := service.NewSessionService(sessionRepo, int64(maxSessions))
+	sessionRepo := repository.NewSessionRepository(rdb, authCfg.SessionTimeout)
+	sessionSvc := service.NewSessionService(sessionRepo, int64(authCfg.SessionMaxPerUser), authCfg.SessionTimeout)
 	sessionHandler := handler.NewSessionHandler(sessionSvc)
 
 	deviceRepo := repository.NewDeviceRepository(db)
-	deviceSvc := service.NewDeviceFingerprintService(deviceRepo, getEnvInt("TRUST_DAYS", 3), 0.3)
+	deviceSvc := service.NewDeviceFingerprintService(deviceRepo, authCfg.DeviceTrustDays, 0.3)
 	deviceHandler := handler.NewDeviceHandler(deviceSvc)
 
-	qrcodeSvc := service.NewQRCodeService(rdb, jwtMgr)
+	qrcodeSvc := service.NewQRCodeService(rdb, jwtMgr, authCfg.QRCodeExpire)
 	qrcodeHandler := handler.NewQRCodeHandler(qrcodeSvc)
 
-	r := gin.Default()
+	r := gin.New()
+	r.Use(gin.RecoveryWithWriter(os.Stderr, func(c *gin.Context, err any) {
+		logger.Error("panic recovered", "error", fmt.Sprintf("%v", err))
+	}))
+	r.Use(logging.Middleware(logger))
 
 	r.Use(func(c *gin.Context) {
 		start := time.Now()
@@ -151,18 +182,20 @@ func main() {
 	}
 
 	go func() {
+		defer logging.RecoverGoroutine(logger, "shutdown-listener")
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 		<-sigChan
-		log.Println("Shutting down...")
+		logger.Info("shutting down")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		srv.Shutdown(shutdownCtx)
 	}()
 
-	log.Printf("Auth service starting on :%s", port)
+	logger.Info("starting server", "port", port)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatalf("Failed to start server: %v", err)
+		logger.Error("failed to start server", "error", err.Error())
+		os.Exit(1)
 	}
 }
 
@@ -173,17 +206,10 @@ func getEnv(key, defaultValue string) string {
 	return defaultValue
 }
 
-func getEnvInt(key string, defaultValue int) int {
-	v := os.Getenv(key)
-	if v == "" {
-		return defaultValue
+func getEnvSecret(key, defaultValue string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
 	}
-	n := 0
-	for _, c := range v {
-		if c < '0' || c > '9' {
-			return defaultValue
-		}
-		n = n*10 + int(c-'0')
-	}
-	return n
+	logger.Warn("environment variable not set, using insecure default", "key", key)
+	return defaultValue
 }

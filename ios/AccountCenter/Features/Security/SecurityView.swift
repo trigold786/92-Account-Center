@@ -88,6 +88,32 @@ struct SecurityView: View {
                 }
                 .padding(16)
             }
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text("修改密码").sectionTitle().padding(.bottom, 8)
+
+                VStack(spacing: 12) {
+                    SecureField("当前密码", text: $viewModel.currentPassword)
+                        .textFieldStyle(.roundedBorder)
+                    SecureField("新密码", text: $viewModel.newPassword)
+                        .textFieldStyle(.roundedBorder)
+                    SecureField("确认新密码", text: $viewModel.confirmPassword)
+                        .textFieldStyle(.roundedBorder)
+                    Button("修改密码") {
+                        viewModel.changePassword()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(viewModel.currentPassword.isEmpty || viewModel.newPassword.isEmpty || viewModel.newPassword != viewModel.confirmPassword)
+                    if let msg = viewModel.passwordChangeMessage {
+                        Text(msg)
+                            .foregroundColor(viewModel.passwordChangeSuccess ? .green : .red)
+                            .font(.caption)
+                    }
+                }
+                .padding(16)
+                .background(Color.bgCard)
+                .cornerRadius(16)
+            }
         }
         .navigationTitle("安全设置")
         .toolbarBackground(Color.bgPrimary.opacity(0.9), for: .navigationBar)

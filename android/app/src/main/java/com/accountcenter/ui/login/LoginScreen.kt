@@ -9,7 +9,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -17,6 +16,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.accountcenter.ui.components.GradientButton
 import com.accountcenter.ui.theme.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
     viewModel: LoginViewModel = hiltViewModel(),
@@ -37,9 +37,9 @@ fun LoginScreen(
                 imageVector = Icons.Default.Person,
                 contentDescription = null,
                 modifier = Modifier.size(56.dp),
-                tint = Brush.horizontalGradient(listOf(BrandPrimary, BrandSecondary))
+                tint = BrandPrimary
             )
-            Spacer().height(12.dp)
+            Spacer(modifier = Modifier.height(12.dp))
             Text(
                 "账户中心",
                 style = MaterialTheme.typography.headlineLarge,
@@ -50,7 +50,7 @@ fun LoginScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 color = TextSecondary
             )
-            Spacer().height(48.dp)
+            Spacer(modifier = Modifier.height(48.dp))
 
             OutlinedTextField(
                 value = uiState.phoneNumber,
@@ -67,7 +67,7 @@ fun LoginScreen(
                     cursorColor = BrandSecondary
                 )
             )
-            Spacer().height(16.dp)
+            Spacer(modifier = Modifier.height(16.dp))
 
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                 SegmentedButton(
@@ -86,7 +86,7 @@ fun LoginScreen(
                 }
             }
 
-            Spacer().height(16.dp)
+            Spacer(modifier = Modifier.height(16.dp))
 
             if (uiState.loginMode == LoginMode.PASSWORD) {
                 OutlinedTextField(
@@ -134,7 +134,7 @@ fun LoginScreen(
             uiState.errorMessage?.let {
                 Text(it, color = Danger, style = MaterialTheme.typography.bodySmall)
             }
-            Spacer().height(16.dp)
+            Spacer(modifier = Modifier.height(16.dp))
 
             GradientButton(
                 text = "登录",
@@ -142,7 +142,7 @@ fun LoginScreen(
                 enabled = !uiState.isLoading
             )
 
-            Spacer().height(24.dp)
+            Spacer(modifier = Modifier.height(24.dp))
             Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
                 Text("还没有账号？", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                 TextButton(onClick = onNavigateToRegister) {

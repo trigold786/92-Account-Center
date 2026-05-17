@@ -27,7 +27,7 @@ func (h *VerificationEmailHandler) SendVerificationCode(c *gin.Context) {
 	}
 
 	if err := h.emailService.SendVerificationCode(c.Request.Context(), req.Email); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "failed to send verification code"})
 		return
 	}
 
@@ -47,7 +47,7 @@ func (h *VerificationEmailHandler) VerifyCode(c *gin.Context) {
 
 	valid, err := h.emailService.VerifyCode(c.Request.Context(), req.Email, req.Code)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "internal error"})
 		return
 	}
 

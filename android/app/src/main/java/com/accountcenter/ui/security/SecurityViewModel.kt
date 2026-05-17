@@ -8,6 +8,7 @@ import com.accountcenter.network.ApiClient
 import com.accountcenter.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import androidx.compose.runtime.mutableStateOf
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -28,8 +29,19 @@ class SecurityViewModel @Inject constructor(
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    var currentPassword = mutableStateOf("")
+    var newPassword = mutableStateOf("")
+    var confirmPassword = mutableStateOf("")
+    var passwordChangeMessage = mutableStateOf<String?>(null)
+    var passwordChangeSuccess = mutableStateOf(false)
+
     init {
         loadData()
+    }
+
+    fun changePassword() {
+        passwordChangeMessage.value = "密码修改功能暂未开放"
+        passwordChangeSuccess.value = false
     }
 
     private fun loadData() {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/trigold786/92-Account-Center/credit-service/internal/model"
 	"github.com/trigold786/92-Account-Center/credit-service/internal/repository"
+	"github.com/trigold786/92-Account-Center/credit-service/internal/svcconfig"
 	"github.com/trigold786/92-Account-Center/credit-service/pkg/crypto"
 )
 
@@ -31,10 +32,11 @@ type CreditService interface {
 type creditService struct {
 	creditRepo repository.CreditRepository
 	db         *sql.DB
+	cfg        *svcconfig.CreditConfig
 }
 
-func NewCreditService(creditRepo repository.CreditRepository, db *sql.DB) CreditService {
-	return &creditService{creditRepo: creditRepo, db: db}
+func NewCreditService(creditRepo repository.CreditRepository, db *sql.DB, cfg *svcconfig.CreditConfig) CreditService {
+	return &creditService{creditRepo: creditRepo, db: db, cfg: cfg}
 }
 
 func (s *creditService) getOrCreateAccount(ctx context.Context, userID int64) (*model.CreditAccount, error) {
@@ -68,7 +70,7 @@ func (s *creditService) GetTransactions(ctx context.Context, userID int64, page,
 		page = 1
 	}
 	if pageSize <= 0 {
-		pageSize = 20
+		pageSize = s.cfg.DefaultPageSize
 	}
 
 	account, err := s.creditRepo.GetAccountByUserID(ctx, userID)

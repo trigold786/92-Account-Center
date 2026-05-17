@@ -6,6 +6,7 @@ import (
 
 	"github.com/trigold786/92-Account-Center/data-product-service/internal/model"
 	"github.com/trigold786/92-Account-Center/data-product-service/internal/repository"
+	"github.com/trigold786/92-Account-Center/data-product-service/internal/svcconfig"
 )
 
 type DashboardService interface {
@@ -16,10 +17,11 @@ type DashboardService interface {
 type dashboardService struct {
 	dataRepo repository.DataRepository
 	rfmSvc   RFMService
+	cfg      *svcconfig.DataProductConfig
 }
 
-func NewDashboardService(dataRepo repository.DataRepository, rfmSvc RFMService) DashboardService {
-	return &dashboardService{dataRepo: dataRepo, rfmSvc: rfmSvc}
+func NewDashboardService(dataRepo repository.DataRepository, rfmSvc RFMService, cfg *svcconfig.DataProductConfig) DashboardService {
+	return &dashboardService{dataRepo: dataRepo, rfmSvc: rfmSvc, cfg: cfg}
 }
 
 func (s *dashboardService) GetOverview(ctx context.Context) (*model.DashboardOverview, error) {
@@ -48,7 +50,7 @@ func (s *dashboardService) GetOverview(ctx context.Context) (*model.DashboardOve
 		return nil, err
 	}
 
-	trend, err := s.dataRepo.GetRegistrationTrend(ctx, 30)
+	trend, err := s.dataRepo.GetRegistrationTrend(ctx, s.cfg.DashboardTrendDays)
 	if err != nil {
 		return nil, err
 	}

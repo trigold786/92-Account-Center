@@ -21,13 +21,13 @@ func NewKYBHandler(kybService service.KYBService) *KYBHandler {
 func (h *KYBHandler) SubmitEnterprise(c *gin.Context) {
 	var req model.EnterpriseInfoRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid request: " + err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid request body"})
 		return
 	}
 
 	resp, err := h.kybService.SubmitEnterpriseInfo(c.Request.Context(), req.UserID, &req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid enterprise info"})
 		return
 	}
 
@@ -39,18 +39,18 @@ func (h *KYBHandler) InitiateMicroPayment(c *gin.Context) {
 		EnterpriseID string `json:"enterprise_id" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid request: " + err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid request body"})
 		return
 	}
 
 	resp, err := h.kybService.InitiateMicroPayment(c.Request.Context(), req.EnterpriseID)
 	if err != nil {
 		if err == service.ErrEnterpriseNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": err.Error()})
+			c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": "enterprise not found"})
 			return
 		}
 		if err == service.ErrMicroPaymentNotPending {
-			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "micro payment not pending"})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "failed to initiate micro payment"})
@@ -63,18 +63,18 @@ func (h *KYBHandler) InitiateMicroPayment(c *gin.Context) {
 func (h *KYBHandler) VerifyMicroPayment(c *gin.Context) {
 	var req model.MicroPaymentVerifyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid request: " + err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid request body"})
 		return
 	}
 
 	err := h.kybService.VerifyMicroPayment(c.Request.Context(), req.EnterpriseID, req.Amount)
 	if err != nil {
 		if err == service.ErrEnterpriseNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": err.Error()})
+			c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": "enterprise not found"})
 			return
 		}
 		if err == service.ErrMicroPaymentNotPending || err == service.ErrInvalidAmount {
-			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid micro payment"})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "failed to verify micro payment"})
@@ -87,18 +87,18 @@ func (h *KYBHandler) VerifyMicroPayment(c *gin.Context) {
 func (h *KYBHandler) SubmitFaceVerification(c *gin.Context) {
 	var req model.FaceVerifyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid request: " + err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "invalid request body"})
 		return
 	}
 
 	err := h.kybService.SubmitFaceVerification(c.Request.Context(), req.EnterpriseID, req.Token)
 	if err != nil {
 		if err == service.ErrEnterpriseNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": err.Error()})
+			c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": "enterprise not found"})
 			return
 		}
 		if err == service.ErrFaceVerificationFailed {
-			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "face verification failed"})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "failed to submit face verification"})
@@ -120,7 +120,7 @@ func (h *KYBHandler) GetEnterpriseStatus(c *gin.Context) {
 	resp, err := h.kybService.GetEnterpriseStatus(c.Request.Context(), enterpriseID)
 	if err != nil {
 		if err == service.ErrEnterpriseNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": err.Error()})
+			c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": "enterprise not found"})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "failed to get enterprise status"})

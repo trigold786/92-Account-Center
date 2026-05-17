@@ -4,9 +4,11 @@ go 1.21
 
 require (
 	github.com/gin-gonic/gin v1.9.1
-	github.com/go-redis/redis/v8 v8.11.5
+	github.com/redis/go-redis/v9 v9.3.0
 	github.com/lib/pq v1.10.9
 	github.com/stretchr/testify v1.8.3
+	github.com/trigold786/92-Account-Center/pkg/config v0.0.0-00010101000000-000000000000
+	github.com/trigold786/92-Account-Center/pkg/logging v0.0.0-00010101000000-000000000000
 )
 
 require (
@@ -42,3 +44,7 @@ require (
 )
 
 replace golang.org/x/crypto => golang.org/x/crypto v0.16.0
+
+replace github.com/trigold786/92-Account-Center/pkg/logging => ../pkg/logging
+
+replace github.com/trigold786/92-Account-Center/pkg/config => ../pkg/config

@@ -1,0 +1,41 @@
+/* Dark Tech Theme - Account Center WeApp */
+page {
+  --bg-primary: #0D1117;
+  --bg-secondary: #161B22;
+  --bg-card: #1C2333;
+  --bg-card-hover: #242D3D;
+  --bg-input: #0D1117;
+
+  --brand-primary: #6C63FF;
+  --brand-secondary: #00D4FF;
+  --brand-gradient: linear-gradient(135deg, #6C63FF 0%, #00D4FF 100%);
+
+  --text-primary: #E6EDF3;
+  --text-secondary: #8B949E;
+  --text-muted: #484F58;
+
+  --color-success: #2ED573;
+  --color-warning: #FFA502;
+  --color-danger: #FF4757;
+  --color-info: #00D4FF;
+
+  --border-color: #30363D;
+  --border-radius: 16rpx;
+  --card-radius: 24rpx;
+  --button-radius: 40rpx;
+
+  --font-xs: 22rpx;
+  --font-sm: 26rpx;
+  --font-base: 28rpx;
+  --font-lg: 32rpx;
+  --font-xl: 36rpx;
+  --font-xxl: 48rpx;
+
+  --spacing-xs: 8rpx;
+  --spacing-sm: 16rpx;
+  --spacing-md: 24rpx;
+  --spacing-lg: 32rpx;
+  --spacing-xl: 48rpx;
+
+  --shadow-card: 0 4rpx 24rpx rgba(0, 0, 0, 0.3);
+}

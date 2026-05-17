@@ -1,0 +1,22 @@
+<view class="sub-container">
+  <app-card title="当前套餐">
+    <view wx:if="{{subscription}}">
+      <view class="plan-header">
+        <text class="plan-name">{{subscription.plan_name}}</text>
+        <text class="plan-status {{subscription.status}}">{{subscription.status}}</text>
+      </view>
+      <view class="plan-dates">
+        <text>开始: {{subscription.current_period_start}}</text>
+        <text>到期: {{subscription.current_period_end}}</text>
+      </view>
+    </view>
+    <view wx:else class="empty">暂无订阅</view>
+  </app-card>
+
+  <app-card title="用户等级" wx:if="{{tier}}">
+    <text class="tier-name">{{tier.tier}}</text>
+    <view class="benefits" wx:for="{{tier.benefits}}" wx:key="*this">
+      <text class="benefit">✓ {{item}}</text>
+    </view>
+  </app-card>
+</view>

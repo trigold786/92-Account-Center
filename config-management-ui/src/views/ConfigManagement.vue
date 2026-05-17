@@ -67,6 +67,8 @@
             <div class="config-actions">
               <el-button size="small" @click.stop="editItem(item)">编辑</el-button>
               <el-button size="small" @click.stop="viewVersions(item)">历史</el-button>
+              <el-button size="small" type="danger" plain @click.stop="deleteItem(item)">删除</el-button>
+              <el-button size="small" @click.stop="resetItem(item)">重置</el-button>
             </div>
           </div>
 
@@ -106,7 +108,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { listGroups, listItems, listVersions } from '@/api/config'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { listGroups, listItems, listVersions, deleteItem as deleteConfigItem, resetItemToDefault } from '@/api/config'
 import type { ConfigGroup, ConfigItem, ConfigVersion } from '@/types'
 
 const router = useRouter()
@@ -134,16 +137,6 @@ async function loadGroups() {
       { id: -1, name: '全部', children: res.data.map((g) => ({ id: g.id, name: g.name })) },
     ]
   } catch (e: any) { console.warn('load failed', e) }
-}
-
-async function loadGroups() {
-  try {
-    const res = await listGroups()
-    groups.value = res.data || []
-    groupTree.value = [
-      { id: -1, name: '全部', children: res.data.map((g) => ({ id: g.id, name: g.name })) },
-    ]
-  } catch (e: any) { console.warn('load groups failed', e) }
 }
 
 async function loadItems() {
@@ -181,22 +174,30 @@ async function viewVersions(item: ConfigItem) {
   } catch (e: any) { console.warn('load versions failed', e) }
 }
 
-function onGroupClick(data: any) {
-  if (data.id === -1 || data.children) return
-  search.value.group_id = data.id
-  handleSearch()
-}
-
-function editItem(item: ConfigItem) {
-  router.push(`/config/edit/${item.id}`)
-}
-
-async function viewVersions(item: ConfigItem) {
+async function deleteItem(item: ConfigItem) {
   try {
-    const res = await listVersions(item.id)
-    versions.value = res.data || []
-    versionDialog.value = true
-  } catch (e: any) { console.warn('view versions failed', e) }
+    await ElMessageBox.confirm(`确定要删除配置项 "${item.code}" 吗？`, '确认删除', {
+      type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消'
+    })
+    await deleteConfigItem(item.id)
+    ElMessage.success('删除成功')
+    await loadItems()
+  } catch (e: any) {
+    if (e !== 'cancel') ElMessage.error('删除失败: ' + (e.message || e))
+  }
+}
+
+async function resetItem(item: ConfigItem) {
+  try {
+    await ElMessageBox.confirm(`确定要将 "${item.code}" 重置为默认值吗？`, '确认重置', {
+      type: 'info', confirmButtonText: '重置', cancelButtonText: '取消'
+    })
+    await resetItemToDefault(item.id)
+    ElMessage.success('重置成功')
+    await loadItems()
+  } catch (e: any) {
+    if (e !== 'cancel') ElMessage.error('重置失败: ' + (e.message || e))
+  }
 }
 </script>
 

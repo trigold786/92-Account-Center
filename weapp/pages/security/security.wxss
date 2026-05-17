@@ -1,0 +1,47 @@
+.security-container { padding-bottom: var(--spacing-xl); }
+.device-item { display: flex; justify-content: space-between; align-items: center; padding: var(--spacing-sm) 0; border-bottom: 1rpx solid var(--border-color); }
+.device-info { flex: 1; }
+.device-name { font-size: var(--font-sm); color: var(--text-primary); display: block; }
+.device-time { font-size: var(--font-xs); color: var(--text-muted); }
+.device-trust { font-size: var(--font-xs); padding: 4rpx 16rpx; border-radius: 20rpx; background: rgba(139,148,158,0.15); color: var(--text-muted); }
+.device-trust.trusted { background: rgba(46,213,115,0.15); color: var(--color-success); }
+.input {
+  background: var(--bg-secondary);
+  border: 1rpx solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 20rpx;
+  font-size: var(--font-sm);
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-sm);
+  width: 100%;
+}
+.change-pwd-btn {
+  background: linear-gradient(135deg, #6C63FF, #00D4FF);
+  border-radius: var(--button-radius);
+  padding: 18rpx;
+  text-align: center;
+  color: #fff;
+  font-size: var(--font-sm);
+  font-weight: 600;
+}
+.pass-msg { display: block; margin-top: var(--spacing-xs); font-size: var(--font-xs); }
+.pass-msg.success { color: var(--color-success); }
+.pass-msg.fail { color: var(--color-danger); }
+.risk-item { display: flex; justify-content: space-between; align-items: center; padding: var(--spacing-sm) 0; border-bottom: 1rpx solid var(--border-color); }
+.risk-left { flex: 1; }
+.risk-type { font-size: var(--font-sm); color: var(--text-primary); display: block; }
+.risk-time { font-size: var(--font-xs); color: var(--text-muted); }
+.risk-score { font-size: var(--font-base); font-weight: 600; }
+.risk-score.level-low { color: var(--color-success); }
+.risk-score.level-medium { color: var(--color-warning); }
+.risk-score.level-high { color: var(--color-danger); }
+.logout-btn {
+  margin: var(--spacing-lg) var(--spacing-md);
+  background: transparent;
+  border: 2rpx solid var(--color-danger);
+  border-radius: var(--button-radius);
+  padding: 20rpx;
+  text-align: center;
+  color: var(--color-danger);
+  font-size: var(--font-base);
+}

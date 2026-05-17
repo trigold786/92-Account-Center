@@ -5,7 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -23,9 +23,16 @@ import (
 	"github.com/trigold786/92-Account-Center/compliance-service/internal/handler"
 	"github.com/trigold786/92-Account-Center/compliance-service/internal/repository"
 	"github.com/trigold786/92-Account-Center/compliance-service/internal/service"
+	"github.com/trigold786/92-Account-Center/compliance-service/internal/svcconfig"
 	"github.com/trigold786/92-Account-Center/compliance-service/pkg/crypto"
 	"github.com/trigold786/92-Account-Center/compliance-service/pkg/mq"
+	"github.com/trigold786/92-Account-Center/pkg/config"
+	"github.com/trigold786/92-Account-Center/pkg/logging"
 )
+
+var logger *slog.Logger
+
+func init() { slog.SetDefault(logger) }
 
 var (
 	requestCount    uint64
@@ -34,28 +41,32 @@ var (
 )
 
 func main() {
+	logger = logging.NewLogger("compliance-service")
+
 	dbHost := getEnv("DB_HOST", "localhost")
 	dbPort := getEnv("DB_PORT", "5432")
 	dbUser := getEnv("DB_USER", "postgres")
-	dbPassword := getEnv("DB_PASSWORD", "postgres")
+	dbPassword := getEnvSecret("DB_PASSWORD", "postgres")
 	dbName := getEnv("DB_NAME", "account_center")
 
 	dsn := "host=" + dbHost + " port=" + dbPort + " user=" + dbUser + " password=" + dbPassword + " dbname=" + dbName + " sslmode=disable"
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		logger.Error("failed to connect to database", "error", err.Error())
+		os.Exit(1)
 	}
 	defer db.Close()
 
 	if err := db.Ping(); err != nil {
-		log.Fatalf("Failed to ping database: %v", err)
+		logger.Error("failed to ping database", "error", err.Error())
+		os.Exit(1)
 	}
-	log.Println("Connected to database")
+	logger.Info("connected to database")
 
 	redisURL := getEnv("REDIS_URL", "localhost:6379")
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     redisURL,
-		Password: getEnv("REDIS_PASSWORD", ""),
+		Password: getEnvSecret("REDIS_PASSWORD", ""),
 		DB:       0,
 	})
 	defer rdb.Close()
@@ -63,18 +74,31 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	configURL := getEnv("CONFIG_SERVICE_URL", "http://localhost:30315")
+	configClient := config.NewClient(configURL)
+	svcCfg, err := svcconfig.Load(configClient)
+	if err != nil {
+		logger.Error("failed to load compliance config", "error", err.Error())
+		os.Exit(1)
+	}
+	logger.Info("compliance config loaded successfully")
+
 	riskRepo := repository.NewRiskRepository(db)
 	geoService := service.NewGeoService()
-	riskService := service.NewRiskService(riskRepo, geoService)
+	riskService := service.NewRiskService(riskRepo, geoService, svcCfg)
 	riskHandler := handler.NewRiskHandler(riskService)
 
 	auditRepo := repository.NewAuditRepository(db)
-	auditService := service.NewAuditService(auditRepo)
+	auditService := service.NewAuditService(auditRepo, svcCfg)
 	auditHandler := handler.NewAuditHandler(auditService)
 
-	encryptKey, err := crypto.GenerateKey()
+	encryptKey, err := crypto.KeyFromEnv("ENCRYPTION_KEY")
 	if err != nil {
-		log.Fatalf("Failed to generate encryption key: %v", err)
+		logger.Error("failed to load encryption key", "error", err.Error())
+		os.Exit(1)
+	}
+	if os.Getenv("ENCRYPTION_KEY") == "" {
+		logger.Warn("ENCRYPTION_KEY not set, using ephemeral key. KYB data will be lost on restart")
 	}
 
 	entRepo := repository.NewEnterpriseRepository(db)
@@ -82,12 +106,16 @@ func main() {
 	kybHandler := handler.NewKYBHandler(kybService)
 
 	blacklistRepo := repository.NewBlacklistRepository(db)
-	blacklistSvc := service.NewBlacklistService(blacklistRepo, rdb)
+	blacklistSvc := service.NewBlacklistService(blacklistRepo, rdb, svcCfg)
 	blacklistHandler := handler.NewBlacklistHandler(blacklistSvc)
-	windowLimiter := service.NewSlidingWindowLimiter(rdb)
+	windowLimiter := service.NewSlidingWindowLimiter(rdb, svcCfg)
 	_ = windowLimiter
 
-	r := gin.Default()
+	r := gin.New()
+	r.Use(gin.RecoveryWithWriter(os.Stderr, func(c *gin.Context, err any) {
+		logger.Error("panic recovered", "error", fmt.Sprintf("%v", err))
+	}))
+	r.Use(logging.Middleware(logger))
 
 	r.Use(func(c *gin.Context) {
 		start := time.Now()
@@ -133,7 +161,7 @@ func main() {
 				IP string `json:"ip" binding:"required"`
 			}
 			if err := c.ShouldBindJSON(&req); err != nil {
-				c.JSON(400, gin.H{"error": err.Error()})
+				c.JSON(400, gin.H{"error": "invalid request body"})
 				return
 			}
 			blocked, reason, _ := blacklistSvc.CheckBlocked(c.Request.Context(), "IP", req.IP)
@@ -142,7 +170,7 @@ func main() {
 				return
 			}
 			allowed, count, _ := windowLimiter.CheckRegistrationLimit(c.Request.Context(), req.IP)
-			c.JSON(200, gin.H{"blocked": !allowed, "current_count": count, "limit": 3})
+			c.JSON(200, gin.H{"blocked": !allowed, "current_count": count, "limit": svcCfg.SlidingWindowRegLimit})
 		})
 	}
 
@@ -179,7 +207,7 @@ func main() {
 
 		kafkaMQ, err := mq.NewKafkaMQ(brokers, topic, groupID)
 		if err != nil {
-			log.Printf("Warning: Failed to create Kafka MQ: %v (audit logs will be synchronous only)", err)
+			logger.Warn("failed to create Kafka MQ, audit logs will be synchronous only", "error", err.Error())
 		} else {
 			messageQueue = kafkaMQ
 		}
@@ -189,25 +217,25 @@ func main() {
 		groupName := getEnv("REDIS_CONSUMER_GROUP", "compliance-service")
 		consumerID := getEnv("REDIS_CONSUMER_ID", "compliance-service-1")
 
-		redisPassword := getEnv("REDIS_PASSWORD", "")
+		redisPassword := getEnvSecret("REDIS_PASSWORD", "")
 		redisDB, _ := strconv.Atoi(getEnv("REDIS_DB", "0"))
 
 		redisMQ := mq.NewRedisStreamsMQ(redisURL, redisPassword, redisDB, streamKey, groupName, consumerID)
 		messageQueue = redisMQ
 
 	default:
-		log.Printf("Unknown AUDIT_MQ_TYPE=%s, falling back to synchronous-only mode", mqType)
+		logger.Warn("unknown AUDIT_MQ_TYPE, falling back to synchronous-only mode", "type", mqType)
 	}
 
 	if messageQueue != nil {
 		defer messageQueue.Close()
 		if err := messageQueue.StartConsumer(ctx, auditService); err != nil {
-			log.Printf("Warning: Failed to start MQ consumer: %v (audit logs will be synchronous only)", err)
+			logger.Warn("failed to start MQ consumer, audit logs will be synchronous only", "error", err.Error())
 		} else {
-			log.Printf("MQ consumer started: type=%s", mqType)
+			logger.Info("MQ consumer started", "type", mqType)
 		}
 	} else {
-		log.Printf("No message queue configured, audit logs are synchronous only")
+		logger.Info("no message queue configured, audit logs are synchronous only")
 	}
 
 	port := getEnv("PORT", "30313")
@@ -217,22 +245,24 @@ func main() {
 	}
 
 	go func() {
+		defer logging.RecoverGoroutine(logger, "signal-handler")
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 		<-sigChan
-		log.Println("Shutting down...")
+		logger.Info("shutting down")
 		cancel()
 
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer shutdownCancel()
 		if err := srv.Shutdown(shutdownCtx); err != nil {
-			log.Printf("Server forced shutdown: %v", err)
+			logger.Warn("server forced shutdown", "error", err.Error())
 		}
 	}()
 
-	log.Printf("Compliance Service starting on :%s", port)
+	logger.Info("starting server", "port", port)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatalf("Failed to start server: %v", err)
+		logger.Error("failed to start server", "error", err.Error())
+		os.Exit(1)
 	}
 }
 
@@ -240,5 +270,13 @@ func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
 	}
+	return defaultValue
+}
+
+func getEnvSecret(key, defaultValue string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	logger.Warn("environment variable not set, using an insecure default", "key", key)
 	return defaultValue
 }

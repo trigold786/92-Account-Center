@@ -21,7 +21,7 @@ func NewConfigHandler(configSvc service.ConfigService) *ConfigHandler {
 func (h *ConfigHandler) ListGroups(c *gin.Context) {
 	groups, err := h.configSvc.ListGroups(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "ok", "data": groups})
@@ -36,7 +36,7 @@ func (h *ConfigHandler) GetGroupByID(c *gin.Context) {
 	}
 	group, err := h.configSvc.GetGroupByID(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
 		return
 	}
 	if group == nil {
@@ -50,12 +50,12 @@ func (h *ConfigHandler) GetGroupByID(c *gin.Context) {
 func (h *ConfigHandler) CreateGroup(c *gin.Context) {
 	var group model.ConfigGroup
 	if err := c.ShouldBindJSON(&group); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": "invalid request body"})
 		return
 	}
 	operator := c.GetString("operator")
 	if err := h.configSvc.CreateGroup(c.Request.Context(), &group, operator); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"code": 0, "message": "ok", "data": group})
@@ -70,13 +70,13 @@ func (h *ConfigHandler) UpdateGroup(c *gin.Context) {
 	}
 	var group model.ConfigGroup
 	if err := c.ShouldBindJSON(&group); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": "invalid request body"})
 		return
 	}
 	group.ID = id
 	operator := c.GetString("operator")
 	if err := h.configSvc.UpdateGroup(c.Request.Context(), &group, operator); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "ok", "data": group})
@@ -91,7 +91,7 @@ func (h *ConfigHandler) DeleteGroup(c *gin.Context) {
 	}
 	operator := c.GetString("operator")
 	if err := h.configSvc.DeleteGroup(c.Request.Context(), id, operator); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "ok"})
@@ -109,7 +109,7 @@ func (h *ConfigHandler) ListItems(c *gin.Context) {
 
 	items, total, err := h.configSvc.ListItems(c.Request.Context(), filter)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "ok", "data": items, "total": total})
@@ -124,7 +124,7 @@ func (h *ConfigHandler) GetItemByID(c *gin.Context) {
 	}
 	item, err := h.configSvc.GetItemByID(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
 		return
 	}
 	if item == nil {
@@ -138,12 +138,12 @@ func (h *ConfigHandler) GetItemByID(c *gin.Context) {
 func (h *ConfigHandler) CreateItem(c *gin.Context) {
 	var item model.ConfigItem
 	if err := c.ShouldBindJSON(&item); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": "invalid request body"})
 		return
 	}
 	operator := c.GetString("operator")
 	if err := h.configSvc.CreateItem(c.Request.Context(), &item, operator); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"code": 0, "message": "ok", "data": item})
@@ -158,14 +158,14 @@ func (h *ConfigHandler) UpdateItem(c *gin.Context) {
 	}
 	var item model.ConfigItem
 	if err := c.ShouldBindJSON(&item); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": "invalid request body"})
 		return
 	}
 	item.ID = id
 	operator := c.GetString("operator")
 	changeReason := c.Query("change_reason")
 	if err := h.configSvc.UpdateItem(c.Request.Context(), &item, changeReason, operator); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "ok", "data": item})
@@ -180,7 +180,7 @@ func (h *ConfigHandler) DeleteItem(c *gin.Context) {
 	}
 	operator := c.GetString("operator")
 	if err := h.configSvc.DeleteItem(c.Request.Context(), id, operator); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "ok"})
@@ -195,7 +195,7 @@ func (h *ConfigHandler) ResetItemToDefault(c *gin.Context) {
 	}
 	operator := c.GetString("operator")
 	if err := h.configSvc.ResetItemToDefault(c.Request.Context(), id, operator); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "ok"})
@@ -210,7 +210,7 @@ func (h *ConfigHandler) ListVersions(c *gin.Context) {
 	}
 	versions, err := h.configSvc.ListVersionsByItemID(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "ok", "data": versions})
@@ -225,7 +225,7 @@ func (h *ConfigHandler) GetItemByCode(c *gin.Context) {
 	}
 	item, err := h.configSvc.GetItemByCode(c.Request.Context(), code)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
 		return
 	}
 	if item == nil {

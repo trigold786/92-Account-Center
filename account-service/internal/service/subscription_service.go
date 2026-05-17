@@ -10,6 +10,7 @@ import (
 
 	"github.com/trigold786/92-Account-Center/account-service/internal/model"
 	"github.com/trigold786/92-Account-Center/account-service/internal/repository"
+	"github.com/trigold786/92-Account-Center/account-service/internal/svcconfig"
 )
 
 var (
@@ -17,8 +18,6 @@ var (
 	ErrInvalidTierUpgrade   = errors.New("invalid tier upgrade")
 	ErrAlreadySubscribed    = errors.New("user already has an active subscription at this or higher tier")
 )
-
-const defaultDuration = 30 * 24 * time.Hour
 
 type SubscriptionService interface {
 	PurchaseSubscription(ctx context.Context, req *model.PurchaseRequest) (*model.Subscription, error)
@@ -32,17 +31,20 @@ type subscriptionService struct {
 	subRepo      repository.SubscriptionRepository
 	userRepo     repository.UserRepository
 	entitleSvc   EntitlementService
+	cfg          *svcconfig.AccountConfig
 }
 
 func NewSubscriptionService(
 	subRepo repository.SubscriptionRepository,
 	userRepo repository.UserRepository,
 	entitleSvc EntitlementService,
+	cfg *svcconfig.AccountConfig,
 ) SubscriptionService {
 	return &subscriptionService{
 		subRepo:    subRepo,
 		userRepo:   userRepo,
 		entitleSvc: entitleSvc,
+		cfg:        cfg,
 	}
 }
 
@@ -68,7 +70,7 @@ func (s *subscriptionService) PurchaseSubscription(ctx context.Context, req *mod
 		UserID:        userID,
 		TierLevel:     req.TierLevel,
 		StartTime:     now,
-		EndTime:       now.Add(defaultDuration),
+		EndTime:       now.Add(s.cfg.SubscriptionDefaultDuration),
 		Status:        "ACTIVE",
 		Price:         req.Price,
 		PaymentMethod: req.PaymentMethod,
@@ -153,7 +155,7 @@ func (s *subscriptionService) RenewSubscription(ctx context.Context, req *model.
 		return nil, ErrSubscriptionNotFound
 	}
 
-	newEnd := active.EndTime.Add(defaultDuration)
+	newEnd := active.EndTime.Add(s.cfg.SubscriptionDefaultDuration)
 	if err := s.subRepo.UpdateEndTime(ctx, active.ID, newEnd.Format(time.RFC3339)); err != nil {
 		return nil, err
 	}

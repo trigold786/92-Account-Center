@@ -1,0 +1,25 @@
+<view class="about-container">
+  <view class="app-header">
+    <text class="app-name">Account Center</text>
+    <text class="app-version">v{{version}} (build {{build}})</text>
+  </view>
+
+  <app-card title="功能介绍">
+    <view class="feature-item" wx:for="{{features}}" wx:key="*this">
+      <text class="feature-check">✓</text>
+      <text class="feature-text">{{item}}</text>
+    </view>
+  </app-card>
+
+  <app-card title="关于">
+    <text class="about-text">
+      Account Center 是一款基于微服务架构的全功能账号管理平台，
+      提供安全认证、风控评估、积分管理、订阅服务等能力。
+    </text>
+  </app-card>
+
+  <view class="footer">
+    <text>© 2026 Account Center Team</text>
+    <text>Powered by 92-Account-Center</text>
+  </view>
+</view>

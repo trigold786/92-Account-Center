@@ -8,12 +8,13 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.Route
 import javax.inject.Inject
+import javax.inject.Provider
 import javax.inject.Singleton
 
 @Singleton
 class TokenAuthenticator @Inject constructor(
     private val tokenManager: TokenManager,
-    private val apiClient: ApiClient
+    private val apiClientProvider: Provider<ApiClient>
 ) : Authenticator {
     private val lock = Any()
 
@@ -26,7 +27,7 @@ class TokenAuthenticator @Inject constructor(
 
             return runBlocking {
                 try {
-                    val newTokenResponse = apiClient.refresh(RefreshTokenRequest(refreshToken))
+                    val newTokenResponse = apiClientProvider.get().refresh(RefreshTokenRequest(refreshToken))
                     if (newTokenResponse.isSuccessful && newTokenResponse.body() != null) {
                         val newToken = newTokenResponse.body()!!
                         tokenManager.saveToken(newToken)

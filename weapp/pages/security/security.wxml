@@ -1,0 +1,32 @@
+<view class="security-container">
+  <app-card title="登录设备">
+    <view wx:if="{{devices.length === 0}}" class="empty">暂无设备记录</view>
+    <view class="device-item" wx:for="{{devices}}" wx:key="device_id">
+      <view class="device-info">
+        <text class="device-name">{{item.device_name}}</text>
+        <text class="device-time">{{item.last_seen_at}}</text>
+      </view>
+      <text class="device-trust {{item.is_trusted ? 'trusted' : ''}}">{{item.is_trusted ? '可信' : '未知'}}</text>
+    </view>
+  </app-card>
+
+  <app-card title="修改密码">
+    <input class="input" type="password" placeholder="当前密码" value="{{currentPassword}}" bindinput="onCurrentPwd" />
+    <input class="input" type="password" placeholder="新密码（至少6位）" value="{{newPassword}}" bindinput="onNewPwd" />
+    <input class="input" type="password" placeholder="确认新密码" value="{{confirmPassword}}" bindinput="onConfirmPwd" />
+    <view class="change-pwd-btn" bindtap="changePassword">修改密码</view>
+    <text wx:if="{{passMsg}}" class="pass-msg {{passSuccess ? 'success' : 'fail'}}">{{passMsg}}</text>
+  </app-card>
+
+  <app-card title="最近风险事件" wx:if="{{riskEvents.length > 0}}">
+    <view class="risk-item" wx:for="{{riskEvents}}" wx:key="id">
+      <view class="risk-left">
+        <text class="risk-type">{{item.event_type}}</text>
+        <text class="risk-time">{{item.created_at}}</text>
+      </view>
+      <text class="risk-score level-{{item.risk_level}}">{{item.risk_score}}</text>
+    </view>
+  </app-card>
+
+  <view class="logout-btn" bindtap="doLogout">退出登录</view>
+</view>

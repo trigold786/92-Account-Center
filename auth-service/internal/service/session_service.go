@@ -17,11 +17,6 @@ var (
 	ErrMaxSessionsReached = errors.New("maximum concurrent sessions reached")
 )
 
-const (
-	DefaultMaxSessions = 5
-	SessionTimeout     = 20 * time.Minute
-)
-
 type SessionService interface {
 	CreateSession(ctx context.Context, req *model.CreateSessionRequest) (*model.Session, error)
 	ValidateSession(ctx context.Context, sessionID string) (*model.SessionInfo, error)
@@ -35,15 +30,20 @@ type SessionService interface {
 type sessionService struct {
 	repo           repository.SessionRepository
 	maxConSessions int64
+	sessionTimeout time.Duration
 }
 
-func NewSessionService(repo repository.SessionRepository, maxConSessions int64) SessionService {
+func NewSessionService(repo repository.SessionRepository, maxConSessions int64, sessionTimeout time.Duration) SessionService {
 	if maxConSessions <= 0 {
-		maxConSessions = DefaultMaxSessions
+		maxConSessions = 5
+	}
+	if sessionTimeout <= 0 {
+		sessionTimeout = 20 * time.Minute
 	}
 	return &sessionService{
 		repo:           repo,
 		maxConSessions: maxConSessions,
+		sessionTimeout: sessionTimeout,
 	}
 }
 
@@ -56,7 +56,7 @@ func (s *sessionService) CreateSession(ctx context.Context, req *model.CreateSes
 		IPAddress:         req.IPAddress,
 		CreatedAt:         now,
 		LastAccessedAt:    now,
-		ExpiresAt:         now.Add(SessionTimeout),
+		ExpiresAt:         now.Add(s.sessionTimeout),
 		IsActive:          true,
 	}
 
@@ -146,7 +146,7 @@ func (s *sessionService) RefreshSession(ctx context.Context, sessionID string) (
 	}
 
 	now := time.Now()
-	newExpiresAt := now.Add(SessionTimeout)
+	newExpiresAt := now.Add(s.sessionTimeout)
 
 	if err := s.repo.UpdateLastAccessed(ctx, sessionID, now, newExpiresAt); err != nil {
 		return nil, err
@@ -155,7 +155,7 @@ func (s *sessionService) RefreshSession(ctx context.Context, sessionID string) (
 	session.LastAccessedAt = now
 	session.ExpiresAt = newExpiresAt
 
-	return session.ToSessionInfo(int64(SessionTimeout.Seconds())), nil
+	return session.ToSessionInfo(int64(s.sessionTimeout.Seconds())), nil
 }
 
 func (s *sessionService) CountUserSessions(ctx context.Context, userID int64) (int64, error) {

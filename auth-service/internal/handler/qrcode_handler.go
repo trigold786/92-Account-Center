@@ -21,7 +21,7 @@ func NewQRCodeHandler(qrcodeService *service.QRCodeService) *QRCodeHandler {
 func (h *QRCodeHandler) Generate(c *gin.Context) {
 	resp, err := h.qrcodeService.Generate(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 
@@ -37,7 +37,7 @@ func (h *QRCodeHandler) GetStatus(c *gin.Context) {
 
 	resp, err := h.qrcodeService.GetStatus(c.Request.Context(), codeID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 
@@ -53,7 +53,7 @@ func (h *QRCodeHandler) Scan(c *gin.Context) {
 
 	var req model.QRCodeScanRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	req.CodeID = codeID
@@ -64,7 +64,7 @@ func (h *QRCodeHandler) Scan(c *gin.Context) {
 	}
 
 	if err := h.qrcodeService.Scan(c.Request.Context(), codeID, userID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
@@ -80,7 +80,7 @@ func (h *QRCodeHandler) Confirm(c *gin.Context) {
 
 	var req model.QRCodeConfirmRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	req.CodeID = codeID
@@ -92,7 +92,7 @@ func (h *QRCodeHandler) Confirm(c *gin.Context) {
 
 	resp, err := h.qrcodeService.Confirm(c.Request.Context(), codeID, userID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 

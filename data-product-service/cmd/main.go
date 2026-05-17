@@ -5,7 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -20,6 +20,9 @@ import (
 	"github.com/trigold786/92-Account-Center/data-product-service/internal/handler"
 	"github.com/trigold786/92-Account-Center/data-product-service/internal/repository"
 	"github.com/trigold786/92-Account-Center/data-product-service/internal/service"
+	"github.com/trigold786/92-Account-Center/data-product-service/internal/svcconfig"
+	"github.com/trigold786/92-Account-Center/pkg/config"
+	"github.com/trigold786/92-Account-Center/pkg/logging"
 )
 
 var (
@@ -28,33 +31,53 @@ var (
 	durationCount   uint64
 )
 
+var logger *slog.Logger
+
+func init() { slog.SetDefault(logger) }
+
 func main() {
+	logger = logging.NewLogger("data-product-service")
 	dbHost := getEnv("DB_HOST", "localhost")
 	dbPort := getEnv("DB_PORT", "5432")
 	dbUser := getEnv("DB_USER", "postgres")
-	dbPassword := getEnv("DB_PASSWORD", "postgres")
+	dbPassword := getEnvSecret("DB_PASSWORD", "postgres")
 	dbName := getEnv("DB_NAME", "account_center")
 
 	dsn := "host=" + dbHost + " port=" + dbPort + " user=" + dbUser + " password=" + dbPassword + " dbname=" + dbName + " sslmode=disable"
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		logger.Error("failed to connect to database", "error", err.Error())
+		os.Exit(1)
 	}
 	defer db.Close()
 	if err := db.Ping(); err != nil {
-		log.Fatalf("Failed to ping database: %v", err)
+		logger.Error("failed to ping database", "error", err.Error())
+		os.Exit(1)
 	}
-	log.Println("Connected to database")
+	logger.Info("connected to database")
+
+	configURL := getEnv("CONFIG_SERVICE_URL", "http://localhost:30315")
+	configClient := config.NewClient(configURL)
+	svcCfg, err := svcconfig.Load(configClient)
+	if err != nil {
+		logger.Error("failed to load data-product config", "error", err.Error())
+		os.Exit(1)
+	}
+	logger.Info("data-product config loaded successfully")
 
 	dataRepo := repository.NewDataRepository(db)
 	rfmSvc := service.NewRFMService(dataRepo)
-	dashSvc := service.NewDashboardService(dataRepo, rfmSvc)
+	dashSvc := service.NewDashboardService(dataRepo, rfmSvc, svcCfg)
 
 	rfmHandler := handler.NewRFMHandler(rfmSvc)
 	dashHandler := handler.NewDashboardHandler(dashSvc)
 	funnelHandler := handler.NewFunnelHandler(dashSvc)
 
-	r := gin.Default()
+	r := gin.New()
+	r.Use(gin.RecoveryWithWriter(os.Stderr, func(c *gin.Context, err any) {
+		logger.Error("panic recovered", "error", fmt.Sprintf("%v", err))
+	}))
+	r.Use(logging.Middleware(logger))
 
 	r.Use(func(c *gin.Context) {
 		start := time.Now()
@@ -97,18 +120,20 @@ func main() {
 	srv := &http.Server{Addr: ":" + port, Handler: r}
 
 	go func() {
+		defer logging.RecoverGoroutine(logger, "shutdown")
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 		<-sigChan
-		log.Println("Shutting down...")
+		logger.Info("shutting down server")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		srv.Shutdown(shutdownCtx)
 	}()
 
-	log.Printf("Data product service starting on :%s", port)
+	logger.Info("starting server", "port", port)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatalf("Failed to start server: %v", err)
+		logger.Error("failed to start server", "error", err.Error())
+		os.Exit(1)
 	}
 }
 
@@ -116,5 +141,13 @@ func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
 	}
+	return defaultValue
+}
+
+func getEnvSecret(key, defaultValue string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	logger.Warn("environment variable not set, using insecure default", "key", key)
 	return defaultValue
 }

@@ -95,7 +95,7 @@ fun SubscriptionScreen(
                     }
 
                     item {
-                        Spacer().height(8.dp)
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text("订阅历史", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
                     }
                     subscriptions.filter { it.status != "active" }.forEach { sub ->
@@ -123,13 +123,13 @@ private fun TierBadge(level: Int) {
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(modifier = Modifier.size(12.dp).clip(RoundedCornerShape(6.dp)).background(tierColor))
-            Spacer().width(8.dp)
+            Spacer(modifier = Modifier.width(8.dp))
             Text(
                 "当前等级",
                 style = MaterialTheme.typography.bodySmall,
                 color = TextSecondary
             )
-            Spacer().width(8.dp)
+            Spacer(modifier = Modifier.width(8.dp))
             Surface(
                 color = BrandSecondary.copy(alpha = 0.15f),
                 shape = RoundedCornerShape(8.dp)
@@ -141,7 +141,7 @@ private fun TierBadge(level: Int) {
                     color = BrandSecondary
                 )
             }
-            Spacer().width(8.dp)
+            Spacer(modifier = Modifier.width(8.dp))
             Text(
                 name,
                 style = MaterialTheme.typography.titleMedium,
@@ -172,7 +172,7 @@ private fun ActiveSubscriptionCard(subscription: Subscription) {
                     Text("状态：", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                     Text(subscription.status, style = MaterialTheme.typography.bodySmall, color = Success)
                 }
-                Spacer().height(4.dp)
+                Spacer(modifier = Modifier.height(4.dp))
                 Row {
                     Text("开始时间：", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                     Text(subscription.startTime, style = MaterialTheme.typography.bodySmall, color = TextPrimary)
@@ -202,7 +202,7 @@ private fun SubscriptionHistoryCard(subscription: Subscription) {
                 Text("状态：${subscription.status}", style = MaterialTheme.typography.bodySmall, color = TextPrimary)
                 Text("¥${subscription.price}", style = MaterialTheme.typography.bodySmall, color = TextPrimary, fontWeight = FontWeight.Bold)
             }
-            Spacer().height(4.dp)
+            Spacer(modifier = Modifier.height(4.dp))
             Text("${subscription.startTime} - ${subscription.endTime}", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
         }
     }
