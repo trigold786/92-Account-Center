@@ -133,7 +133,17 @@ async function loadGroups() {
     groupTree.value = [
       { id: -1, name: '全部', children: res.data.map((g) => ({ id: g.id, name: g.name })) },
     ]
-  } catch { /* ignore */ }
+  } catch (e: any) { console.warn('load failed', e) }
+}
+
+async function loadGroups() {
+  try {
+    const res = await listGroups()
+    groups.value = res.data || []
+    groupTree.value = [
+      { id: -1, name: '全部', children: res.data.map((g) => ({ id: g.id, name: g.name })) },
+    ]
+  } catch (e: any) { console.warn('load groups failed', e) }
 }
 
 async function loadItems() {
@@ -145,7 +155,7 @@ async function loadItems() {
     const res = await listItems(params)
     items.value = res.data || []
     total.value = (res as any).total || 0
-  } catch { /* ignore */ }
+  } catch (e: any) { console.warn('load items failed', e) }
 }
 
 function handleSearch() {
@@ -168,7 +178,25 @@ async function viewVersions(item: ConfigItem) {
     const res = await listVersions(item.id)
     versions.value = res.data || []
     versionDialog.value = true
-  } catch { /* ignore */ }
+  } catch (e: any) { console.warn('load versions failed', e) }
+}
+
+function onGroupClick(data: any) {
+  if (data.id === -1 || data.children) return
+  search.value.group_id = data.id
+  handleSearch()
+}
+
+function editItem(item: ConfigItem) {
+  router.push(`/config/edit/${item.id}`)
+}
+
+async function viewVersions(item: ConfigItem) {
+  try {
+    const res = await listVersions(item.id)
+    versions.value = res.data || []
+    versionDialog.value = true
+  } catch (e: any) { console.warn('view versions failed', e) }
 }
 </script>
 

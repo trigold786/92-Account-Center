@@ -95,7 +95,7 @@ async function loadRoles() {
   try {
     const res = await listRoles()
     roles.value = res.data || []
-  } catch { /* ignore */ }
+  } catch (e: any) { console.warn('permission operation failed', e) }
 }
 
 async function selectRole(role: Role) {
@@ -103,7 +103,7 @@ async function selectRole(role: Role) {
   try {
     const res = await getRolePermissions(role.id)
     permissions.value = res.data || []
-  } catch { /* ignore */ }
+  } catch (e: any) { console.warn('permission operation failed', e) }
 }
 
 function roleName(id: number) {
@@ -121,7 +121,7 @@ async function doCreateRole() {
     showRoleDialog.value = false
     newRole.value = { name: '', description: '' }
     loadRoles()
-  } catch { /* ignore */ }
+  } catch (e: any) { console.warn('permission operation failed', e) }
 }
 
 async function searchUserRoles() {
@@ -129,6 +129,6 @@ async function searchUserRoles() {
   try {
     const res = await getUserRoles(userSearch.value)
     userRoles.value = res.data || []
-  } catch { /* ignore */ }
+  } catch (e: any) { console.warn('permission operation failed', e) }
 }
 </script>

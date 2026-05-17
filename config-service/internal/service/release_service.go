@@ -139,6 +139,14 @@ func (s *releaseService) ExecuteRelease(ctx context.Context, id int64, operator 
 		if err := s.configRepo.UpdateItem(ctx, item); err != nil {
 			return fmt.Errorf("failed to update item %d: %w", ri.ItemID, err)
 		}
+
+		s.configRepo.CreateVersion(ctx, &model.ConfigVersion{
+			ItemID:       ri.ItemID,
+			ValueBefore:  ri.ValueBefore,
+			ValueAfter:   ri.ValueAfter,
+			ChangeReason: "release: " + rel.Title,
+			ChangedBy:    operator,
+		})
 	}
 
 	if err := s.releaseRepo.UpdateReleaseStatus(ctx, id, "released", ""); err != nil {
@@ -162,7 +170,6 @@ func (s *releaseService) AddReleaseItem(ctx context.Context, ri *model.ConfigRel
 		return fmt.Errorf("config item not found: %d", ri.ItemID)
 	}
 	ri.ValueBefore = item.CurrentValue
-	ri.ValueAfter = item.CurrentValue
 
 	if err := s.releaseRepo.AddReleaseItem(ctx, ri); err != nil {
 		return err

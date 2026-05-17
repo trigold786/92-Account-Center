@@ -119,7 +119,7 @@ async function loadLogs() {
     const res = await listAuditLogs(params)
     logs.value = res.data || []
     total.value = (res as any).total || 0
-  } catch { /* ignore */ }
+  } catch (e: any) { console.warn('audit operation failed', e) }
 }
 
 function onDateChange(val: [Date, Date] | null) {

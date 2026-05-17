@@ -127,7 +127,7 @@ async function loadReleases() {
     const res = await listReleases(params)
     releases.value = res.data || []
     total.value = (res as any).total || 0
-  } catch { /* ignore */ }
+  } catch (e: any) { console.warn('release operation failed', e) }
 }
 
 async function doCreate() {
@@ -141,7 +141,7 @@ async function doCreate() {
     showCreateDialog.value = false
     newRelease.value = { title: '', description: '' }
     loadReleases()
-  } catch { /* ignore */ }
+  } catch (e: any) { console.warn('release operation failed', e) }
 }
 
 async function doSubmit(row: ConfigRelease) {
@@ -149,7 +149,7 @@ async function doSubmit(row: ConfigRelease) {
     await submitRelease(row.id)
     ElMessage.success('已提交审批')
     loadReleases()
-  } catch { /* ignore */ }
+  } catch (e: any) { console.warn('release operation failed', e) }
 }
 
 async function doApprove(row: ConfigRelease) {
@@ -158,7 +158,7 @@ async function doApprove(row: ConfigRelease) {
     await approveRelease(row.id)
     ElMessage.success('已通过')
     loadReleases()
-  } catch { /* ignore */ }
+  } catch (e: any) { console.warn('release operation failed', e) }
 }
 
 async function doReject(row: ConfigRelease) {
@@ -167,7 +167,7 @@ async function doReject(row: ConfigRelease) {
     await rejectRelease(row.id)
     ElMessage.success('已拒绝')
     loadReleases()
-  } catch { /* ignore */ }
+  } catch (e: any) { console.warn('release operation failed', e) }
 }
 
 async function doExecute(row: ConfigRelease) {
@@ -176,7 +176,7 @@ async function doExecute(row: ConfigRelease) {
     await executeRelease(row.id)
     ElMessage.success('发布成功')
     loadReleases()
-  } catch { /* ignore */ }
+  } catch (e: any) { console.warn('release operation failed', e) }
 }
 
 async function viewDetail(row: ConfigRelease) {
@@ -184,7 +184,7 @@ async function viewDetail(row: ConfigRelease) {
   try {
     const res = await listReleaseItems(row.id)
     releaseItems.value = res.data || []
-  } catch { /* ignore */ }
+  } catch (e: any) { console.warn('release operation failed', e) }
   showDetailDialog.value = true
 }
 </script>

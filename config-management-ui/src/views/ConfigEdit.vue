@@ -113,7 +113,7 @@ onMounted(async () => {
   try {
     const res = await listGroups()
     groups.value = res.data || []
-  } catch { /* ignore */ }
+  } catch (e: any) { console.warn('edit failed', e) }
 
   if (isEdit) {
     try {
@@ -121,7 +121,7 @@ onMounted(async () => {
       if (res.data) {
         Object.assign(form.value, res.data)
       }
-    } catch { /* ignore */ }
+    } catch (e: any) { console.warn('edit failed', e) }
   }
 })
 
@@ -144,6 +144,6 @@ async function handleSave() {
       ElMessage.success('创建成功')
     }
     router.push('/config')
-  } catch { /* ignore */ }
+  } catch (e: any) { console.warn('edit failed', e) }
 }
 </script>

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -75,73 +76,82 @@ func main() {
 		atomic.AddUint64(&durationCount, 1)
 	})
 
-	// Operator middleware
-	r.Use(func(c *gin.Context) {
-		operator := c.GetHeader("X-Operator")
-		if operator == "" {
-			operator = "system"
+	// Auth middleware
+	authMiddleware := func(requiredPermission string) gin.HandlerFunc {
+		return func(c *gin.Context) {
+			operator := c.GetHeader("X-Operator")
+			if operator == "" {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"code": 4, "message": "X-Operator header required"})
+				return
+			}
+			c.Set("operator", operator)
+
+			if requiredPermission != "" {
+				allowed, err := permSvc.CheckPermission(c.Request.Context(), operator, requiredPermission)
+				if err != nil || !allowed {
+					c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"code": 5, "message": "permission denied: " + requiredPermission})
+					return
+				}
+			}
+
+			ip := c.ClientIP()
+			ctx := service.WithClientIP(c.Request.Context(), ip)
+			c.Request = c.Request.WithContext(ctx)
+			c.Next()
 		}
-		c.Set("operator", operator)
-
-		ip := c.ClientIP()
-		ctx := service.WithClientIP(c.Request.Context(), ip)
-		c.Request = c.Request.WithContext(ctx)
-
-		c.Next()
-	})
+	}
 
 	// API routes - Config Groups
-	configGroup := r.Group("/api/v1/config")
+	configGroup := r.Group("/api/v1/config", authMiddleware("config.read"))
 	{
 		configGroup.GET("/groups", configH.ListGroups)
 		configGroup.GET("/groups/:id", configH.GetGroupByID)
-		configGroup.POST("/groups", configH.CreateGroup)
-		configGroup.PUT("/groups/:id", configH.UpdateGroup)
-		configGroup.DELETE("/groups/:id", configH.DeleteGroup)
+		configGroup.POST("/groups", authMiddleware("config.edit"), configH.CreateGroup)
+		configGroup.PUT("/groups/:id", authMiddleware("config.edit"), configH.UpdateGroup)
+		configGroup.DELETE("/groups/:id", authMiddleware("config.delete"), configH.DeleteGroup)
 
 		configGroup.GET("/items", configH.ListItems)
 		configGroup.GET("/items/:id", configH.GetItemByID)
-		configGroup.POST("/items", configH.CreateItem)
-		configGroup.PUT("/items/:id", configH.UpdateItem)
-		configGroup.DELETE("/items/:id", configH.DeleteItem)
-		configGroup.POST("/items/:id/reset-default", configH.ResetItemToDefault)
+		configGroup.POST("/items", authMiddleware("config.edit"), configH.CreateItem)
+		configGroup.PUT("/items/:id", authMiddleware("config.edit"), configH.UpdateItem)
+		configGroup.DELETE("/items/:id", authMiddleware("config.delete"), configH.DeleteItem)
+		configGroup.POST("/items/:id/reset-default", authMiddleware("config.edit"), configH.ResetItemToDefault)
 		configGroup.GET("/items/:id/versions", configH.ListVersions)
 	}
 
 	// Release routes
-	releaseGroup := r.Group("/api/v1/config/releases")
+	releaseGroup := r.Group("/api/v1/config/releases", authMiddleware("release.create"))
 	{
 		releaseGroup.GET("", releaseH.ListReleases)
 		releaseGroup.GET("/:id", releaseH.GetReleaseByID)
 		releaseGroup.POST("", releaseH.CreateRelease)
-		releaseGroup.PUT("/:id/submit", releaseH.SubmitRelease)
-		releaseGroup.PUT("/:id/approve", releaseH.ApproveRelease)
-		releaseGroup.PUT("/:id/reject", releaseH.RejectRelease)
-		releaseGroup.POST("/:id/execute", releaseH.ExecuteRelease)
+		releaseGroup.PUT("/:id/submit", authMiddleware("release.submit"), releaseH.SubmitRelease)
+		releaseGroup.PUT("/:id/approve", authMiddleware("release.approve"), releaseH.ApproveRelease)
+		releaseGroup.PUT("/:id/reject", authMiddleware("release.reject"), releaseH.RejectRelease)
+		releaseGroup.POST("/:id/execute", authMiddleware("release.execute"), releaseH.ExecuteRelease)
 		releaseGroup.GET("/:id/items", releaseH.ListReleaseItems)
 		releaseGroup.POST("/:id/items", releaseH.AddReleaseItem)
 	}
 
 	// Audit routes
-	auditGroup := r.Group("/api/v1/config/audit-logs")
+	auditGroup := r.Group("/api/v1/config/audit-logs", authMiddleware("audit.view"))
 	{
 		auditGroup.GET("", auditH.ListLogs)
 		auditGroup.GET("/:id", auditH.GetLogByID)
 	}
 
 	// Permission routes
-	permGroup := r.Group("/api/v1/config")
+	permGroup := r.Group("/api/v1/config", authMiddleware("permission.manage"))
 	{
 		permGroup.GET("/roles", permH.ListRoles)
 		permGroup.POST("/roles", permH.CreateRole)
 		permGroup.GET("/roles/:id/permissions", permH.GetRolePermissions)
 		permGroup.POST("/roles/:id/permissions", permH.AddRolePermission)
-
 		permGroup.GET("/users/:userId/roles", permH.GetUserRoles)
 		permGroup.POST("/users/:userId/roles", permH.SetUserRole)
 	}
 
-	// Internal routes for service integration
+	// Internal routes for service integration (no auth - service-to-service)
 	internalGroup := r.Group("/internal/v1/config")
 	{
 		internalGroup.GET("/items/:code", configH.GetItemByCode)
@@ -171,15 +181,23 @@ func main() {
 	port := getEnv("PORT", "30315")
 	log.Printf("Config service starting on :%s", port)
 
+	srv := &http.Server{
+		Addr:    ":" + port,
+		Handler: r,
+	}
+
 	go func() {
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 		<-sigChan
-		log.Println("Shutting down...")
-		os.Exit(0)
+		log.Println("Shutting down gracefully...")
+		db.Close()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		srv.Shutdown(shutdownCtx)
 	}()
 
-	if err := r.Run(":" + port); err != nil {
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }

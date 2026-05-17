@@ -26,6 +26,9 @@ type ConfigRepository interface {
 	DeleteItem(ctx context.Context, id int64) error
 	ResetItemToDefault(ctx context.Context, id int64) error
 
+	// Stats
+	GetTotalCount(ctx context.Context) (int, error)
+
 	// Versions
 	ListVersionsByItemID(ctx context.Context, itemID int64) ([]model.ConfigVersion, error)
 	CreateVersion(ctx context.Context, v *model.ConfigVersion) error
@@ -203,11 +206,11 @@ func (r *configRepository) CreateItem(ctx context.Context, item *model.ConfigIte
 
 func (r *configRepository) UpdateItem(ctx context.Context, item *model.ConfigItem) error {
 	query := `UPDATE config_items SET group_id = $2, name = $3, description = $4, data_type = $5,
-		current_value = $6, min_value = $7, max_value = $8, allowed_values = $9, is_sensitive = $10, is_enabled = $11,
-		updated_at = NOW() WHERE id = $1 RETURNING updated_at`
+		current_value = $6, default_value = $7, min_value = $8, max_value = $9, allowed_values = $10,
+		is_sensitive = $11, is_enabled = $12, updated_at = NOW() WHERE id = $1 RETURNING updated_at`
 	return r.db.QueryRowContext(ctx, query,
 		item.ID, item.GroupID, item.Name, item.Description, item.DataType,
-		item.CurrentValue, item.MinValue, item.MaxValue,
+		item.CurrentValue, item.DefaultValue, item.MinValue, item.MaxValue,
 		item.AllowedValues, item.IsSensitive, item.IsEnabled,
 	).Scan(&item.UpdatedAt)
 }
@@ -244,6 +247,12 @@ func (r *configRepository) ListVersionsByItemID(ctx context.Context, itemID int6
 		versions = append(versions, v)
 	}
 	return versions, rows.Err()
+}
+
+func (r *configRepository) GetTotalCount(ctx context.Context) (int, error) {
+	var total int
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM config_items").Scan(&total)
+	return total, err
 }
 
 func (r *configRepository) CreateVersion(ctx context.Context, v *model.ConfigVersion) error {

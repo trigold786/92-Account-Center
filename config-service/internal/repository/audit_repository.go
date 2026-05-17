@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/trigold786/92-Account-Center/config-service/internal/model"
 )
@@ -113,5 +112,4 @@ func (r *auditRepository) CreateLog(ctx context.Context, l *model.AuditLog) erro
 		l.OperatorIP, l.OperationResult, l.OperationDetails, l.SM3Hash).Scan(&l.ID, &l.CreatedAt)
 }
 
-// Ensure time import is used
-var _ = time.Now
+
