@@ -8,4 +8,6 @@ use (
 	./credit-service
 	./compliance-service
 	./data-product-service
+	./config-service
+	./pkg/config
 )
