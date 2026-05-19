@@ -328,22 +328,22 @@ Account Center（账户管理微服务）是 Neuro 产品线的核心基础设�
 
 | 技术栈 | 版本 | 说明 |
 |--------|------|------|
-| Go | 1.24.x | 最新稳定版 |
+| Go | 1.26.x | 最新稳定版（endoflife.date 验证 2026-05-19） |
 | Gin | v1.10.x | 最新稳定版 |
-| PostgreSQL | 18.x | GA 版，启用 pgvector 支持向量检索 |
-| Redis | 7.4.x | 最新 7.x 稳定版 |
+| PostgreSQL | 18.x | GA 版 (最新 18.4)，启用 pgvector 支持向量检索 |
+| Redis | 8.6.x | 最新稳定版（endoflife.date 验证 2026-05-19，最新 8.6.3） |
 | Kafka | 3.9.x | 最新稳定版 |
 | VictoriaMetrics | v1.105.x | 最新 LTS |
 | Loki | 3.x | 最新大版本 |
-| Grafana | 11.x | 最新 LTS |
+| Grafana | 13.x | 最新稳定版（endoflife.date 验证 2026-05-19，最新 13.0.1） |
 | Vue.js | 3.5.x | 最新稳定版 |
 | TypeScript | 5.7.x | 最新稳定版 |
 | Vite | 6.x | 最新大版本 |
 | Element Plus | 2.9.x | 最新稳定版 |
 | iOS / Swift / SwiftUI | iOS 17+ / Swift 6.0 / iOS 17 API | 最新 |
 | Android / Kotlin / Compose | minSdk 26 / Kotlin 2.1.x / Compose BOM 2024.12 | 最新 |
-| Docker Engine | 27.x | 最新稳定版 |
-| Docker Compose | V2.32.x | 最新稳定版 |
+| Docker Engine | 29.x | 最新稳定版（endoflife.date 验证 2026-05-19，最新 29.5.1；⚠️ 27.x 安全支持已于 2025-05-03 终止） |
+| Docker Compose | V2.36.x | 最新稳定版 |
 
 **pgvector 应用场景**（PostgreSQL 18 核心增值）：
 
@@ -366,7 +366,7 @@ Account Center（账户管理微服务）是 Neuro 产品线的核心基础设�
 | 监控 | **VM + Promtail + Loki + Grafana（容器化）** | **VM + Promtail + Loki + Grafana（ECS 本地部署，多项目共享）** | VM HA + Promtail + Loki + Grafana + AlertManager |
 | 日志 | **Promtail → Loki（容器化）** | **Promtail → Loki（ECS 本地部署，多项目共享）** | Promtail → Loki 聚合 + OSS 归档 (180 天) |
 | 备份 | 无 | pg_dump 每日 | PITR + 每日全量 + OSS 异地 |
-| 对象存储 | 本地卷 | MinIO 容器 | 阿里云 OSS |
+| 对象存储 | 本地卷 | **ECS 本地部署 MinIO**（多项目共享） | 阿里云 OSS |
 | 负载均衡 | 无 | **无**（Docker Compose 直连） | K8s Ingress / SLB |
 | 域名 | localhost:port | **uat-wxxx.neurongene.cn** | api.neuro.xxx.com |
 
@@ -665,15 +665,15 @@ Phase 8: 竞争力提升 (持续)
 
 | 技术 | 版本 | 说明 |
 |------|------|------|
-| Go | 1.24.x | 最新稳定版 |
+| Go | 1.26.x | 最新稳定版 |
 | Gin | v1.10.x | 最新稳定版 |
-| PostgreSQL | 18.x | GA 版 + pgvector |
-| Redis | 7.4.x | 最新 7.x 稳定版 |
+| PostgreSQL | 18.x | GA 版 + pgvector（最新 18.4） |
+| Redis | 8.6.x | 最新稳定版（最新 8.6.3） |
 | Kafka | 3.9.x | 最新稳定版（Prod） |
 | Asynq | v0.25.x | Go 异步任务库最新稳定版 |
 | VictoriaMetrics | v1.105.x | 最新 LTS |
 | Loki | 3.x | 最新大版本 |
-| Grafana | 11.x | 最新 LTS |
+| Grafana | 13.x | 最新稳定版（最新 13.0.1） |
 | Goose | v3.24.x | 最新稳定版 |
 | golangci-lint | v1.63.x | 最新稳定版 |
 | gosec | v2.22.x | 最新稳定版 |
@@ -707,8 +707,8 @@ Phase 8: 竞争力提升 (持续)
 
 | 技术 | 版本 | 说明 |
 |------|------|------|
-| Docker Engine | 27.x | 最新稳定版 |
-| Docker Compose | V2.32.x | 最新稳定版 |
+| Docker Engine | 29.x | 最新稳定版（最新 29.5.1） |
+| Docker Compose | V2.36.x | 最新稳定版 |
 | Kubernetes | 1.32.x | 最新稳定版（未来） |
 | Helm | 3.17.x | 最新稳定版（未来） |
 | GitHub Actions Runner | 最新版 | 自动更新 |
