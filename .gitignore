@@ -15,8 +15,12 @@ Thumbs.db
 
 # Go
 *.exe
+*.exe~
 *.test
 *.out
+coverage.out
+/bin/
+/dist/
 
 # Node.js
 node_modules/
