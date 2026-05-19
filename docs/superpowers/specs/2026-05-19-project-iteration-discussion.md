@@ -355,20 +355,53 @@ Account Center（账户管理微服务）是 Neuro 产品线的核心基础设�
 
 | 维度 | Dev | UAT | Prod |
 |------|-----|-----|------|
-| PG 部署 | Docker 单容器 | Docker 单容器 + 持久卷 | RDS PG 18.x HA (主备自动切换) |
-| Redis 部署 | Docker 单容器 | Docker 单容器 + AOF 持久化 | Redis Sentinel (3 节点) 或 Cluster |
+| PG 部署 | Docker 单容器 | **ECS 本地部署**（单节点，多项目共享） | RDS PG 18.x HA (主备自动切换) |
+| Redis 部署 | Docker 单容器 | **ECS 本地部署**（单节点 AOF 持久化，多项目共享） | Redis Sentinel (3 节点) 或 Cluster |
 | Kafka 部署 | Redis Streams（兼容层） | Redis Streams（兼容层） | Kafka 3.9.x 独立集群（3 Broker） |
 | 应用部署 | Docker Compose (本地) | Docker Compose (ECS 单节点) | K8s Helm Chart (多副本 HPA) |
 | 密钥管理 | .env 文件 | .env + config-service | Vault / 阿里云 KMS + config-service |
 | SSL/TLS | HTTP (无证书) | 自签名证书 | 正式证书 (ACME/商业) |
-| 监控 | 可选 | VM + Loki + Grafana | VM HA + Loki + Grafana + AlertManager |
-| 日志 | stdout 终端 | Loki 聚合 | Loki 聚合 + OSS 归档 (180 天) |
+| 监控 | **VM + Promtail + Loki + Grafana（容器化）** | **VM + Promtail + Loki + Grafana（ECS 本地部署，多项目共享）** | VM HA + Promtail + Loki + Grafana + AlertManager |
+| 日志 | **Promtail → Loki（容器化）** | **Promtail → Loki（ECS 本地部署，多项目共享）** | Promtail → Loki 聚合 + OSS 归档 (180 天) |
 | 备份 | 无 | pg_dump 每日 | PITR + 每日全量 + OSS 异地 |
 | 对象存储 | 本地卷 | MinIO 容器 | 阿里云 OSS |
-| 负载均衡 | 无 | Nginx 容器 | K8s Ingress / SLB |
-| 域名 | localhost:port | uat-api.neuro.xxx.com | api.neuro.xxx.com |
+| 负载均衡 | 无 | **无**（Docker Compose 直连） | K8s Ingress / SLB |
+| 域名 | localhost:port | **uat-wxxx.neurongene.cn** | api.neuro.xxx.com |
 
-> **关键约束**：上表所有技术的**二进制版本/镜像 tag 必须完全一致**。Dev 环境不运行 Kafka 但兼容层（Redis Streams）确保代码逻辑与 Prod Kafka 消费者/生产者接口一致。
+> **关键约束**：
+> - 上表所有技术的**二进制版本/镜像 tag 必须完全一致**。Dev 环境不运行 Kafka 但兼容层（Redis Streams）确保代码逻辑与 Prod Kafka 消费者/生产者接口一致。
+> - **UAT 环境基础设施为多项目共享**：PG、Redis、监控组件（VM/Promtail/Loki/Grafana）均部署在 ECS 本地，由多个项目共用同一套基础设施实例。各项目通过不同 DB schema / Redis key 前缀 / Grafana folder 做逻辑隔离。
+> - **Dev 环境必须配置完整的监控和日志栈**：使用 Docker Compose 容器化部署 VictoriaMetrics + Promtail + Loki + Grafana，确保开发阶段即可发现性能和日志问题，与 UAT/Prod 保持一致的可观测性体验。
+
+**Dev 环境监控与日志容器化部署示意（docker-compose 扩展）**：
+
+```yaml
+# docker-compose.monitoring.yml（Dev 环境追加）
+services:
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:v1.105.0
+    ports: ["20010:8428"]
+    volumes: ["vmdata:/storage"]
+    command: ["--storageDataPath=/storage", "--retentionPeriod=30d"]
+
+  loki:
+    image: grafana/loki:3.x
+    ports: ["3100:3100"]
+    volumes: ["lokidata:/loki"]
+
+  promtail:
+    image: grafana/promtail:latest
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./monitoring/promtail.yml:/etc/promtail/config.yml
+
+  grafana:
+    image: grafana/grafana:11.x
+    ports: ["3001:3000"]
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes: ["grafanadata:/var/lib/grafana"]
+```
 
 #### 5.8.4 Dev → UAT → Prod 部署推进策略
 
@@ -378,7 +411,8 @@ Account Center（账户管理微服务）是 Neuro 产品线的核心基础设�
 - [ ] 所有 PRD 需求单元测试通过（覆盖率 ≥ 60%）
 - [ ] golangci-lint + gosec 扫描无高危问题
 - [ ] API 契约测试通过（请求/响应与 API_SPEC.md 一致）
-- [ ] Docker Compose 全服务健康启动
+- [ ] Docker Compose 全服务健康启动（含监控栈 VM+Promtail+Loki+Grafana）
+- [ ] Dev 环境监控和日志正常采集（Grafana 可查看指标和日志）
 - [ ] 数据库 migration up/down 验证通过
 - [ ] 移动端编译通过
 - [ ] 代码合并至 main 且 CI 流水线全绿
@@ -387,18 +421,26 @@ Account Center（账户管理微服务）是 Neuro 产品线的核心基础设�
 1. GitHub Actions 触发：main 分支 push/tag
 2. 构建 Docker 镜像（多阶段 Dockerfile）
 3. 推送至阿里云 ACR（容器镜像服务）
-4. SSH 到 UAT ECS，`docker-compose pull && up -d`
-5. 自动运行 migration（goose up）
-6. 健康检查：所有 `/health` 端点 200
-7. 自动冒烟测试（关键 API 调用验证）
-8. 通知团队："UAT 部署完成，请验收"
+4. SSH 到 UAT ECS，`docker-compose pull && up -d`（应用服务容器更新）
+5. 自动运行 migration（goose up，连接 ECS 本地 PG 实例）
+6. 健康检查：所有 `/health` 端点 200（验证 PG/Redis 本地实例连通）
+7. 自动冒烟测试（关键 API 调用验证，通过 `uat-wxxx.neurongene.cn` 域名访问）
+8. 验证监控数据：VictoriaMetrics 采集正常、Promtail 日志推送正常、Grafana Dashboard 可查看
+9. 通知团队："UAT 部署完成，请通过 uat-wxxx.neurongene.cn 验收"
+
+**UAT 环境注意事项**：
+- PG / Redis 为 ECS 本地部署且多项目共享，migration 需使用独立 schema 隔离，避免影响其他项目
+- 监控栈（VM/Promtail/Loki/Grafana）为多项目共享，本项目指标使用独立 job label 过滤
+- 无负载均衡，应用服务通过 Docker Compose 直连，端口通过 ECS 安全组暴露
+- 域名 `uat-wxxx.neurongene.cn` 解析到 UAT ECS 公网 IP
 
 **UAT 验收标准**：
 - [ ] 产品经理：功能走查通过（与 PRD 一致）
 - [ ] 测试人员：集成测试 + E2E 测试通过
 - [ ] 安全人员：基础安全扫描通过（OWASP ZAP 快速扫描）
-- [ ] 性能基线：登录 P95 < 80ms，注册 P95 < 150ms（k6 压测）
-- [ ] 移动端：四端功能验证通过
+- [ ] 性能基线：登录 P95 < 80ms，注册 P95 < 150ms（k6 压测，通过 UAT 域名执行）
+- [ ] 移动端：四端功能验证通过（移动端连接 UAT 域名）
+- [ ] 可观测性：Grafana 仪表盘可见服务指标、Loki 可检索应用日志
 - [ ] UAT 签字确认（产品 + 测试 + 技术）
 
 ##### 阶段二：UAT → Prod 推进
@@ -409,7 +451,7 @@ Account Center（账户管理微服务）是 Neuro 产品线的核心基础设�
 - [ ] 安全渗透测试通过（第三方报告）
 - [ ] 数据备份策略已验证（PG PITR 恢复演练 + Redis RDB 恢复）
 - [ ] KMS/Vault 密钥已配置
-- [ ] 监控告警已配置并验证
+- [ ] 监控告警已配置并验证（Prod 独立监控栈）
 - [ ] SSL 证书已部署，TLS 1.2+ 强制
 - [ ] 运维手册已编写（故障排查/回滚/扩容 SOP）
 - [ ] 回滚方案已验证
@@ -417,7 +459,7 @@ Account Center（账户管理微服务）是 Neuro 产品线的核心基础设�
 
 **Prod 金丝雀发布流程**：
 
-- **阶段 A — 基础设施就绪（T-7 天）**：K8s namespace + Helm Chart 部署、RDS PG HA 创建 + 数据迁移、Redis Sentinel 创建、Kafka 集群创建、Vault/KMS 密钥注入、DNS 配置
+- **阶段 A — 基础设施就绪（T-7 天）**：K8s namespace + Helm Chart 部署、RDS PG HA 创建 + 数据迁移（从 UAT 本地 PG 导出）、Redis Sentinel 创建、Kafka 集群创建、Vault/KMS 密钥注入、DNS 配置、Prod 独立监控栈部署
 - **阶段 B — 金丝雀发布（T-Day）**：5% 流量 → 新版本，监控 15 分钟，异常则自动回滚
 - **阶段 C — 扩大发布（T+15min）**：25% → 50% → 100%，每阶段观察 15 分钟
 - **阶段 D — 稳定观察（T+1h ~ T+24h）**：全量运行，持续监控，数据一致性验证，旧版本保留 24h
