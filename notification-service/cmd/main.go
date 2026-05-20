@@ -166,6 +166,9 @@ func main() {
 	pushHandler := handler.NewPushHandler(pushService)
 	deviceHandler := handler.NewDeviceHandler(pushService)
 
+	wechatTemplateSvc := service.NewWeChatTemplateService(nil)
+	wechatTemplateHandler := handler.NewWeChatTemplateHandler(wechatTemplateSvc)
+
 	r := gin.New()
 	r.Use(gin.RecoveryWithWriter(os.Stderr, func(c *gin.Context, err any) {
 		logger.Error("panic recovered", "error", fmt.Sprintf("%v", err))
@@ -230,6 +233,11 @@ func main() {
 		pushGroup.POST("/device/register", pushHandler.RegisterDevice)
 		pushGroup.GET("/user/:user_id/devices", pushHandler.GetUserDevices)
 		pushGroup.DELETE("/device/:user_id/:device_token", deviceHandler.UnregisterDevice)
+	}
+
+	wechatGroup := r.Group("/api/v1/wechat")
+	{
+		wechatGroup.POST("/template/send", wechatTemplateHandler.SendTemplate)
 	}
 
 	port := getEnv("PORT", "30311")
