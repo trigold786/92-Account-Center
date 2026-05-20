@@ -15,14 +15,17 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/hibiken/asynq"
 	"github.com/redis/go-redis/v9"
 	_ "github.com/lib/pq"
 
 	"github.com/trigold786/92-Account-Center/account-service/internal/cache"
 	"github.com/trigold786/92-Account-Center/account-service/internal/handler"
+	"github.com/trigold786/92-Account-Center/account-service/internal/middleware"
 	"github.com/trigold786/92-Account-Center/account-service/internal/repository"
 	"github.com/trigold786/92-Account-Center/account-service/internal/service"
 	"github.com/trigold786/92-Account-Center/account-service/internal/svcconfig"
+	"github.com/trigold786/92-Account-Center/account-service/internal/worker"
 	"github.com/trigold786/92-Account-Center/account-service/pkg/sms"
 	"github.com/trigold786/92-Account-Center/pkg/config"
 	"github.com/trigold786/92-Account-Center/pkg/logging"
@@ -89,6 +92,38 @@ func main() {
 	entitlementService := service.NewEntitlementService(entitlementRepo, entitlementCache)
 	subscriptionService := service.NewSubscriptionService(subscriptionRepo, userRepo, entitlementService, svcCfg)
 
+	deletionService := service.NewDeletionService(userRepo, entitlementRepo, rdb, logger)
+	deletionWorker := worker.NewDeletionWorker(deletionService, logger)
+
+	redisAddr := getEnv("REDIS_ADDR", "localhost:6379")
+	asynqServer := asynq.NewServer(
+		asynq.RedisClientOpt{Addr: redisAddr},
+		asynq.Config{Concurrency: 5},
+	)
+	asynqMux := worker.NewServeMux(deletionWorker)
+
+	scheduler, err := worker.NewScheduler(redisAddr)
+	if err != nil {
+		logger.Error("failed to create scheduler", "error", err.Error())
+		os.Exit(1)
+	}
+
+	go func() {
+		defer logging.RecoverGoroutine(logger, "asynq-worker")
+		logger.Info("starting asynq worker")
+		if err := asynqServer.Run(asynqMux); err != nil {
+			logger.Error("asynq worker stopped", "error", err.Error())
+		}
+	}()
+
+	go func() {
+		defer logging.RecoverGoroutine(logger, "asynq-scheduler")
+		logger.Info("starting asynq scheduler")
+		if err := scheduler.Run(); err != nil {
+			logger.Error("asynq scheduler stopped", "error", err.Error())
+		}
+	}()
+
 	var referralBinder handler.ReferralBinder
 	creditServiceURL := getEnv("CREDIT_SERVICE_URL", "")
 	if creditServiceURL != "" {
@@ -101,6 +136,19 @@ func main() {
 	tierHandler := handler.NewTierHandler(userRepo)
 	entitlementHandler := handler.NewEntitlementHandler(entitlementService)
 	subscriptionHandler := handler.NewSubscriptionHandler(subscriptionService)
+	pricingHandler := handler.NewPricingHandler()
+
+	adminRepo := repository.NewAdminRepository(db)
+	var creditClient service.CreditClient
+	if creditServiceURL != "" {
+		creditClient = service.NewHTTPCreditClient(creditServiceURL)
+	}
+	adminService := service.NewAdminService(adminRepo, creditClient)
+	adminHandler := handler.NewAdminHandler(adminService)
+
+	if err := adminRepo.EnsureAuditLogTable(context.Background()); err != nil {
+		logger.Warn("failed to ensure audit_log table", "error", err)
+	}
 
 	r := gin.New()
 	r.Use(gin.RecoveryWithWriter(os.Stderr, func(c *gin.Context, err any) {
@@ -154,6 +202,25 @@ func main() {
 		subscriptionGroup.GET("/:user_id", subscriptionHandler.GetUserSubscriptions)
 	}
 
+	pricingGroup := r.Group("/api/v1/pricing")
+	{
+		pricingGroup.GET("", pricingHandler.GetPricing)
+		pricingGroup.POST("/calculate-discount", pricingHandler.CalculateDiscount)
+	}
+
+	jwtSecret := getEnv("JWT_SECRET", "default-secret")
+
+	adminGroup := r.Group("/api/v1/admin")
+	adminGroup.Use(middleware.AdminAuthMiddleware(jwtSecret))
+	{
+		adminGroup.GET("/users", adminHandler.ListUsers)
+		adminGroup.GET("/users/:user_id", adminHandler.GetUserDetail)
+		adminGroup.PUT("/users/:user_id/status", adminHandler.UpdateUserStatus)
+		adminGroup.PUT("/users/:user_id/tier", adminHandler.AdjustIdentityTier)
+		adminGroup.POST("/users/:user_id/credits", adminHandler.AdjustCredits)
+		adminGroup.GET("/users/:user_id/audit-log", adminHandler.GetAuditLog)
+	}
+
 	r.Any("/metrics", func(c *gin.Context) {
 		var buf bytes.Buffer
 		fmt.Fprintf(&buf, "# HELP http_requests_total Total HTTP requests\n")
@@ -189,6 +256,8 @@ func main() {
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 		<-sigChan
 		logger.Info("shutting down")
+		scheduler.Shutdown()
+		asynqServer.Shutdown()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		srv.Shutdown(shutdownCtx)

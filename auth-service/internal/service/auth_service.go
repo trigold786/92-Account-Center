@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 
+	"github.com/trigold786/92-Account-Center/auth-service/internal/auth"
 	"github.com/trigold786/92-Account-Center/auth-service/internal/model"
 	"github.com/trigold786/92-Account-Center/auth-service/internal/svcconfig"
 	"github.com/trigold786/92-Account-Center/auth-service/internal/util"
@@ -23,6 +25,7 @@ type UserRepository interface {
 	GetByPhoneNumber(ctx context.Context, phoneNumber string) (*model.User, error)
 	GetByEmail(ctx context.Context, email string) (*model.User, error)
 	GetByAccountID(ctx context.Context, accountID string) (*model.User, error)
+	UpdatePasswordHash(ctx context.Context, userID int64, passwordHash string) error
 }
 
 type AuthService interface {
@@ -41,6 +44,7 @@ type authService struct {
 	maxAttempts              int
 	lockoutDuration          time.Duration
 	refreshTokenBlacklistTTL time.Duration
+	logger                   *slog.Logger
 }
 
 func NewAuthService(userRepo UserRepository, jwtMgr *jwt.JWTManager, rdb *redis.Client, cfg *svcconfig.AuthConfig) AuthService {
@@ -51,6 +55,7 @@ func NewAuthService(userRepo UserRepository, jwtMgr *jwt.JWTManager, rdb *redis.
 		maxAttempts:              cfg.LoginMaxAttempts,
 		lockoutDuration:          cfg.LoginLockoutDuration,
 		refreshTokenBlacklistTTL: cfg.JwtRefreshTokenExpire,
+		logger:                   slog.Default(),
 	}
 }
 
@@ -143,6 +148,9 @@ func (s *authService) Login(ctx context.Context, req *model.LoginRequest) (*mode
 			s.recordFailedAttempt(req.Credential)
 			return nil, errors.New("invalid credentials")
 		}
+		if auth.NeedsRehash(user.PasswordHash) {
+			s.rehashPassword(ctx, user.ID, req.Password)
+		}
 	case req.Code != "":
 		if !s.verifyOTPCode(ctx, req.Credential, req.Code) {
 			s.recordFailedAttempt(req.Credential)
@@ -230,13 +238,20 @@ func (s *authService) Logout(ctx context.Context, accessToken string) error {
 }
 
 func (s *authService) VerifyPassword(password, storedHash string) bool {
-	parts := splitHash(storedHash)
-	if len(parts) != 2 {
-		return false
+	return auth.VerifyPassword(password, storedHash)
+}
+
+func (s *authService) rehashPassword(ctx context.Context, userID int64, password string) {
+	result, err := auth.HashPassword(password)
+	if err != nil {
+		s.logger.Error("failed to rehash password", "user_id", userID, "error", err.Error())
+		return
 	}
-	salt, hash := parts[0], parts[1]
-	computed := sm3Hash([]byte(salt + password))
-	return subtleCompare(hash, computed)
+	if err := s.userRepo.UpdatePasswordHash(ctx, userID, result.Hash); err != nil {
+		s.logger.Error("failed to update rehashed password", "user_id", userID, "error", err.Error())
+	} else {
+		s.logger.Info("password rehashed to argon2id", "user_id", userID)
+	}
 }
 
 func (s *authService) verifyOTPCode(ctx context.Context, credential, code string) bool {

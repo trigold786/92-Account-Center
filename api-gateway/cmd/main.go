@@ -25,6 +25,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/trigold786/92-Account-Center/api-gateway/internal/middleware"
+	proxyutil "github.com/trigold786/92-Account-Center/api-gateway/internal/proxy"
 	"github.com/trigold786/92-Account-Center/api-gateway/internal/svcconfig"
 	"github.com/trigold786/92-Account-Center/pkg/config"
 	"github.com/trigold786/92-Account-Center/pkg/logging"
@@ -205,6 +207,7 @@ func main() {
 	r.Use(corsMiddleware())
 	r.Use(rateLimitMiddleware(svcCfg.RateLimitRPS))
 	r.Use(cacheControlMiddleware(svcCfg.CacheMaxAge))
+	r.Use(middleware.TimeoutMiddleware(svcCfg.GlobalRequestTimeoutSec))
 
 	publicPaths := map[string]bool{
 		"/api/v1/auth/login":              true,
@@ -235,22 +238,22 @@ func main() {
 
 	r.Use(desensitizeMiddleware(svcCfg.MaxDesensitizeBodySize))
 
-	r.Any("/api/v1/account/*path", proxyHandler(svcCfg.AccountServiceURL))
-	r.Any("/api/v1/entitlements/*path", proxyHandler(svcCfg.AccountServiceURL))
-	r.Any("/api/v1/subscriptions/*path", proxyHandler(svcCfg.AccountServiceURL))
-	r.Any("/api/v1/auth/*path", proxyHandler(svcCfg.AuthServiceURL))
-	r.Any("/api/v1/session/*path", proxyHandler(svcCfg.AuthServiceURL))
-	r.Any("/api/v1/device/*path", proxyHandler(svcCfg.AuthServiceURL))
-	r.Any("/api/v1/qrcode/*path", proxyHandler(svcCfg.AuthServiceURL))
-	r.Any("/api/v1/sms/*path", proxyHandler(svcCfg.NotificationServiceURL))
-	r.Any("/api/v1/email/*path", proxyHandler(svcCfg.NotificationServiceURL))
-	r.Any("/api/v1/push/*path", proxyHandler(svcCfg.NotificationServiceURL))
-	r.Any("/api/v1/credits/*path", proxyHandler(svcCfg.CreditServiceURL))
-	r.Any("/api/v1/referral/*path", proxyHandler(svcCfg.CreditServiceURL))
-	r.Any("/api/v1/risk/*path", proxyHandler(svcCfg.ComplianceServiceURL))
-	r.Any("/api/v1/audit/*path", proxyHandler(svcCfg.ComplianceServiceURL))
-	r.Any("/api/v1/kyb/*path", proxyHandler(svcCfg.ComplianceServiceURL))
-	r.Any("/api/v1/data/*path", proxyHandler(svcCfg.DataProductServiceURL))
+	r.Any("/api/v1/account/*path", proxyHandler(svcCfg.AccountServiceURL, svcCfg))
+	r.Any("/api/v1/entitlements/*path", proxyHandler(svcCfg.AccountServiceURL, svcCfg))
+	r.Any("/api/v1/subscriptions/*path", proxyHandler(svcCfg.AccountServiceURL, svcCfg))
+	r.Any("/api/v1/auth/*path", proxyHandler(svcCfg.AuthServiceURL, svcCfg))
+	r.Any("/api/v1/session/*path", proxyHandler(svcCfg.AuthServiceURL, svcCfg))
+	r.Any("/api/v1/device/*path", proxyHandler(svcCfg.AuthServiceURL, svcCfg))
+	r.Any("/api/v1/qrcode/*path", proxyHandler(svcCfg.AuthServiceURL, svcCfg))
+	r.Any("/api/v1/sms/*path", proxyHandler(svcCfg.NotificationServiceURL, svcCfg))
+	r.Any("/api/v1/email/*path", proxyHandler(svcCfg.NotificationServiceURL, svcCfg))
+	r.Any("/api/v1/push/*path", proxyHandler(svcCfg.NotificationServiceURL, svcCfg))
+	r.Any("/api/v1/credits/*path", proxyHandler(svcCfg.CreditServiceURL, svcCfg))
+	r.Any("/api/v1/referral/*path", proxyHandler(svcCfg.CreditServiceURL, svcCfg))
+	r.Any("/api/v1/risk/*path", proxyHandler(svcCfg.ComplianceServiceURL, svcCfg))
+	r.Any("/api/v1/audit/*path", proxyHandler(svcCfg.ComplianceServiceURL, svcCfg))
+	r.Any("/api/v1/kyb/*path", proxyHandler(svcCfg.ComplianceServiceURL, svcCfg))
+	r.Any("/api/v1/data/*path", proxyHandler(svcCfg.DataProductServiceURL, svcCfg))
 
 	r.Any("/metrics", func(c *gin.Context) {
 		var buf bytes.Buffer
@@ -296,7 +299,7 @@ func main() {
 	}
 }
 
-func proxyHandler(target string) gin.HandlerFunc {
+func proxyHandler(target string, cfg *svcconfig.GatewayConfig) gin.HandlerFunc {
 	targetURL, err := url.Parse(target)
 	if err != nil {
 		logger.Error("invalid target URL", "error", err.Error())
@@ -304,6 +307,7 @@ func proxyHandler(target string) gin.HandlerFunc {
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(targetURL)
+	proxy.Transport = proxyutil.NewTransport(cfg.ResponseHeaderTimeoutSec, cfg.IdleConnTimeoutSec)
 	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
 		logger.Error("proxy error", "target", target, "error", err.Error())
 		http.Error(w, "Service unavailable", http.StatusServiceUnavailable)

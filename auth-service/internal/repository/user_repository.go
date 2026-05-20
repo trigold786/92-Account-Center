@@ -11,6 +11,7 @@ type UserRepository interface {
 	GetByPhoneNumber(ctx context.Context, phoneNumber string) (*model.User, error)
 	GetByEmail(ctx context.Context, email string) (*model.User, error)
 	GetByAccountID(ctx context.Context, accountID string) (*model.User, error)
+	UpdatePasswordHash(ctx context.Context, userID int64, passwordHash string) error
 }
 
 type userRepository struct {
@@ -70,4 +71,10 @@ func (r *userRepository) GetByAccountID(ctx context.Context, accountID string) (
 		return nil, err
 	}
 	return user, nil
+}
+
+func (r *userRepository) UpdatePasswordHash(ctx context.Context, userID int64, passwordHash string) error {
+	query := `UPDATE users SET password_hash = $2, updated_at = NOW() WHERE id = $1`
+	_, err := r.db.ExecContext(ctx, query, userID, passwordHash)
+	return err
 }

@@ -38,6 +38,16 @@ func (m *mockUserRepo) GetByAccountID(ctx context.Context, accountID string) (*m
 	return nil, nil
 }
 
+func (m *mockUserRepo) UpdatePasswordHash(ctx context.Context, userID int64, passwordHash string) error {
+	for _, u := range m.users {
+		if u.ID == userID {
+			u.PasswordHash = passwordHash
+			return nil
+		}
+	}
+	return nil
+}
+
 func newTestAuthService(repo UserRepository) AuthService {
 	jwtMgr := jwt.NewJWTManager("test-access-secret", "test-refresh-secret", 15*time.Minute, 24*time.Hour)
 	cfg := &svcconfig.AuthConfig{

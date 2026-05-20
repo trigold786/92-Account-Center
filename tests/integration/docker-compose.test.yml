@@ -1,0 +1,115 @@
+services:
+  postgres:
+    environment:
+      POSTGRES_DB: account_center_test
+      POSTGRES_PASSWORD: testpassword
+
+  redis:
+
+  db-migrate:
+    environment:
+      GOOSE_DRIVER: postgres
+      GOOSE_DBSTRING: "postgres://postgres:testpassword@postgres:5432/account_center_test?sslmode=disable"
+
+  config-service:
+    environment:
+      DB_PASSWORD: testpassword
+      DB_NAME: account_center_test
+
+  api-gateway:
+    environment:
+      JWT_SECRET: test-jwt-secret-for-integration-tests
+      ACCOUNT_SERVICE_URL: "http://account-service:30301"
+      AUTH_SERVICE_URL: "http://auth-service:30302"
+      NOTIFICATION_SERVICE_URL: "http://notification-service:30311"
+      CREDIT_SERVICE_URL: "http://credit-service:30312"
+      COMPLIANCE_SERVICE_URL: "http://compliance-service:30313"
+      DATA_PRODUCT_SERVICE_URL: "http://data-product-service:30314"
+      CONFIG_SERVICE_URL: "http://config-service:30315"
+
+  account-service:
+    environment:
+      DB_PASSWORD: testpassword
+      DB_NAME: account_center_test
+      CREDIT_SERVICE_URL: "http://credit-service:30312"
+      CONFIG_SERVICE_URL: "http://config-service:30315"
+
+  auth-service:
+    environment:
+      DB_PASSWORD: testpassword
+      DB_NAME: account_center_test
+      JWT_ACCESS_SECRET: test-access-secret-for-integration
+      JWT_REFRESH_SECRET: test-refresh-secret-for-integration
+      CONFIG_SERVICE_URL: "http://config-service:30315"
+
+  notification-service:
+    environment:
+      CONFIG_SERVICE_URL: "http://config-service:30315"
+
+  credit-service:
+    environment:
+      DB_PASSWORD: testpassword
+      DB_NAME: account_center_test
+
+  compliance-service:
+    environment:
+      DB_PASSWORD: testpassword
+      DB_NAME: account_center_test
+      CONFIG_SERVICE_URL: "http://config-service:30315"
+
+  data-product-service:
+    environment:
+      DB_PASSWORD: testpassword
+      DB_NAME: account_center_test
+
+  integration-test:
+    image: golang:1.24-alpine
+    container_name: integration-test
+    working_dir: /app
+    volumes:
+      - ../..:/app
+      - go-module-cache:/go
+    environment:
+      GATEWAY_URL: "http://api-gateway:30300"
+      ACCOUNT_SERVICE_URL: "http://account-service:30301"
+      AUTH_SERVICE_URL: "http://auth-service:30302"
+      NOTIFICATION_SERVICE_URL: "http://notification-service:30311"
+      CREDIT_SERVICE_URL: "http://credit-service:30312"
+      COMPLIANCE_SERVICE_URL: "http://compliance-service:30313"
+      DATA_PRODUCT_SERVICE_URL: "http://data-product-service:30314"
+      CONFIG_SERVICE_URL: "http://config-service:30315"
+      PAYMENT_SERVICE_URL: "http://payment-service:30316"
+      DB_PASSWORD: testpassword
+      DB_NAME: account_center_test
+      JWT_SECRET: test-jwt-secret-for-integration-tests
+      JWT_ACCESS_SECRET: test-access-secret-for-integration
+      JWT_REFRESH_SECRET: test-refresh-secret-for-integration
+    networks:
+      - app_network
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+      account-service:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+      credit-service:
+        condition: service_healthy
+      compliance-service:
+        condition: service_healthy
+      config-service:
+        condition: service_healthy
+    command: ["go", "test", "./tests/integration/...", "-tags=integration", "-v", "-timeout", "5m"]
+
+  victoriametrics:
+
+  loki:
+
+  grafana:
+
+  web-ui:
+
+volumes:
+  go-module-cache:
