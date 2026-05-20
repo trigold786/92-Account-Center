@@ -169,6 +169,9 @@ func main() {
 	wechatTemplateSvc := service.NewWeChatTemplateService(nil)
 	wechatTemplateHandler := handler.NewWeChatTemplateHandler(wechatTemplateSvc)
 
+	messageSvc := service.NewMessageService(nil)
+	messageHandler := handler.NewMessageHandler(messageSvc)
+
 	r := gin.New()
 	r.Use(gin.RecoveryWithWriter(os.Stderr, func(c *gin.Context, err any) {
 		logger.Error("panic recovered", "error", fmt.Sprintf("%v", err))
@@ -238,6 +241,14 @@ func main() {
 	wechatGroup := r.Group("/api/v1/wechat")
 	{
 		wechatGroup.POST("/template/send", wechatTemplateHandler.SendTemplate)
+	}
+
+	messageGroup := r.Group("/api/v1/messages")
+	{
+		messageGroup.POST("", messageHandler.CreateMessage)
+		messageGroup.GET("", messageHandler.ListMessages)
+		messageGroup.PUT("/:id/read", messageHandler.MarkRead)
+		messageGroup.POST("/read-all", messageHandler.MarkAllRead)
 	}
 
 	port := getEnv("PORT", "30311")
