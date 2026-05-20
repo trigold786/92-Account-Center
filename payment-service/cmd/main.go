@@ -82,6 +82,10 @@ func main() {
 	orderSvc := service.NewOrderService(orderRepo, svcCfg)
 	orderHandler := handler.NewOrderHandler(orderSvc)
 
+	invoiceRepo := repository.NewInvoiceRepository(db)
+	invoiceHandler := handler.NewInvoiceHandler(invoiceRepo)
+	paymentFlowHandler := handler.NewPaymentFlowHandler()
+
 	providerRegistry := provider.NewProviderRegistry()
 	wechatProvider := service.NewWeChatPayProvider(service.WeChatPayConfig{
 		AppID:    getEnv("WECHAT_APP_ID", "wx_sandbox_app_id"),
@@ -123,6 +127,18 @@ func main() {
 		ordersGroup.GET("", orderHandler.ListOrders)
 		ordersGroup.PUT("/:id/status", orderHandler.UpdateStatus)
 		ordersGroup.GET("/export/csv", orderHandler.ExportCSV)
+	}
+
+	invoiceGroup := r.Group("/api/v1/invoices")
+	{
+		invoiceGroup.POST("", invoiceHandler.CreateInvoice)
+		invoiceGroup.GET("", invoiceHandler.ListInvoices)
+	}
+
+	paymentFlowGroup := r.Group("/api/v1/payment-flow")
+	{
+		paymentFlowGroup.GET("/result/:order_no", paymentFlowHandler.GetPaymentResult)
+		paymentFlowGroup.POST("/retry/:order_no", paymentFlowHandler.RetryPayment)
 	}
 
 	paymentGroup := r.Group("/api/v1/payment")
