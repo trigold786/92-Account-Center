@@ -1,0 +1,52 @@
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - gosec
+    - revive
+    - unused
+    - gosimple
+    - ineffassign
+    - typecheck
+    - misspell
+  disable:
+    - exhaustive
+
+linters-settings:
+  revive:
+    rules:
+      - name: exported
+        severity: warning
+      - name: blank-imports
+      - name: context-as-argument
+      - name: error-return
+      - name: error-strings
+      - name: unused-parameter
+        severity: warning
+  staticcheck:
+    checks: ["all"]
+  gosec:
+    excludes:
+      - G101
+      - G204
+  misspell:
+    locale: US
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
+        - gosec
+        - unused
+    - path: cmd/main\.go
+      text: "hugeParam"
+      linters:
+        - revive
+  max-issues-per-linter: 0
+  max-same-issues: 0
