@@ -30,7 +30,7 @@ import (
 
 var logger *slog.Logger
 
-func init() { slog.SetDefault(logger) }
+func init() {}
 
 var (
 	requestCount    uint64

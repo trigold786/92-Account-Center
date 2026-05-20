@@ -41,6 +41,16 @@ func (s *StreamService) ProcessEvent(ctx context.Context, e *model.StreamEvent) 
 
 	s.mu.Lock()
 	s.events = append(s.events, e)
+	if len(s.events) > 50000 {
+		cutoff := time.Now().Add(-1 * time.Hour)
+		filtered := s.events[:0]
+		for _, ev := range s.events {
+			if ev.Timestamp.After(cutoff) {
+				filtered = append(filtered, ev)
+			}
+		}
+		s.events = filtered
+	}
 	s.mu.Unlock()
 	return e, nil
 }

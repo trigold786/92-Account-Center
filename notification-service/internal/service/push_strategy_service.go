@@ -91,6 +91,16 @@ func (s *PushStrategyService) EvaluateStrategy(ctx context.Context, strategyID i
 		StrategyID: strategyID,
 		Timestamp:  time.Now(),
 	})
+	if len(s.events) > 10000 {
+		cutoff := time.Now().Add(-24 * time.Hour)
+		filtered := s.events[:0]
+		for _, e := range s.events {
+			if e.Timestamp.After(cutoff) {
+				filtered = append(filtered, e)
+			}
+		}
+		s.events = filtered
+	}
 
 	return true, "allowed"
 }

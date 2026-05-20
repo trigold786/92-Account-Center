@@ -60,11 +60,14 @@ func JWTAuthMiddleware(secret string) gin.HandlerFunc {
 			return
 		}
 
-		if exp, ok := claims["exp"].(float64); ok {
-			if time.Now().Unix() > int64(exp) {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "token expired"})
-				return
-			}
+		exp, ok := claims["exp"].(float64)
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing exp claim"})
+			return
+		}
+		if time.Now().Unix() > int64(exp) {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "token expired"})
+			return
 		}
 
 		userID, _ := claims["sub"].(string)

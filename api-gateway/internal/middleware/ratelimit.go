@@ -9,9 +9,10 @@ import (
 )
 
 type TokenBucket struct {
-	Tokens  float64
-	LastRef time.Time
-	Mu      sync.Mutex
+	Tokens   float64
+	LastRef  time.Time
+	LastUsed time.Time
+	Mu       sync.Mutex
 }
 
 type IPRateLimiter struct {
@@ -20,15 +21,40 @@ type IPRateLimiter struct {
 }
 
 func NewIPRateLimiter(rps int) *IPRateLimiter {
-	return &IPRateLimiter{RPS: float64(rps)}
+	l := &IPRateLimiter{RPS: float64(rps)}
+	go l.evictStale()
+	return l
+}
+
+func (l *IPRateLimiter) evictStale() {
+	ticker := time.NewTicker(5 * time.Minute)
+	for range ticker.C {
+		cutoff := time.Now().Add(-10 * time.Minute)
+		l.Buckets.Range(func(key, value any) bool {
+			b := value.(*TokenBucket)
+			b.Mu.Lock()
+			stale := b.LastUsed.Before(cutoff)
+			b.Mu.Unlock()
+			if stale {
+				l.Buckets.Delete(key)
+			}
+			return true
+		})
+	}
 }
 
 func (l *IPRateLimiter) GetBucket(ip string) *TokenBucket {
+	now := time.Now()
 	val, _ := l.Buckets.LoadOrStore(ip, &TokenBucket{
-		Tokens:  l.RPS,
-		LastRef: time.Now(),
+		Tokens:   l.RPS,
+		LastRef:  now,
+		LastUsed: now,
 	})
-	return val.(*TokenBucket)
+	b := val.(*TokenBucket)
+	b.Mu.Lock()
+	b.LastUsed = now
+	b.Mu.Unlock()
+	return b
 }
 
 func (l *IPRateLimiter) Allow(ip string) bool {
@@ -37,15 +63,16 @@ func (l *IPRateLimiter) Allow(ip string) bool {
 	defer b.Mu.Unlock()
 	now := time.Now()
 	elapsed := now.Sub(b.LastRef).Seconds()
-	b.LastRef = now
 	b.Tokens += elapsed * l.RPS
 	if b.Tokens > l.RPS {
 		b.Tokens = l.RPS
 	}
 	if b.Tokens < 1 {
+		b.LastRef = now
 		return false
 	}
 	b.Tokens--
+	b.LastRef = now
 	return true
 }
 

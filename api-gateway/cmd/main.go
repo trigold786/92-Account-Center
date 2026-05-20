@@ -28,7 +28,7 @@ import (
 
 var logger *slog.Logger
 
-func init() { slog.SetDefault(logger) }
+func init() {}
 
 var (
 	gatewayRequestCount uint64

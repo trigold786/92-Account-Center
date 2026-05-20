@@ -35,7 +35,7 @@ var (
 
 var logger *slog.Logger
 
-func init() { slog.SetDefault(logger) }
+func init() {}
 
 func main() {
 	logger = logging.NewLogger("notification-service")
