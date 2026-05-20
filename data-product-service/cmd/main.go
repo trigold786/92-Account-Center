@@ -84,6 +84,14 @@ func main() {
 	dashHandler := handler.NewDashboardHandler(dashSvc)
 	funnelHandler := handler.NewFunnelHandler(dashSvc)
 
+	eventRepo := repository.NewEventRepository(db)
+	eventSvc := service.NewEventService(eventRepo)
+	eventHandler := handler.NewEventHandler(eventSvc)
+
+	metricsRepo := repository.NewMetricsRepository(db)
+	metricsSvc := service.NewMetricsService(metricsRepo)
+	opsDashHandler := handler.NewOpsDashboardHandler(metricsSvc)
+
 	r := gin.New()
 	r.Use(gin.RecoveryWithWriter(os.Stderr, func(c *gin.Context, err any) {
 		logger.Error("panic recovered", "error", fmt.Sprintf("%v", err))
@@ -104,6 +112,21 @@ func main() {
 		dataGroup.POST("/rfm/batch", rfmHandler.GetRFMBatch)
 		dataGroup.GET("/dashboard/overview", dashHandler.GetOverview)
 		dataGroup.GET("/funnel/subscription", funnelHandler.GetSubscriptionFunnel)
+	}
+
+	eventsGroup := r.Group("/api/v1/events")
+	{
+		eventsGroup.POST("", eventHandler.TrackEvent)
+		eventsGroup.POST("/batch", eventHandler.BatchTrack)
+	}
+
+	opsGroup := r.Group("/api/v1/ops")
+	{
+		opsGroup.GET("/registration-trends", opsDashHandler.GetRegistrationTrends)
+		opsGroup.GET("/conversion-funnel", opsDashHandler.GetConversionFunnel)
+		opsGroup.GET("/mrr", opsDashHandler.GetMRR)
+		opsGroup.GET("/k-factor", opsDashHandler.GetKFactor)
+		opsGroup.GET("/rfm-distribution", opsDashHandler.GetRFM)
 	}
 
 	r.Any("/metrics", func(c *gin.Context) {

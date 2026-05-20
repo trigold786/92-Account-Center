@@ -1,0 +1,4 @@
+{
+  "title": "转化漏斗",
+  "panels": [{"title": "漏斗", "type": "table", "targets": [{"expr": "conversion_funnel"}]}]
+}
