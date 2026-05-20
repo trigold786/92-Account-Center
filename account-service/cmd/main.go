@@ -166,6 +166,10 @@ func main() {
 	upgradeSvc := service.NewUpgradeService(nil, nil)
 	upgradeHandler := handler.NewUpgradeHandler(upgradeSvc)
 
+	subAdminRepo := repository.NewSubscriptionAdminRepository(db)
+	subAdminSvc := service.NewSubscriptionAdminService(subAdminRepo)
+	subAdminHandler := handler.NewSubscriptionAdminHandler(subAdminSvc)
+
 	adminRepo := repository.NewAdminRepository(db)
 	var creditClient service.CreditClient
 	if creditServiceURL != "" {
@@ -256,6 +260,13 @@ func main() {
 		adminGroup.PUT("/users/:user_id/tier", adminHandler.AdjustIdentityTier)
 		adminGroup.POST("/users/:user_id/credits", adminHandler.AdjustCredits)
 		adminGroup.GET("/users/:user_id/audit-log", adminHandler.GetAuditLog)
+
+		adminGroup.POST("/plans", subAdminHandler.CreatePlan)
+		adminGroup.GET("/plans", subAdminHandler.ListPlans)
+		adminGroup.DELETE("/plans/:id", subAdminHandler.DeletePlan)
+
+		adminGroup.POST("/coupons", subAdminHandler.CreateCoupon)
+		adminGroup.GET("/coupons", subAdminHandler.ListCoupons)
 	}
 
 	r.Any("/metrics", func(c *gin.Context) {
