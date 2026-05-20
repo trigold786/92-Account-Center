@@ -1,0 +1,9 @@
+{
+  "title": "Saga 事务追踪",
+  "uid": "saga-tracing",
+  "panels": [
+    {"title": "Saga 成功率", "type": "stat", "targets": [{"expr": "rate(saga_completed_total[1h]) / rate(saga_started_total[1h]) * 100"}]},
+    {"title": "补偿次数", "type": "graph", "targets": [{"expr": "rate(saga_compensation_total[1h])"}]},
+    {"title": "Saga 延迟", "type": "graph", "targets": [{"expr": "histogram_quantile(0.95, rate(saga_duration_seconds_bucket[5m]))"}]}
+  ]
+}
