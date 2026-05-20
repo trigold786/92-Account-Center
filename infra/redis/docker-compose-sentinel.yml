@@ -1,0 +1,75 @@
+version: "3.8"
+
+services:
+  redis-master:
+    image: redis:7-alpine
+    command: redis-server /usr/local/etc/redis/redis.conf
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+      - redis-master-data:/data
+    networks:
+      - redis-net
+    restart: unless-stopped
+
+  redis-replica:
+    image: redis:7-alpine
+    command: redis-server /usr/local/etc/redis/redis.conf --replicaof redis-master 6379
+    ports:
+      - "6380:6379"
+    volumes:
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+      - redis-replica-data:/data
+    networks:
+      - redis-net
+    depends_on:
+      - redis-master
+    restart: unless-stopped
+
+  redis-sentinel-1:
+    image: redis:7-alpine
+    command: redis-sentinel /usr/local/etc/redis/sentinel.conf
+    ports:
+      - "26379:26379"
+    volumes:
+      - ./sentinel.conf:/usr/local/etc/redis/sentinel.conf
+    networks:
+      - redis-net
+    depends_on:
+      - redis-master
+    restart: unless-stopped
+
+  redis-sentinel-2:
+    image: redis:7-alpine
+    command: redis-sentinel /usr/local/etc/redis/sentinel.conf
+    ports:
+      - "26380:26379"
+    volumes:
+      - ./sentinel.conf:/usr/local/etc/redis/sentinel.conf
+    networks:
+      - redis-net
+    depends_on:
+      - redis-master
+    restart: unless-stopped
+
+  redis-sentinel-3:
+    image: redis:7-alpine
+    command: redis-sentinel /usr/local/etc/redis/sentinel.conf
+    ports:
+      - "26381:26379"
+    volumes:
+      - ./sentinel.conf:/usr/local/etc/redis/sentinel.conf
+    networks:
+      - redis-net
+    depends_on:
+      - redis-master
+    restart: unless-stopped
+
+volumes:
+  redis-master-data:
+  redis-replica-data:
+
+networks:
+  redis-net:
+    driver: bridge
