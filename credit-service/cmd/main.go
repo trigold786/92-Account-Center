@@ -108,6 +108,9 @@ func main() {
 	creditHandler := handler.NewCreditHandler(creditSvc)
 	referralHandler := handler.NewReferralHandler(referralSvc)
 
+	referralDashboardSvc := service.NewReferralDashboardService(nil)
+	referralDashboardHandler := handler.NewReferralDashboardHandler(referralDashboardSvc)
+
 	r := gin.New()
 	r.Use(gin.RecoveryWithWriter(os.Stderr, func(c *gin.Context, err any) {
 		logger.Error("panic recovered", "error", fmt.Sprintf("%v", err))
@@ -142,6 +145,9 @@ func main() {
 		referralGroup.POST("/generate-link", referralHandler.GenerateLink)
 		referralGroup.GET("/:user_id/summary", referralHandler.GetSummary)
 	}
+
+	r.GET("/api/v1/referral-dashboard/funnel", referralDashboardHandler.GetFunnel)
+	r.GET("/api/v1/referral-dashboard/earnings-trend", referralDashboardHandler.GetEarningsTrend)
 
 	r.Any("/metrics", func(c *gin.Context) {
 		var buf bytes.Buffer
