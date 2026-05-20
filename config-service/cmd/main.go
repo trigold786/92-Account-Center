@@ -89,6 +89,9 @@ func main() {
 	adConfigSvc := service.NewAdConfigService(nil)
 	adConfigH := handler.NewAdConfigHandler(adConfigSvc)
 
+	faqSvc := service.NewFAQService(nil)
+	faqH := handler.NewFAQHandler(faqSvc)
+
 	r := gin.New()
 	r.Use(gin.RecoveryWithWriter(os.Stderr, func(c *gin.Context, err any) {
 		logger.Error("panic recovered", "error", fmt.Sprintf("%v", err))
@@ -210,6 +213,13 @@ func main() {
 	{
 		adGroup.GET("/config", adConfigH.GetAdConfig)
 		adGroup.GET("/frequency", adConfigH.CheckFrequency)
+	}
+
+	faqGroup := r.Group("/api/v1/faqs")
+	{
+		faqGroup.GET("", faqH.ListFAQs)
+		faqGroup.GET("/search", faqH.SearchFAQs)
+		faqGroup.POST("", faqH.CreateFAQ)
 	}
 
 	r.Any("/metrics", func(c *gin.Context) {
