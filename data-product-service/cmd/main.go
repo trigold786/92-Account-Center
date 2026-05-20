@@ -92,6 +92,9 @@ func main() {
 	metricsSvc := service.NewMetricsService(metricsRepo)
 	opsDashHandler := handler.NewOpsDashboardHandler(metricsSvc)
 
+	streamSvc := service.NewStreamService(nil)
+	streamHandler := handler.NewStreamHandler(streamSvc)
+
 	r := gin.New()
 	r.Use(gin.RecoveryWithWriter(os.Stderr, func(c *gin.Context, err any) {
 		logger.Error("panic recovered", "error", fmt.Sprintf("%v", err))
@@ -127,6 +130,13 @@ func main() {
 		opsGroup.GET("/mrr", opsDashHandler.GetMRR)
 		opsGroup.GET("/k-factor", opsDashHandler.GetKFactor)
 		opsGroup.GET("/rfm-distribution", opsDashHandler.GetRFM)
+	}
+
+	streamGroup := r.Group("/api/v1/stream")
+	{
+		streamGroup.POST("/events", streamHandler.ProcessEvent)
+		streamGroup.GET("/online", streamHandler.GetOnlineCount)
+		streamGroup.GET("/funnel", streamHandler.GetRealtimeFunnel)
 	}
 
 	r.Any("/metrics", func(c *gin.Context) {
