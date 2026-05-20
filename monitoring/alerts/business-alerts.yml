@@ -1,0 +1,17 @@
+groups:
+  - name: business
+    rules:
+      - alert: RegistrationAnomaly
+        expr: rate(registrations_total[1h]) < rate(registrations_total[1h] offset 1d) * 0.5
+        for: 2h
+        labels:
+          severity: warning
+        annotations:
+          summary: "注册量异常下降超过 50%"
+      - alert: PaymentFailureSpike
+        expr: rate(payment_failures_total[5m]) > rate(payment_failures_total[5m] offset 1h) * 2
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "支付失败率突增"
