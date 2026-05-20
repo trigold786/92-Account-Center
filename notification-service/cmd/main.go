@@ -134,8 +134,26 @@ func main() {
 	otpEmailService := service.NewOTPEmailService(redisClient, emailProvider, jwtSecret, fromAddress, svcCfg)
 	otpEmailHandler := handler.NewOTPEmailHandler(otpEmailService)
 
-	pushService := service.NewPushService(redisClient)
+	pushRegistry := provider.NewPushProviderRegistry()
+	pushRegistry.Register(provider.NewAPNsProvider(provider.APNsConfig{
+		CertificatePath: getEnv("APNS_CERTIFICATE_PATH", ""),
+		KeyPath:         getEnv("APNS_KEY_PATH", ""),
+		BundleID:        getEnv("APNS_BUNDLE_ID", ""),
+		Production:      getEnv("APNS_PRODUCTION", "false") == "true",
+	}))
+	pushRegistry.Register(provider.NewFCMProvider(provider.FCMConfig{
+		ServerKey: getEnv("FCM_SERVER_KEY", ""),
+		ProjectID: getEnv("FCM_PROJECT_ID", ""),
+	}))
+	pushRegistry.Register(provider.NewHMSProvider(provider.HMSConfig{
+		AppID:     getEnv("HMS_APP_ID", ""),
+		AppSecret: getEnvSecret("HMS_APP_SECRET", ""),
+	}))
+	logger.Info("push providers registered", "providers", pushRegistry.List())
+
+	pushService := service.NewPushService(redisClient, pushRegistry)
 	pushHandler := handler.NewPushHandler(pushService)
+	deviceHandler := handler.NewDeviceHandler(pushService)
 
 	r := gin.New()
 	r.Use(gin.RecoveryWithWriter(os.Stderr, func(c *gin.Context, err any) {
@@ -194,6 +212,7 @@ func main() {
 		pushGroup.POST("/send", pushHandler.SendPush)
 		pushGroup.POST("/device/register", pushHandler.RegisterDevice)
 		pushGroup.GET("/user/:user_id/devices", pushHandler.GetUserDevices)
+		pushGroup.DELETE("/device/:user_id/:device_token", deviceHandler.UnregisterDevice)
 	}
 
 	port := getEnv("PORT", "30311")

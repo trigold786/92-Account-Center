@@ -1,0 +1,89 @@
+{
+    "name": "Account Center V2.0 Security Scan",
+    "description": "OWASP ZAP automated scan configuration for Account Center API Gateway",
+    "target": "http://localhost:30300",
+    "context": {
+        "name": "account-center-api",
+        "includePaths": [
+            "http://localhost:30300/api/v1/.*"
+        ],
+        "excludePaths": [
+            "http://localhost:30300/health",
+            "http://localhost:30300/metrics"
+        ],
+        "authentication": {
+            "method": "bearer",
+            "tokenEndpoint": "http://localhost:30300/api/v1/auth/login",
+            "tokenPayload": {
+                "credential": "${PHONE}",
+                "password": "${PASSWORD}"
+            },
+            "tokenField": "access_token",
+            "headerName": "Authorization",
+            "headerPrefix": "Bearer "
+        },
+        "users": [
+            {
+                "name": "test-user",
+                "credentials": {
+                    "PHONE": "13800138000",
+                    "PASSWORD": "TestPass123!"
+                }
+            },
+            {
+                "name": "admin-user",
+                "credentials": {
+                    "PHONE": "13900000001",
+                    "PASSWORD": "AdminTest123!"
+                }
+            }
+        ]
+    },
+    "spider": {
+        "maxDuration": 5,
+        "maxDepth": 10,
+        "threadCount": 5
+    },
+    "activeScan": {
+        "policy": "Default Policy",
+        "maxDuration": 60,
+        "delayInMs": 0,
+        "threadCount": 5,
+        "rules": {
+            "enabled": [
+                "40012",
+                "40014",
+                "40018",
+                "40019",
+                "40020",
+                "90019",
+                "90021",
+                "50000",
+                "30001",
+                "90020",
+                "10045",
+                "10202",
+                "10108",
+                "10027",
+                "10035",
+                "10039",
+                "10054",
+                "10056",
+                "10063",
+                "10096",
+                "10097",
+                "10010",
+                "10011"
+            ]
+        }
+    },
+    "alerts": {
+        "threshold": "MEDIUM",
+        "strength": "MEDIUM"
+    },
+    "report": {
+        "format": "html",
+        "outputFile": "reports/security/zap-scan-report.html",
+        "includeAllAlerts": true
+    }
+}

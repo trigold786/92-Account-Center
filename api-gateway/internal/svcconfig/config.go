@@ -19,8 +19,11 @@ type GatewayConfig struct {
 	Port                   string
 	RateLimitRPS           int
 	CacheMaxAge            int
-	ShutdownTimeout        time.Duration
-	MaxDesensitizeBodySize int64
+	ShutdownTimeout          time.Duration
+	MaxDesensitizeBodySize   int64
+	ResponseHeaderTimeoutSec int
+	IdleConnTimeoutSec       int
+	GlobalRequestTimeoutSec  int
 }
 
 func Load(c *config.Client) (*GatewayConfig, error) {
@@ -38,6 +41,9 @@ func Load(c *config.Client) (*GatewayConfig, error) {
 	cfg.CacheMaxAge = loadInt(c, "GATEWAY_CACHE_MAX_AGE", "CACHE_MAX_AGE", 60)
 	cfg.ShutdownTimeout = time.Duration(loadInt(c, "GATEWAY_SHUTDOWN_TIMEOUT_SECONDS", "SHUTDOWN_TIMEOUT_SECONDS", 10)) * time.Second
 	cfg.MaxDesensitizeBodySize = int64(loadInt(c, "GATEWAY_MAX_DESENSITIZE_BODY_SIZE", "MAX_DESENSITIZE_BODY_SIZE", 1048576))
+	cfg.ResponseHeaderTimeoutSec = loadInt(c, "GATEWAY_RESPONSE_HEADER_TIMEOUT_SEC", "RESPONSE_HEADER_TIMEOUT_SEC", 30)
+	cfg.IdleConnTimeoutSec = loadInt(c, "GATEWAY_IDLE_CONN_TIMEOUT_SEC", "IDLE_CONN_TIMEOUT_SEC", 90)
+	cfg.GlobalRequestTimeoutSec = loadInt(c, "GATEWAY_GLOBAL_REQUEST_TIMEOUT_SEC", "GLOBAL_REQUEST_TIMEOUT_SEC", 60)
 
 	return cfg, nil
 }

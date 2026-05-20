@@ -22,3 +22,10 @@ func TestNewOTPEmailService(t *testing.T) {
 		t.Error("NewOTPEmailService returned nil")
 	}
 }
+
+func TestNewPushService(t *testing.T) {
+	s := NewPushService(nil, nil)
+	if s == nil {
+		t.Error("NewPushService returned nil")
+	}
+}

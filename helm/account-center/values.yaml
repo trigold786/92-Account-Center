@@ -1,0 +1,324 @@
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  storageClass: ""
+  namespace: account-center
+
+imagePullPolicy: IfNotPresent
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: account-center.example.com
+      paths:
+        - path: /api
+          pathType: Prefix
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: account-center-tls
+      hosts:
+        - account-center.example.com
+
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: postgres
+    database: account_center
+  primary:
+    persistence:
+      enabled: true
+      size: 10Gi
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+redis:
+  enabled: true
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: true
+      size: 2Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+services:
+  api-gateway:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: account-center/api-gateway
+      tag: "2.0.0"
+    port: 30300
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    hpa:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 5
+      targetCPUUtilizationPercentage: 70
+    env:
+      ACCOUNT_SERVICE_URL: "http://account-service:30301"
+      AUTH_SERVICE_URL: "http://auth-service:30302"
+      NOTIFICATION_SERVICE_URL: "http://notification-service:30311"
+      CREDIT_SERVICE_URL: "http://credit-service:30312"
+      COMPLIANCE_SERVICE_URL: "http://compliance-service:30313"
+      DATA_PRODUCT_SERVICE_URL: "http://data-product-service:30314"
+      CONFIG_SERVICE_URL: "http://config-service:30315"
+    envSecrets:
+      JWT_SECRET: jwt-secret
+
+  account-service:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: account-center/account-service
+      tag: "2.0.0"
+    port: 30301
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    hpa:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 5
+      targetCPUUtilizationPercentage: 70
+    env:
+      DB_HOST: "{{ .Release.Name }}-postgresql"
+      DB_PORT: "5432"
+      DB_USER: postgres
+      DB_NAME: account_center
+      REDIS_URL: "{{ .Release.Name }}-redis-master:6379"
+      CREDIT_SERVICE_URL: "http://credit-service:30312"
+      CONFIG_SERVICE_URL: "http://config-service:30315"
+    envSecrets:
+      DB_PASSWORD: db-password
+
+  auth-service:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: account-center/auth-service
+      tag: "2.0.0"
+    port: 30302
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    hpa:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 5
+      targetCPUUtilizationPercentage: 70
+    env:
+      DB_HOST: "{{ .Release.Name }}-postgresql"
+      DB_PORT: "5432"
+      DB_USER: postgres
+      DB_NAME: account_center
+      REDIS_URL: "{{ .Release.Name }}-redis-master:6379"
+      CONFIG_SERVICE_URL: "http://config-service:30315"
+    envSecrets:
+      DB_PASSWORD: db-password
+      JWT_ACCESS_SECRET: jwt-access-secret
+      JWT_REFRESH_SECRET: jwt-refresh-secret
+
+  notification-service:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: account-center/notification-service
+      tag: "2.0.0"
+    port: 30311
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    hpa:
+      enabled: false
+    env:
+      REDIS_URL: "{{ .Release.Name }}-redis-master:6379"
+      SMTP_HOST: "smtp.163.com"
+      SMTP_PORT: "465"
+      CONFIG_SERVICE_URL: "http://config-service:30315"
+    envSecrets:
+      ALIYUN_ACCESS_KEY_ID: aliyun-access-key-id
+      ALIYUN_ACCESS_KEY_SECRET: aliyun-access-key-secret
+      SMTP_USERNAME: smtp-username
+      SMTP_PASSWORD: smtp-password
+
+  credit-service:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: account-center/credit-service
+      tag: "2.0.0"
+    port: 30312
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    hpa:
+      enabled: false
+    env:
+      DB_HOST: "{{ .Release.Name }}-postgresql"
+      DB_PORT: "5432"
+      DB_USER: postgres
+      DB_NAME: account_center
+      REDIS_URL: "{{ .Release.Name }}-redis-master:6379"
+    envSecrets:
+      DB_PASSWORD: db-password
+
+  compliance-service:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: account-center/compliance-service
+      tag: "2.0.0"
+    port: 30313
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    hpa:
+      enabled: false
+    env:
+      DB_HOST: "{{ .Release.Name }}-postgresql"
+      DB_PORT: "5432"
+      DB_USER: postgres
+      DB_NAME: account_center
+      REDIS_URL: "{{ .Release.Name }}-redis-master:6379"
+      CONFIG_SERVICE_URL: "http://config-service:30315"
+    envSecrets:
+      DB_PASSWORD: db-password
+
+  data-product-service:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: account-center/data-product-service
+      tag: "2.0.0"
+    port: 30314
+    resources:
+      requests:
+        cpu: 125m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+    hpa:
+      enabled: false
+    env:
+      DB_HOST: "{{ .Release.Name }}-postgresql"
+      DB_PORT: "5432"
+      DB_USER: postgres
+      DB_NAME: account_center
+    envSecrets:
+      DB_PASSWORD: db-password
+
+  config-service:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: account-center/config-service
+      tag: "2.0.0"
+    port: 30315
+    resources:
+      requests:
+        cpu: 125m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+    hpa:
+      enabled: false
+    env:
+      DB_HOST: "{{ .Release.Name }}-postgresql"
+      DB_PORT: "5432"
+      DB_USER: postgres
+      DB_NAME: account_center
+    envSecrets:
+      DB_PASSWORD: db-password
+
+  payment-service:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: account-center/payment-service
+      tag: "2.0.0"
+    port: 30316
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    hpa:
+      enabled: false
+    env:
+      DB_HOST: "{{ .Release.Name }}-postgresql"
+      DB_PORT: "5432"
+      DB_USER: postgres
+      DB_NAME: account_center
+      REDIS_URL: "{{ .Release.Name }}-redis-master:6379"
+    envSecrets:
+      DB_PASSWORD: db-password
+
+  web-ui:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: account-center/web-ui
+      tag: "2.0.0"
+    port: 80
+    resources:
+      requests:
+        cpu: 50m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 64Mi
+    hpa:
+      enabled: false
+    env: {}
+    envSecrets: {}

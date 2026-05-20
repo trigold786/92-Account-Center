@@ -19,6 +19,8 @@ type UserRepository interface {
 	ExistsByAccountID(ctx context.Context, accountID string) (bool, error)
 	ExistsByEmail(ctx context.Context, email string) (bool, error)
 	PermanentDelete(ctx context.Context, userID int64) error
+	AnonymizeUser(ctx context.Context, userID int64) error
+	GetExpiredDeletions(ctx context.Context) ([]model.User, error)
 	UpdateEmail(ctx context.Context, id int64, email string) error
 	UpdatePhone(ctx context.Context, id int64, phone string) error
 	UpdateIdentityTier(ctx context.Context, userID int64, tier int) error
@@ -233,4 +235,54 @@ func (r *userRepository) GetIdentityTier(ctx context.Context, userID int64) (int
 		return 0, nil
 	}
 	return tier, err
+}
+
+func (r *userRepository) AnonymizeUser(ctx context.Context, userID int64) error {
+	query := `
+		UPDATE users SET
+			phone_number = 'DELETED_' || id,
+			account_id = 'DELETED_' || id,
+			email = NULL,
+			password_hash = '',
+			mfa_enabled = false,
+			mfa_secret = '',
+			status = 'deleted',
+			deletion_deleted_at = NOW(),
+			updated_at = NOW()
+		WHERE id = $1`
+	_, err := r.db.ExecContext(ctx, query, userID)
+	return err
+}
+
+func (r *userRepository) GetExpiredDeletions(ctx context.Context) ([]model.User, error) {
+	query := `
+		SELECT id, phone_number, account_id, email, password_hash, identity_tier, status,
+			created_at, updated_at, deletion_requested_at, deletion_expires_at,
+			deletion_cancelled_at, deletion_deleted_at
+		FROM users
+		WHERE deletion_requested_at IS NOT NULL
+			AND deletion_expires_at IS NOT NULL
+			AND deletion_expires_at <= NOW()
+			AND deletion_deleted_at IS NULL
+			AND (deletion_cancelled_at IS NULL OR deletion_requested_at > deletion_cancelled_at)`
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []model.User
+	for rows.Next() {
+		var u model.User
+		if err := rows.Scan(
+			&u.ID, &u.PhoneNumber, &u.AccountID, &u.Email, &u.PasswordHash,
+			&u.IdentityTier, &u.Status, &u.CreatedAt, &u.UpdatedAt,
+			&u.DeletionRequestedAt, &u.DeletionExpiresAt,
+			&u.DeletionCancelledAt, &u.DeletionDeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	return users, rows.Err()
 }

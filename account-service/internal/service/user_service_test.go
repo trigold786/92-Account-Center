@@ -123,6 +123,14 @@ func (m *MockUserRepository) GetIdentityTier(ctx context.Context, userID int64) 
 	return 0, nil
 }
 
+func (m *MockUserRepository) AnonymizeUser(ctx context.Context, userID int64) error {
+	return nil
+}
+
+func (m *MockUserRepository) GetExpiredDeletions(ctx context.Context) ([]model.User, error) {
+	return nil, nil
+}
+
 func int64ToString(n int64) string {
 	return string(rune(n))
 }

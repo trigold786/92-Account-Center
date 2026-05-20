@@ -1,0 +1,16 @@
+apiVersion: v2
+name: account-center
+description: Account Center V2.0 Helm Chart
+type: application
+version: 2.0.0
+appVersion: "2.0.0"
+
+dependencies:
+  - name: postgresql
+    version: "15.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+  - name: redis
+    version: "18.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
