@@ -84,6 +84,8 @@ func main() {
 
 	invoiceRepo := repository.NewInvoiceRepository(db)
 	invoiceHandler := handler.NewInvoiceHandler(invoiceRepo)
+	invoiceSvc := service.NewInvoiceService(nil)
+	invoiceSvcHandler := handler.NewInvoiceServiceHandler(invoiceSvc)
 	paymentFlowHandler := handler.NewPaymentFlowHandler()
 
 	refundRepo := repository.NewRefundRepository(db)
@@ -137,6 +139,8 @@ func main() {
 	{
 		invoiceGroup.POST("", invoiceHandler.CreateInvoice)
 		invoiceGroup.GET("", invoiceHandler.ListInvoices)
+		invoiceGroup.GET("/:id", invoiceSvcHandler.GetInvoiceSvc)
+		invoiceGroup.POST("/svc", invoiceSvcHandler.CreateInvoiceSvc)
 	}
 
 	paymentFlowGroup := r.Group("/api/v1/payment-flow")
