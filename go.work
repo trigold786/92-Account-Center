@@ -15,5 +15,6 @@ use (
 	./pkg/health
 	./pkg/logging
 	./pkg/trace
+	./pkg/saga
 	./tests/integration
 )
