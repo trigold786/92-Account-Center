@@ -57,6 +57,24 @@ func main() {
 	}
 	logger.Info("connected to database")
 
+	var replicaDB *sql.DB
+	readReplicaURL := getEnv("READ_REPLICA_URL", "")
+	if readReplicaURL != "" {
+		replicaDB, err = sql.Open("postgres", readReplicaURL)
+		if err != nil {
+			logger.Warn("failed to connect to read replica, falling back to primary", "error", err.Error())
+			replicaDB = nil
+		} else if err := replicaDB.Ping(); err != nil {
+			logger.Warn("read replica ping failed, falling back to primary", "error", err.Error())
+			replicaDB = nil
+		} else {
+			logger.Info("connected to read replica")
+		}
+	}
+
+	readReplica := repository.NewReadReplicaRepo(db, replicaDB)
+	_ = readReplica
+
 	var healthCheckers []healthpkg.Checker
 	if db != nil {
 		healthCheckers = append(healthCheckers, &healthpkg.PostgresChecker{
