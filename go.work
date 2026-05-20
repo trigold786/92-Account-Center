@@ -16,5 +16,6 @@ use (
 	./pkg/logging
 	./pkg/trace
 	./pkg/saga
+	./pkg/async
 	./tests/integration
 )
