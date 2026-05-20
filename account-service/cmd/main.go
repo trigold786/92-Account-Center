@@ -160,6 +160,9 @@ func main() {
 	dashboardSvc := service.NewDashboardService(nil)
 	dashboardHandler := handler.NewDashboardHandler(dashboardSvc)
 
+	upgradeSvc := service.NewUpgradeService(nil, nil)
+	upgradeHandler := handler.NewUpgradeHandler(upgradeSvc)
+
 	adminRepo := repository.NewAdminRepository(db)
 	var creditClient service.CreditClient
 	if creditServiceURL != "" {
@@ -231,6 +234,13 @@ func main() {
 	}
 
 	r.GET("/api/v1/dashboard", dashboardHandler.GetDashboard)
+
+	upgradeGroup := r.Group("/api/v1/upgrade")
+	{
+		upgradeGroup.POST("/preview", upgradeHandler.PreviewUpgrade)
+		upgradeGroup.POST("/downgrade/preview", upgradeHandler.PreviewDowngrade)
+		upgradeGroup.POST("/execute", upgradeHandler.ExecuteUpgrade)
+	}
 
 	jwtSecret := getEnv("JWT_SECRET", "default-secret")
 
