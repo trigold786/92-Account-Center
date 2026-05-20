@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <font-family
+        android:fontProviderAuthority="com.google.android.gms.fonts"
+        android:fontProviderPackage="com.google.android.gms"
+        android:fontProviderQuery="Inter"
+        android:fontProviderCerts="@array/com_google_android_gms_fonts_certs">
+    </font-family>
+    <font-family
+        android:fontProviderAuthority="com.google.android.gms.fonts"
+        android:fontProviderPackage="com.google.android.gms"
+        android:fontProviderQuery="Space+Grotesk"
+        android:fontProviderCerts="@array/com_google_android_gms_fonts_certs">
+    </font-family>
+</resources>
