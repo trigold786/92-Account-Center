@@ -24,6 +24,7 @@ import (
 	"github.com/trigold786/92-Account-Center/notification-service/internal/service"
 	"github.com/trigold786/92-Account-Center/notification-service/internal/svcconfig"
 	circuitbreaker "github.com/trigold786/92-Account-Center/pkg/circuitbreaker"
+	healthpkg "github.com/trigold786/92-Account-Center/pkg/health"
 )
 
 var (
@@ -54,6 +55,16 @@ func main() {
 		os.Exit(1)
 	}
 	logger.Info("connected to Redis")
+
+	var healthCheckers []healthpkg.Checker
+	if redisClient != nil {
+		healthCheckers = append(healthCheckers, &healthpkg.RedisChecker{
+			Ping: func(ctx context.Context) error {
+				return redisClient.Ping(ctx).Err()
+			},
+		})
+	}
+	compositeHealth := healthpkg.CompositeChecker{Checkers: healthCheckers}
 
 	service.SetRedisClient(redisClient)
 
@@ -187,7 +198,13 @@ func main() {
 	})
 
 	r.Any("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+		result := compositeHealth.Check(c.Request.Context())
+		resp := healthpkg.BuildResponse(result.Checks)
+		statusCode := 200
+		if result.Status == healthpkg.StatusDown {
+			statusCode = 503
+		}
+		c.JSON(statusCode, resp)
 	})
 
 	smsGroup := r.Group("/api/v1/sms")

@@ -29,6 +29,7 @@ import (
 	proxyutil "github.com/trigold786/92-Account-Center/api-gateway/internal/proxy"
 	"github.com/trigold786/92-Account-Center/api-gateway/internal/svcconfig"
 	"github.com/trigold786/92-Account-Center/pkg/config"
+	healthpkg "github.com/trigold786/92-Account-Center/pkg/health"
 	"github.com/trigold786/92-Account-Center/pkg/logging"
 )
 
@@ -189,6 +190,8 @@ func main() {
 }
 	logger.Info("gateway config loaded successfully")
 
+	compositeHealth := healthpkg.CompositeChecker{}
+
 	r := gin.New()
 	r.Use(gin.RecoveryWithWriter(os.Stderr, func(c *gin.Context, err any) {
 		logger.Error("panic recovered", "error", fmt.Sprintf("%v", err))
@@ -273,7 +276,13 @@ func main() {
 	})
 
 	r.Any("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+		result := compositeHealth.Check(c.Request.Context())
+		resp := healthpkg.BuildResponse(result.Checks)
+		statusCode := 200
+		if result.Status == healthpkg.StatusDown {
+			statusCode = 503
+		}
+		c.JSON(statusCode, resp)
 	})
 
 	srv := &http.Server{

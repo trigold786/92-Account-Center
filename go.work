@@ -12,6 +12,7 @@ use (
 	./payment-service
 	./pkg/config
 	./pkg/circuitbreaker
+	./pkg/health
 	./pkg/logging
 	./tests/integration
 )

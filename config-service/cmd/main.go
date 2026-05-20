@@ -19,6 +19,7 @@ import (
 
 	"github.com/trigold786/92-Account-Center/config-service/internal/handler"
 	"github.com/trigold786/92-Account-Center/config-service/internal/model"
+	healthpkg "github.com/trigold786/92-Account-Center/pkg/health"
 	"github.com/trigold786/92-Account-Center/config-service/internal/repository"
 	"github.com/trigold786/92-Account-Center/config-service/internal/service"
 	"github.com/trigold786/92-Account-Center/pkg/logging"
@@ -56,6 +57,17 @@ func main() {
 		os.Exit(1)
 	}
 	logger.Info("connected to database")
+
+	var healthCheckers []healthpkg.Checker
+	if db != nil {
+		healthCheckers = append(healthCheckers, &healthpkg.PostgresChecker{
+			Ping: func(ctx context.Context) error {
+				_, err := db.ExecContext(ctx, "SELECT 1")
+				return err
+			},
+		})
+	}
+	compositeHealth := healthpkg.CompositeChecker{Checkers: healthCheckers}
 
 	// Repositories
 	configRepo := repository.NewConfigRepository(db)
@@ -210,7 +222,13 @@ func main() {
 	})
 
 	r.Any("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok"})
+		result := compositeHealth.Check(c.Request.Context())
+		resp := healthpkg.BuildResponse(result.Checks)
+		statusCode := 200
+		if result.Status == healthpkg.StatusDown {
+			statusCode = 503
+		}
+		c.JSON(statusCode, resp)
 	})
 
 	port := getEnv("PORT", "30315")

@@ -7,8 +7,11 @@ require (
 	github.com/lib/pq v1.5.1
 	github.com/redis/go-redis/v9 v9.19.0
 	github.com/trigold786/92-Account-Center/pkg/config v0.0.0-00010101000000-000000000000
+	github.com/trigold786/92-Account-Center/pkg/health v0.0.0-00010101000000-000000000000
 	github.com/trigold786/92-Account-Center/pkg/logging v0.0.0-00010101000000-000000000000
 )
+
+replace github.com/trigold786/92-Account-Center/pkg/health => ../pkg/health
 
 replace github.com/trigold786/92-Account-Center/pkg/config => ../pkg/config
 
