@@ -11,6 +11,7 @@ use (
 	./notification-service
 	./payment-service
 	./pkg/config
+	./pkg/circuitbreaker
 	./pkg/logging
 	./tests/integration
 )
