@@ -1,0 +1,20 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["TEAM_ID.com.neuro.ac", "TEAM_ID.com.neuro.AccountCenter"],
+        "components": [
+          { "/": "/subscribe", "comment": "Subscription deep link" },
+          { "/": "/subscribe/*" },
+          { "/": "/register", "comment": "Registration deep link" },
+          { "/": "/referral", "comment": "Referral deep link" },
+          { "/": "/credits", "comment": "Credits deep link" },
+          { "/": "/*", "comment": "Catch-all for universal links" }
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["TEAM_ID.com.neuro.ac"]
+  }
+}
