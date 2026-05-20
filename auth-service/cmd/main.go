@@ -147,6 +147,9 @@ func main() {
 	oauthSvc := service.NewOAuthService(oauthRegistry, userRepo)
 	oauthH := handler.NewOAuthHandler(oauthSvc)
 
+	guestSvc := service.NewGuestService(nil)
+	guestHandler := handler.NewGuestHandler(guestSvc)
+
 	r := gin.New()
 	r.Use(gin.RecoveryWithWriter(os.Stderr, func(c *gin.Context, err any) {
 		logger.Error("panic recovered", "error", fmt.Sprintf("%v", err))
@@ -170,6 +173,8 @@ func main() {
 		authGroup.POST("/biometric/login", loginHandler.LoginWithBiometric)
 		authGroup.GET("/oauth/authorize", oauthH.Authorize)
 		authGroup.POST("/oauth/callback", oauthH.Callback)
+		authGroup.POST("/guest", guestHandler.CreateGuest)
+		authGroup.POST("/guest/upgrade", guestHandler.UpgradeGuest)
 	}
 
 	sessionGroup := r.Group("/api/v1/session")
