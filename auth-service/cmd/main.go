@@ -139,6 +139,11 @@ func main() {
 		getEnvSecret("GOOGLE_SECRET", authCfg.GoogleSecret),
 		getEnv("OAUTH_REDIRECT_URI", authCfg.OAuthRedirectURI),
 	))
+	oauthRegistry.Register(service.NewAlipayOAuthProvider(
+		getEnvSecret("ALIPAY_APP_ID", ""),
+		getEnvSecret("ALIPAY_PRIVATE_KEY", ""),
+		getEnv("OAUTH_REDIRECT_URI", ""),
+	))
 	oauthSvc := service.NewOAuthService(oauthRegistry, userRepo)
 	oauthH := handler.NewOAuthHandler(oauthSvc)
 
