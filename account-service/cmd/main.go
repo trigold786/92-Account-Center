@@ -176,6 +176,9 @@ func main() {
 	openAPISvc := service.NewOpenAPIService()
 	openAPIHandler := handler.NewOpenAPIHandler(openAPISvc)
 
+	searchSvc := service.NewSearchService(nil)
+	searchHandler := handler.NewSearchHandler(searchSvc)
+
 	adminRepo := repository.NewAdminRepository(db)
 	var creditClient service.CreditClient
 	if creditServiceURL != "" {
@@ -285,6 +288,9 @@ func main() {
 	{
 		openAPIGroup.POST("/token", openAPIHandler.IssueToken)
 	}
+
+	r.GET("/api/v1/search", searchHandler.Search)
+	r.GET("/api/v1/quick-actions", searchHandler.QuickActions)
 
 	r.Any("/metrics", func(c *gin.Context) {
 		var buf bytes.Buffer
