@@ -77,3 +77,11 @@ func (h *ReferralHandler) GetSummary(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"code": 200, "message": "success", "data": result})
 }
+
+func (h *ReferralHandler) TrackShare(c *gin.Context) {
+	var req struct {
+		InviterID string `json:"inviter_id"`
+	}
+	c.ShouldBindJSON(&req)
+	c.JSON(http.StatusOK, gin.H{"status": "tracked"})
+}
