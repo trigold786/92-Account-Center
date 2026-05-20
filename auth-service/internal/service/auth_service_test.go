@@ -48,6 +48,18 @@ func (m *mockUserRepo) UpdatePasswordHash(ctx context.Context, userID int64, pas
 	return nil
 }
 
+func (m *mockUserRepo) FindBySocialAccount(ctx context.Context, provider, providerUID string) (*model.User, error) {
+	return nil, nil
+}
+
+func (m *mockUserRepo) CreateFromSocial(ctx context.Context, info *model.SocialUserInfo) (*model.User, error) {
+	return &model.User{ID: 1, Email: &info.Email}, nil
+}
+
+func (m *mockUserRepo) LinkSocialAccount(ctx context.Context, userID int64, provider, providerUID, email, avatar, accessToken, refreshToken string) error {
+	return nil
+}
+
 func newTestAuthService(repo UserRepository) AuthService {
 	jwtMgr := jwt.NewJWTManager("test-access-secret", "test-refresh-secret", 15*time.Minute, 24*time.Hour)
 	cfg := &svcconfig.AuthConfig{

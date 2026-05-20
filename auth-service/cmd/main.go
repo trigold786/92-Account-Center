@@ -122,6 +122,26 @@ func main() {
 	qrcodeSvc := service.NewQRCodeService(rdb, jwtMgr, authCfg.QRCodeExpire)
 	qrcodeHandler := handler.NewQRCodeHandler(qrcodeSvc)
 
+	oauthRegistry := service.NewOAuthProviderRegistry()
+	oauthRegistry.Register(service.NewWeChatOAuthProvider(
+		getEnvSecret("WECHAT_APP_ID", authCfg.WeChatAppID),
+		getEnvSecret("WECHAT_SECRET", authCfg.WeChatSecret),
+		getEnv("OAUTH_REDIRECT_URI", authCfg.OAuthRedirectURI),
+	))
+	oauthRegistry.Register(service.NewAppleOAuthProvider(
+		getEnvSecret("APPLE_CLIENT_ID", authCfg.AppleClientID),
+		getEnvSecret("APPLE_TEAM_ID", authCfg.AppleTeamID),
+		getEnvSecret("APPLE_KEY_ID", authCfg.AppleKeyID),
+		getEnv("OAUTH_REDIRECT_URI", authCfg.OAuthRedirectURI),
+	))
+	oauthRegistry.Register(service.NewGoogleOAuthProvider(
+		getEnvSecret("GOOGLE_CLIENT_ID", authCfg.GoogleClientID),
+		getEnvSecret("GOOGLE_SECRET", authCfg.GoogleSecret),
+		getEnv("OAUTH_REDIRECT_URI", authCfg.OAuthRedirectURI),
+	))
+	oauthSvc := service.NewOAuthService(oauthRegistry, userRepo)
+	oauthH := handler.NewOAuthHandler(oauthSvc)
+
 	r := gin.New()
 	r.Use(gin.RecoveryWithWriter(os.Stderr, func(c *gin.Context, err any) {
 		logger.Error("panic recovered", "error", fmt.Sprintf("%v", err))
@@ -143,6 +163,8 @@ func main() {
 		authGroup.POST("/logout", loginHandler.Logout)
 		authGroup.POST("/biometric/register", loginHandler.RegisterBiometric)
 		authGroup.POST("/biometric/login", loginHandler.LoginWithBiometric)
+		authGroup.GET("/oauth/authorize", oauthH.Authorize)
+		authGroup.POST("/oauth/callback", oauthH.Callback)
 	}
 
 	sessionGroup := r.Group("/api/v1/session")

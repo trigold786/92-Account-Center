@@ -26,6 +26,9 @@ type UserRepository interface {
 	GetByEmail(ctx context.Context, email string) (*model.User, error)
 	GetByAccountID(ctx context.Context, accountID string) (*model.User, error)
 	UpdatePasswordHash(ctx context.Context, userID int64, passwordHash string) error
+	FindBySocialAccount(ctx context.Context, provider, providerUID string) (*model.User, error)
+	CreateFromSocial(ctx context.Context, info *model.SocialUserInfo) (*model.User, error)
+	LinkSocialAccount(ctx context.Context, userID int64, provider, providerUID, email, avatar, accessToken, refreshToken string) error
 }
 
 type AuthService interface {

@@ -22,6 +22,14 @@ type AuthConfig struct {
 	DeviceRiskThreshold  float64
 	QRCodeExpire         time.Duration
 	LoginRateLimitPerIP  int
+	WeChatAppID          string
+	WeChatSecret         string
+	AppleClientID        string
+	AppleTeamID          string
+	AppleKeyID           string
+	GoogleClientID       string
+	GoogleSecret         string
+	OAuthRedirectURI     string
 }
 
 func Load(c *config.Client) (*AuthConfig, error) {
@@ -93,6 +101,31 @@ func Load(c *config.Client) (*AuthConfig, error) {
 		errs = append(errs, fmt.Sprintf("LOGIN_RATE_LIMIT_PER_IP: %v", err))
 	} else {
 		cfg.LoginRateLimitPerIP = v
+	}
+
+	if v, err := c.GetConfig("WECHAT_APP_ID"); err == nil {
+		cfg.WeChatAppID = v
+	}
+	if v, err := c.GetConfig("WECHAT_SECRET"); err == nil {
+		cfg.WeChatSecret = v
+	}
+	if v, err := c.GetConfig("APPLE_CLIENT_ID"); err == nil {
+		cfg.AppleClientID = v
+	}
+	if v, err := c.GetConfig("APPLE_TEAM_ID"); err == nil {
+		cfg.AppleTeamID = v
+	}
+	if v, err := c.GetConfig("APPLE_KEY_ID"); err == nil {
+		cfg.AppleKeyID = v
+	}
+	if v, err := c.GetConfig("GOOGLE_CLIENT_ID"); err == nil {
+		cfg.GoogleClientID = v
+	}
+	if v, err := c.GetConfig("GOOGLE_SECRET"); err == nil {
+		cfg.GoogleSecret = v
+	}
+	if v, err := c.GetConfig("OAUTH_REDIRECT_URI"); err == nil {
+		cfg.OAuthRedirectURI = v
 	}
 
 	if len(errs) > 0 {
