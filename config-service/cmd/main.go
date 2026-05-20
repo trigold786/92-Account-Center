@@ -86,6 +86,8 @@ func main() {
 	releaseH := handler.NewReleaseHandler(releaseSvc)
 	auditH := handler.NewAuditHandler(auditSvc)
 	permH := handler.NewPermissionHandler(permSvc)
+	adConfigSvc := service.NewAdConfigService(nil)
+	adConfigH := handler.NewAdConfigHandler(adConfigSvc)
 
 	r := gin.New()
 	r.Use(gin.RecoveryWithWriter(os.Stderr, func(c *gin.Context, err any) {
@@ -202,6 +204,12 @@ func main() {
 	internalGroup := r.Group("/internal/v1/config")
 	{
 		internalGroup.GET("/items/:code", configH.GetItemByCode)
+	}
+
+	adGroup := r.Group("/api/v1/ad")
+	{
+		adGroup.GET("/config", adConfigH.GetAdConfig)
+		adGroup.GET("/frequency", adConfigH.CheckFrequency)
 	}
 
 	r.Any("/metrics", func(c *gin.Context) {
