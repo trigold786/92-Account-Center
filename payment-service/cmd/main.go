@@ -86,6 +86,10 @@ func main() {
 	invoiceHandler := handler.NewInvoiceHandler(invoiceRepo)
 	paymentFlowHandler := handler.NewPaymentFlowHandler()
 
+	refundRepo := repository.NewRefundRepository(db)
+	refundSvc := service.NewRefundService(refundRepo, nil, nil)
+	refundHandler := handler.NewRefundHandler(refundSvc)
+
 	providerRegistry := provider.NewProviderRegistry()
 	wechatProvider := service.NewWeChatPayProvider(service.WeChatPayConfig{
 		AppID:    getEnv("WECHAT_APP_ID", "wx_sandbox_app_id"),
@@ -139,6 +143,13 @@ func main() {
 	{
 		paymentFlowGroup.GET("/result/:order_no", paymentFlowHandler.GetPaymentResult)
 		paymentFlowGroup.POST("/retry/:order_no", paymentFlowHandler.RetryPayment)
+	}
+
+	refundGroup := r.Group("/api/v1/refunds")
+	{
+		refundGroup.POST("", refundHandler.RequestRefund)
+		refundGroup.PUT("/:id/approve", refundHandler.ApproveRefund)
+		refundGroup.PUT("/:id/reject", refundHandler.RejectRefund)
 	}
 
 	paymentGroup := r.Group("/api/v1/payment")
