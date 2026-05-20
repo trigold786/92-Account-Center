@@ -170,6 +170,12 @@ func main() {
 	subAdminSvc := service.NewSubscriptionAdminService(subAdminRepo)
 	subAdminHandler := handler.NewSubscriptionAdminHandler(subAdminSvc)
 
+	exportSvc := service.NewExportService(nil, "")
+	exportHandler := handler.NewExportHandler(exportSvc)
+
+	openAPISvc := service.NewOpenAPIService()
+	openAPIHandler := handler.NewOpenAPIHandler(openAPISvc)
+
 	adminRepo := repository.NewAdminRepository(db)
 	var creditClient service.CreditClient
 	if creditServiceURL != "" {
@@ -267,6 +273,17 @@ func main() {
 
 		adminGroup.POST("/coupons", subAdminHandler.CreateCoupon)
 		adminGroup.GET("/coupons", subAdminHandler.ListCoupons)
+	}
+
+	exportGroup := r.Group("/api/v1/export")
+	{
+		exportGroup.GET("/personal", exportHandler.ExportPersonalData)
+		exportGroup.POST("/request", exportHandler.RequestExport)
+	}
+
+	openAPIGroup := r.Group("/api/v1/openapi")
+	{
+		openAPIGroup.POST("/token", openAPIHandler.IssueToken)
 	}
 
 	r.Any("/metrics", func(c *gin.Context) {
