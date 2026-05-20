@@ -258,6 +258,10 @@ func main() {
 	r.Any("/api/v1/kyb/*path", proxyHandler(svcCfg.ComplianceServiceURL, svcCfg))
 	r.Any("/api/v1/data/*path", proxyHandler(svcCfg.DataProductServiceURL, svcCfg))
 
+	r.GET("/api/v1/security/pins", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"pins": []string{"sha256/AAAA...", "sha256/BBBB..."}})
+	})
+
 	r.Any("/metrics", func(c *gin.Context) {
 		var buf bytes.Buffer
 		fmt.Fprintf(&buf, "# HELP http_requests_total Total HTTP requests\n")
