@@ -179,6 +179,9 @@ func main() {
 	searchSvc := service.NewSearchService(nil)
 	searchHandler := handler.NewSearchHandler(searchSvc)
 
+	leaderboardSvc := service.NewLeaderboardService(nil)
+	leaderboardHandler := handler.NewLeaderboardHandler(leaderboardSvc)
+
 	adminRepo := repository.NewAdminRepository(db)
 	var creditClient service.CreditClient
 	if creditServiceURL != "" {
@@ -291,6 +294,9 @@ func main() {
 
 	r.GET("/api/v1/search", searchHandler.Search)
 	r.GET("/api/v1/quick-actions", searchHandler.QuickActions)
+
+	r.GET("/api/v1/leaderboard", leaderboardHandler.GetLeaderboard)
+	r.GET("/api/v1/leaderboard/me", leaderboardHandler.GetMyRank)
 
 	r.Any("/metrics", func(c *gin.Context) {
 		var buf bytes.Buffer
