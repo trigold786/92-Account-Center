@@ -14,5 +14,6 @@ use (
 	./pkg/circuitbreaker
 	./pkg/health
 	./pkg/logging
+	./pkg/trace
 	./tests/integration
 )
