@@ -95,6 +95,9 @@ func main() {
 	streamSvc := service.NewStreamService(nil)
 	streamHandler := handler.NewStreamHandler(streamSvc)
 
+	adEventSvc := service.NewAdEventService(nil)
+	adEventHandler := handler.NewAdEventHandler(adEventSvc)
+
 	r := gin.New()
 	r.Use(gin.RecoveryWithWriter(os.Stderr, func(c *gin.Context, err any) {
 		logger.Error("panic recovered", "error", fmt.Sprintf("%v", err))
@@ -137,6 +140,12 @@ func main() {
 		streamGroup.POST("/events", streamHandler.ProcessEvent)
 		streamGroup.GET("/online", streamHandler.GetOnlineCount)
 		streamGroup.GET("/funnel", streamHandler.GetRealtimeFunnel)
+	}
+
+	adGroup := r.Group("/api/v1/ad")
+	{
+		adGroup.POST("/events", adEventHandler.TrackAdEvent)
+		adGroup.GET("/metrics", adEventHandler.GetAdMetrics)
 	}
 
 	r.Any("/metrics", func(c *gin.Context) {
