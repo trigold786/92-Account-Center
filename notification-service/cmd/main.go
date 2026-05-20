@@ -172,6 +172,9 @@ func main() {
 	messageSvc := service.NewMessageService(nil)
 	messageHandler := handler.NewMessageHandler(messageSvc)
 
+	templateSvc := service.NewTemplateService(nil)
+	templateHandler := handler.NewTemplateHandler(templateSvc)
+
 	r := gin.New()
 	r.Use(gin.RecoveryWithWriter(os.Stderr, func(c *gin.Context, err any) {
 		logger.Error("panic recovered", "error", fmt.Sprintf("%v", err))
@@ -249,6 +252,16 @@ func main() {
 		messageGroup.GET("", messageHandler.ListMessages)
 		messageGroup.PUT("/:id/read", messageHandler.MarkRead)
 		messageGroup.POST("/read-all", messageHandler.MarkAllRead)
+	}
+
+	templateGroup := r.Group("/api/v1/templates")
+	{
+		templateGroup.POST("", templateHandler.CreateTemplate)
+		templateGroup.GET("", templateHandler.ListTemplates)
+		templateGroup.GET("/:id", templateHandler.GetTemplate)
+		templateGroup.PUT("/:id", templateHandler.UpdateTemplate)
+		templateGroup.DELETE("/:id", templateHandler.DeleteTemplate)
+		templateGroup.GET("/:id/records", templateHandler.ListSendRecords)
 	}
 
 	port := getEnv("PORT", "30311")
