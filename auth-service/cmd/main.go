@@ -19,6 +19,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/trigold786/92-Account-Center/auth-service/internal/handler"
+	"github.com/trigold786/92-Account-Center/auth-service/internal/provider"
 	"github.com/trigold786/92-Account-Center/auth-service/internal/repository"
 	"github.com/trigold786/92-Account-Center/auth-service/internal/service"
 	"github.com/trigold786/92-Account-Center/auth-service/internal/svcconfig"
@@ -150,6 +151,20 @@ func main() {
 	guestSvc := service.NewGuestService(nil)
 	guestHandler := handler.NewGuestHandler(guestSvc)
 
+	entOAuthSvc := service.NewEnterpriseOAuthService()
+	entOAuthSvc.Register(provider.NewWorkWeChatProvider(
+		getEnvSecret("WORK_WECHAT_CORP_ID", ""),
+		getEnv("WORK_WECHAT_AGENT_ID", ""),
+		getEnvSecret("WORK_WECHAT_CORP_SECRET", ""),
+		getEnv("ENTERPRISE_OAUTH_REDIRECT_URI", ""),
+	))
+	entOAuthSvc.Register(provider.NewDingTalkProvider(
+		getEnvSecret("DINGTALK_APP_KEY", ""),
+		getEnvSecret("DINGTALK_APP_SECRET", ""),
+		getEnv("ENTERPRISE_OAUTH_REDIRECT_URI", ""),
+	))
+	entOAuthHandler := handler.NewEnterpriseOAuthHandler(entOAuthSvc)
+
 	r := gin.New()
 	r.Use(gin.RecoveryWithWriter(os.Stderr, func(c *gin.Context, err any) {
 		logger.Error("panic recovered", "error", fmt.Sprintf("%v", err))
@@ -175,6 +190,13 @@ func main() {
 		authGroup.POST("/oauth/callback", oauthH.Callback)
 		authGroup.POST("/guest", guestHandler.CreateGuest)
 		authGroup.POST("/guest/upgrade", guestHandler.UpgradeGuest)
+	}
+
+	enterpriseGroup := r.Group("/api/v1/auth/enterprise")
+	{
+		enterpriseGroup.GET("/work-wechat", entOAuthHandler.WorkWeChatAuth)
+		enterpriseGroup.GET("/dingtalk", entOAuthHandler.DingTalkAuth)
+		enterpriseGroup.GET("/callback", entOAuthHandler.Callback)
 	}
 
 	sessionGroup := r.Group("/api/v1/session")
