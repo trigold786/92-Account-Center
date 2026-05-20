@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -63,6 +64,7 @@ func main() {
 
 	r.Use(middleware.RequestIDMiddleware())
 	r.Use(middleware.CORSMiddleware())
+	r.Use(middleware.VersionMiddleware())
 	r.Use(middleware.RateLimitMiddleware(svcCfg.RateLimitRPS))
 	r.Use(cacheControlMiddleware(svcCfg.CacheMaxAge))
 	r.Use(middleware.TimeoutMiddleware(svcCfg.GlobalRequestTimeoutSec))
@@ -114,6 +116,23 @@ func main() {
 	r.Any("/api/v1/audit/*path", proxyHandler(svcCfg.ComplianceServiceURL, svcCfg))
 	r.Any("/api/v1/kyb/*path", proxyHandler(svcCfg.ComplianceServiceURL, svcCfg))
 	r.Any("/api/v1/data/*path", proxyHandler(svcCfg.DataProductServiceURL, svcCfg))
+
+	v2Routes := []struct {
+		prefix  string
+		target  string
+	}{
+		{"/api/v2/account", svcCfg.AccountServiceURL},
+		{"/api/v2/entitlements", svcCfg.AccountServiceURL},
+		{"/api/v2/subscriptions", svcCfg.AccountServiceURL},
+		{"/api/v2/auth", svcCfg.AuthServiceURL},
+		{"/api/v2/session", svcCfg.AuthServiceURL},
+		{"/api/v2/device", svcCfg.AuthServiceURL},
+		{"/api/v2/credits", svcCfg.CreditServiceURL},
+		{"/api/v2/data", svcCfg.DataProductServiceURL},
+	}
+	for _, route := range v2Routes {
+		r.Any(route.prefix+"/*path", v2ProxyHandler(route.target, svcCfg))
+	}
 
 	r.GET("/api/v1/security/pins", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"pins": []string{"sha256/AAAA...", "sha256/BBBB..."}})
@@ -199,6 +218,37 @@ func proxyHandler(target string, cfg *svcconfig.GatewayConfig) gin.HandlerFunc {
 
 		c.Header("X-Request-ID", c.GetHeader("X-Request-ID"))
 		c.Header("X-Forwarded-For", c.ClientIP())
+
+		proxy.ServeHTTP(wrapWriter(c), c.Request)
+	}
+}
+
+func v2ProxyHandler(target string, cfg *svcconfig.GatewayConfig) gin.HandlerFunc {
+	targetURL, err := url.Parse(target)
+	if err != nil {
+		logger.Error("invalid target URL", "error", err.Error())
+		os.Exit(1)
+	}
+
+	proxy := httputil.NewSingleHostReverseProxy(targetURL)
+	proxy.Transport = proxyutil.NewTransport(cfg.ResponseHeaderTimeoutSec, cfg.IdleConnTimeoutSec)
+	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+		logger.Error("proxy error", "target", target, "error", err.Error())
+		http.Error(w, "Service unavailable", http.StatusServiceUnavailable)
+	}
+
+	return func(c *gin.Context) {
+		c.Request.URL.Host = targetURL.Host
+		c.Request.URL.Scheme = targetURL.Scheme
+		c.Request.Host = targetURL.Host
+		c.Request.Header.Set("X-API-Version", "2")
+
+		rewrittenPath := strings.Replace(c.Request.URL.Path, "/api/v2/", "/api/v1/", 1)
+		c.Request.URL.Path = rewrittenPath
+
+		c.Header("X-Request-ID", c.GetHeader("X-Request-ID"))
+		c.Header("X-Forwarded-For", c.ClientIP())
+		c.Header("X-API-Version", "2")
 
 		proxy.ServeHTTP(wrapWriter(c), c.Request)
 	}
