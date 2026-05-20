@@ -114,12 +114,15 @@ func main() {
 	deletionService := service.NewDeletionService(userRepo, entitlementRepo, rdb, logger)
 	deletionWorker := worker.NewDeletionWorker(deletionService, logger)
 
+	renewalSvc := service.NewRenewalService(nil, nil)
+	renewalWorker := worker.NewRenewalWorker(renewalSvc)
+
 	redisAddr := getEnv("REDIS_ADDR", "localhost:6379")
 	asynqServer := asynq.NewServer(
 		asynq.RedisClientOpt{Addr: redisAddr},
 		asynq.Config{Concurrency: 5},
 	)
-	asynqMux := worker.NewServeMux(deletionWorker)
+	asynqMux := worker.NewServeMux(deletionWorker, renewalWorker)
 
 	scheduler, err := worker.NewScheduler(redisAddr)
 	if err != nil {
