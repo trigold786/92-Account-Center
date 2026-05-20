@@ -1,0 +1,95 @@
+{
+  "dashboard": {
+    "title": "Canary Release Monitor",
+    "tags": ["canary", "account-center"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "title": "Canary vs Stable Request Rate",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{version=\"canary\"}[5m]))",
+            "legendFormat": "Canary"
+          },
+          {
+            "expr": "sum(rate(http_requests_total{version=\"stable\"}[5m]))",
+            "legendFormat": "Stable"
+          }
+        ]
+      },
+      {
+        "title": "Error Rate Comparison",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{version=\"canary\",status=~\"5..\"}[5m])) / sum(rate(http_requests_total{version=\"canary\"}[5m])) * 100",
+            "legendFormat": "Canary Error %"
+          },
+          {
+            "expr": "sum(rate(http_requests_total{version=\"stable\",status=~\"5..\"}[5m])) / sum(rate(http_requests_total{version=\"stable\"}[5m])) * 100",
+            "legendFormat": "Stable Error %"
+          }
+        ]
+      },
+      {
+        "title": "P99 Latency Comparison",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{version=\"canary\"}[5m])) by (le))",
+            "legendFormat": "Canary P99"
+          },
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{version=\"stable\"}[5m])) by (le))",
+            "legendFormat": "Stable P99"
+          }
+        ]
+      },
+      {
+        "title": "Canary Weight",
+        "type": "gauge",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "canary_weight_percent",
+            "legendFormat": "Weight"
+          }
+        ]
+      },
+      {
+        "title": "CPU Usage Comparison",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "sum(rate(container_cpu_usage_seconds_total{version=\"canary\"}[5m])) * 100",
+            "legendFormat": "Canary CPU %"
+          },
+          {
+            "expr": "sum(rate(container_cpu_usage_seconds_total{version=\"stable\"}[5m])) * 100",
+            "legendFormat": "Stable CPU %"
+          }
+        ]
+      },
+      {
+        "title": "Memory Usage Comparison",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+        "targets": [
+          {
+            "expr": "container_memory_working_set_bytes{version=\"canary\"}",
+            "legendFormat": "Canary Memory"
+          },
+          {
+            "expr": "container_memory_working_set_bytes{version=\"stable\"}",
+            "legendFormat": "Stable Memory"
+          }
+        ]
+      }
+    ]
+  }
+}

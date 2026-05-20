@@ -1,0 +1,42 @@
+canary:
+  enabled: true
+  host: account-center.example.com
+  gateway: account-center-gateway
+  stablePort: 80
+  canaryPort: 80
+  canaryWeight: 5
+
+  stages:
+    - name: initial
+      weight: 5
+      duration: 10m
+    - name: ramp-up
+      weight: 25
+      duration: 30m
+    - name: expanded
+      weight: 50
+      duration: 1h
+    - name: full
+      weight: 100
+      duration: 0
+
+  rollback:
+    enabled: true
+    errorRateThreshold: 5
+    latencyP99ThresholdMs: 2000
+    checkInterval: 30s
+
+canaryImage:
+  repository: account-center
+  tag: canary
+  pullPolicy: IfNotPresent
+
+canaryReplicaCount: 1
+
+canaryResources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi

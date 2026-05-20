@@ -1,0 +1,68 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: {{ include "account-center.fullname" . }}-canary
+  namespace: {{ .Values.global.namespace }}
+spec:
+  hosts:
+    - {{ .Values.canary.host | default "account-center.example.com" }}
+  gateways:
+    - {{ .Values.canary.gateway | default "account-center-gateway" }}
+  http:
+    - match:
+        - headers:
+            x-canary:
+              exact: "true"
+      route:
+        - destination:
+            host: {{ include "account-center.fullname" . }}-canary
+            port:
+              number: {{ .Values.canary.canaryPort | default 80 }}
+          weight: {{ .Values.canary.canaryWeight | default 5 }}
+        - destination:
+            host: {{ include "account-center.fullname" . }}
+            port:
+              number: {{ .Values.canary.stablePort | default 80 }}
+          weight: {{ sub 100 (int .Values.canary.canaryWeight | default 5) }}
+    - route:
+        - destination:
+            host: {{ include "account-center.fullname" . }}-canary
+            port:
+              number: {{ .Values.canary.canaryPort | default 80 }}
+          weight: {{ .Values.canary.canaryWeight | default 5 }}
+        - destination:
+            host: {{ include "account-center.fullname" . }}
+            port:
+              number: {{ .Values.canary.stablePort | default 80 }}
+          weight: {{ sub 100 (int .Values.canary.canaryWeight | default 5) }}
+      retries:
+        attempts: 3
+        perTryTimeout: 2s
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: {{ include "account-center.fullname" . }}-canary
+  namespace: {{ .Values.global.namespace }}
+spec:
+  host: {{ include "account-center.fullname" . }}
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        h2UpgradePolicy: DEFAULT
+        http1MaxPendingRequests: 100
+        http2MaxRequests: 100
+    outlierDetection:
+      consecutive5xxErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+  subsets:
+    - name: stable
+      labels:
+        version: stable
+    - name: canary
+      labels:
+        version: canary
