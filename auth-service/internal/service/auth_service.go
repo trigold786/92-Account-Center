@@ -341,6 +341,13 @@ func (s *authService) LoginWithBiometric(ctx context.Context, req *model.Biometr
 	return nil, errors.New("生物识别验证失败")
 }
 
+func (s *authService) ValidateDeviceFingerprint(ctx context.Context, userID int64, fingerprint string) bool {
+	if fingerprint == "" {
+		return false
+	}
+	return len(fingerprint) == 64
+}
+
 func subtleCompare(a, b string) bool {
 	if len(a) != len(b) {
 		return false
