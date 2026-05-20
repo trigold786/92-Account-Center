@@ -1,0 +1,438 @@
+openapi: 3.0.3
+info:
+  title: Account Center API
+  description: Account Center V2.2 RESTful API
+  version: 2.2.0
+  contact:
+    name: Account Center Team
+    email: dev@accountcenter.com
+
+servers:
+  - url: http://localhost:30300
+    description: Local development gateway
+
+tags:
+  - name: Account
+    description: User account management
+  - name: Auth
+    description: Authentication and authorization
+  - name: Payment
+    description: Payment and billing
+  - name: Notification
+    description: Messaging and notifications
+  - name: Config
+    description: Configuration management
+  - name: Data
+    description: Data analytics
+
+paths:
+  /api/v1/account/register:
+    post:
+      tags: [Account]
+      summary: Register a new account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone_number, password]
+              properties:
+                phone_number:
+                  type: string
+                  example: "13800138000"
+                password:
+                  type: string
+                  format: password
+                email:
+                  type: string
+                  format: email
+      responses:
+        "201":
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: Login with credentials
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [credential, password]
+              properties:
+                credential:
+                  type: string
+                  description: Phone number or email
+                password:
+                  type: string
+                  format: password
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: Invalid credentials
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        "200":
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+
+  /api/v1/auth/guest:
+    post:
+      tags: [Auth]
+      summary: Create guest session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                device_id:
+                  type: string
+      responses:
+        "201":
+          description: Guest session created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  account_id:
+                    type: string
+                  status:
+                    type: string
+
+  /api/v1/orders:
+    post:
+      tags: [Payment]
+      summary: Create an order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, plan_id, amount]
+              properties:
+                user_id:
+                  type: integer
+                plan_id:
+                  type: string
+                amount:
+                  type: number
+                currency:
+                  type: string
+                  default: CNY
+      responses:
+        "201":
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderResponse"
+
+    get:
+      tags: [Payment]
+      summary: List orders
+      parameters:
+        - name: user_id
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Orders list
+
+  /api/v1/invoices:
+    post:
+      tags: [Payment]
+      summary: Create an invoice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [order_id, title, email]
+              properties:
+                order_id:
+                  type: integer
+                title:
+                  type: string
+                tax_id:
+                  type: string
+                email:
+                  type: string
+                amount:
+                  type: number
+      responses:
+        "201":
+          description: Invoice created
+
+  /api/v1/messages:
+    post:
+      tags: [Notification]
+      summary: Create a message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, type, title, body]
+              properties:
+                user_id:
+                  type: integer
+                type:
+                  type: string
+                title:
+                  type: string
+                body:
+                  type: string
+      responses:
+        "201":
+          description: Message created
+
+    get:
+      tags: [Notification]
+      summary: List messages
+      parameters:
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Messages list
+
+  /api/v1/templates:
+    get:
+      tags: [Notification]
+      summary: List notification templates
+      parameters:
+        - name: channel
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Templates list
+
+    post:
+      tags: [Notification]
+      summary: Create notification template
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [channel, name, body]
+              properties:
+                channel:
+                  type: string
+                name:
+                  type: string
+                subject:
+                  type: string
+                body:
+                  type: string
+                variables:
+                  type: string
+      responses:
+        "201":
+          description: Template created
+
+  /api/v1/faqs:
+    get:
+      tags: [Config]
+      summary: List FAQs
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: FAQ list
+
+  /api/v1/faqs/search:
+    get:
+      tags: [Config]
+      summary: Search FAQs
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Search results
+
+  /api/v1/stream/events:
+    post:
+      tags: [Data]
+      summary: Process stream event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, event_type]
+              properties:
+                user_id:
+                  type: integer
+                event_type:
+                  type: string
+                payload:
+                  type: string
+      responses:
+        "201":
+          description: Event processed
+
+  /api/v1/ad/events:
+    post:
+      tags: [Data]
+      summary: Track ad event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, event_type]
+              properties:
+                user_id:
+                  type: integer
+                event_type:
+                  type: string
+                  enum: [ad_splash_shown, ad_banner_shown, ad_clicked]
+                ad_id:
+                  type: string
+                placement:
+                  type: string
+                converted:
+                  type: boolean
+      responses:
+        "201":
+          description: Event tracked
+
+  /api/v1/ad/metrics:
+    get:
+      tags: [Data]
+      summary: Get ad metrics
+      parameters:
+        - name: event_type
+          in: query
+          schema:
+            type: string
+        - name: placement
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Ad metrics
+
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+
+    AccountResponse:
+      type: object
+      properties:
+        user_id:
+          type: integer
+        account_id:
+          type: string
+        status:
+          type: string
+
+    LoginResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        expires_in:
+          type: integer
+        user_id:
+          type: integer
+        account_id:
+          type: string
+
+    OrderResponse:
+      type: object
+      properties:
+        order_id:
+          type: string
+        status:
+          type: string
+        amount:
+          type: number
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - BearerAuth: []
