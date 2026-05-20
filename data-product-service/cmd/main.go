@@ -98,6 +98,9 @@ func main() {
 	adEventSvc := service.NewAdEventService(nil)
 	adEventHandler := handler.NewAdEventHandler(adEventSvc)
 
+	abTestSvc := service.NewABTestService()
+	abTestHandler := handler.NewABTestHandler(abTestSvc)
+
 	r := gin.New()
 	r.Use(gin.RecoveryWithWriter(os.Stderr, func(c *gin.Context, err any) {
 		logger.Error("panic recovered", "error", fmt.Sprintf("%v", err))
@@ -146,6 +149,14 @@ func main() {
 	{
 		adGroup.POST("/events", adEventHandler.TrackAdEvent)
 		adGroup.GET("/metrics", adEventHandler.GetAdMetrics)
+	}
+
+	experimentGroup := r.Group("/api/v1/experiments")
+	{
+		experimentGroup.POST("", abTestHandler.CreateExperiment)
+		experimentGroup.GET("/:id/assign", abTestHandler.AssignVariant)
+		experimentGroup.POST("/:id/events", abTestHandler.RecordEvent)
+		experimentGroup.GET("/:id/results", abTestHandler.GetResults)
 	}
 
 	r.Any("/metrics", func(c *gin.Context) {
