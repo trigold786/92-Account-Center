@@ -157,6 +157,9 @@ func main() {
 	subscriptionHandler := handler.NewSubscriptionHandler(subscriptionService)
 	pricingHandler := handler.NewPricingHandler()
 
+	dashboardSvc := service.NewDashboardService(nil)
+	dashboardHandler := handler.NewDashboardHandler(dashboardSvc)
+
 	adminRepo := repository.NewAdminRepository(db)
 	var creditClient service.CreditClient
 	if creditServiceURL != "" {
@@ -226,6 +229,8 @@ func main() {
 		pricingGroup.GET("", pricingHandler.GetPricing)
 		pricingGroup.POST("/calculate-discount", pricingHandler.CalculateDiscount)
 	}
+
+	r.GET("/api/v1/dashboard", dashboardHandler.GetDashboard)
 
 	jwtSecret := getEnv("JWT_SECRET", "default-secret")
 
