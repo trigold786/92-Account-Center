@@ -18,5 +18,9 @@ use (
 	./pkg/saga
 	./pkg/async
 	./pkg/vault
+	./pkg/discovery
+	./pkg/database
+	./pkg/server
 	./tests/integration
+	./tests/e2e
 )
