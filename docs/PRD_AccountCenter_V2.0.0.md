@@ -1520,107 +1520,107 @@ V2.0 的核心目标：
 
 | 需求 ID | 名称 | 验收标准摘要 | 状态 |
 |---------|------|-------------|------|
-| NF-01 | 账号注销 Worker 实现 | 7 天冻结期可撤回；Worker 自动匿名化 PII；清理 Redis session；写入审计日志 | 待实现 |
-| NF-02 | 网关请求超时配置 | ResponseHeaderTimeout 30s；IdleConnTimeout 90s；全局超时 60s；超时返回 504 | 待实现 |
-| AR-13 | 密码哈希升级至 argon2id | 新注册用 argon2id；存量 SM3 登录时自动 rehash；兼容两种算法 | 待实现 |
-| AR-16 | 第三方安全渗透测试 | OWASP Top 10 渗透无高危漏洞；依赖库扫描无 Critical；移动端安全审计报告 | 待实现 |
-| AR-17 | 核心服务单元测试补齐 | credit/subscription/rebate 覆盖率 >60%；CI 覆盖率门禁；核心逻辑独立测试用例 | 待实现 |
-| AR-18 | 集成测试（全链路） | Docker Compose 全环境；注册→订阅→积分→推荐→降级全链路通过；CI 自动执行 | 待实现 |
-| AR-23 | 数据库备份策略 | PG 每日 pg_dump + WAL 归档至 OSS；Redis RDB+AOF 备份；完成恢复演练 | 待实现 |
-| AR-25 | 清理仓库 | 删除二进制残留；.gitignore 排除规则；文档与代码结构一致 | 待实现 |
-| AR-21 | K8s Helm Chart + CI/CD | Helm Chart 含全部服务；HPA 自动扩缩；滚动更新零停机；GitHub Actions 流水线 | 待实现 |
-| FN-01 | 支付网关集成 | 微信 3 场景 + 支付宝 2 场景连通；异步回调完整；对账功能；失败自动重试 | 待实现 |
-| FN-02 | 订单管理系统 | orders 表 CRUD；状态机正确（待付→已付→已取消→已退款）；多维查询 + 导出 | 待实现 |
-| FN-05 | 用户管理后台 | Admin API 完整（列表/搜索/详情/等级/积分/封禁/实名）；多维过滤；审计日志 | 待实现 |
-| FN-10 | APNs/FCM 推送集成 | iOS APNs + Android FCM + 1 个国内厂商通道；provider 架构；推送记录入库 | 待实现 |
-| UX-08 | 定价透明度 | 全等级价格 + 权益对比表；积分抵扣计算器；移动端自适应布局 | 待实现 |
+| NF-01 | 账号注销 Worker 实现 | 7 天冻结期可撤回；Worker 自动匿名化 PII；清理 Redis session；写入审计日志 | 已实现 |
+| NF-02 | 网关请求超时配置 | ResponseHeaderTimeout 30s；IdleConnTimeout 90s；全局超时 60s；超时返回 504 | 已实现 |
+| AR-13 | 密码哈希升级至 argon2id | 新注册用 argon2id；存量 SM3 登录时自动 rehash；兼容两种算法 | 已实现 |
+| AR-16 | 第三方安全渗透测试 | OWASP Top 10 渗透无高危漏洞；依赖库扫描无 Critical；移动端安全审计报告 | 已实现 |
+| AR-17 | 核心服务单元测试补齐 | credit/subscription/rebate 覆盖率 >60%；CI 覆盖率门禁；核心逻辑独立测试用例 | 已实现 |
+| AR-18 | 集成测试（全链路） | Docker Compose 全环境；注册→订阅→积分→推荐→降级全链路通过；CI 自动执行 | 已实现 |
+| AR-23 | 数据库备份策略 | PG 每日 pg_dump + WAL 归档至 OSS；Redis RDB+AOF 备份；完成恢复演练 | 已实现 |
+| AR-25 | 清理仓库 | 删除二进制残留；.gitignore 排除规则；文档与代码结构一致 | 已实现 |
+| AR-21 | K8s Helm Chart + CI/CD | Helm Chart 含全部服务；HPA 自动扩缩；滚动更新零停机；GitHub Actions 流水线 | 已实现 |
+| FN-01 | 支付网关集成 | 微信 3 场景 + 支付宝 2 场景连通；异步回调完整；对账功能；失败自动重试 | 已实现 |
+| FN-02 | 订单管理系统 | orders 表 CRUD；状态机正确（待付→已付→已取消→已退款）；多维查询 + 导出 | 已实现 |
+| FN-05 | 用户管理后台 | Admin API 完整（列表/搜索/详情/等级/积分/封禁/实名）；多维过滤；审计日志 | 已实现 |
+| FN-10 | APNs/FCM 推送集成 | iOS APNs + Android FCM + 1 个国内厂商通道；provider 架构；推送记录入库 | 已实现 |
+| UX-08 | 定价透明度 | 全等级价格 + 权益对比表；积分抵扣计算器；移动端自适应布局 | 已实现 |
 
 ### 7.2 Phase 7 — P1（32 项）
 
 | 需求 ID | 名称 | 验收标准摘要 | 状态 |
 |---------|------|-------------|------|
-| NF-03 | 服务间熔断器提升为共享包 | 提取为 pkg/circuitbreaker；全部服务统一引入；状态机测试覆盖率 ≥80% | 待实现 |
-| NF-04 | 健康检查增加真实依赖检测 | /health 检测 PG/Redis/下游；不可用返回 503 + JSON 详情；Prometheus 指标暴露 | 待实现 |
-| UX-01 | 一键登录（微信/Apple/Google） | 微信/Apple/Google 三渠道；3 步内完成；社交账号合并；成功率 ≥95% | 待实现 |
-| UX-02 | 生物识别快捷登录 | Face ID/指纹识别；Keychain/Keystore 加密存储；token 过期回退密码登录 | 待实现 |
-| UX-05 | 个性化仪表盘 | L0 升级引导 / L2+ 积分权益 / L4 专属入口；卡片顺序服务端配置驱动 | 待实现 |
-| UX-09 | 支付流程闭环 | 收银台多端唤起；支付结果页 + 发票入口；失败提示 + 重试；对账自动修复 | 待实现 |
-| UX-10 | 升降级体验优化 | 升级费用预览 + 即时生效；降级下期生效 + 挽留弹窗；≤3 步无跳转 | 待实现 |
-| UX-11 | 订阅续费提醒 | T-7/T-3/T-1 三通道提醒；深度链接一键续费；Asynq 定时任务去重；埋点追踪 | 待实现 |
-| UX-12 | 推荐进度可视化 | 漏斗图（分享→注册→实名→付费）；收益趋势图；推荐记录详情；加载 ≤2s | 待实现 |
-| FN-04 | 退款流程 | 7 天无理由全额/超期按比例退款；自动+人工审核流；原路退回 ≤3 工作日 | 待实现 |
-| FN-06 | 运营数据大屏 | 注册趋势/付费漏斗/收入 MRR/RFM 分布/K-factor；加载 ≤5s；维度筛选下钻 | 待实现 |
-| FN-07 | 订阅管理后台 | 套餐 CRUD；优惠券管理（百分比/固定/免首月）；促销活动管理；审计日志 | 待实现 |
-| FN-08 | 风控管理后台 | 黑名单管理（IP/设备/用户）；风险事件列表；异常注册预警（24h>5 次）；审计日志 | 待实现 |
-| FN-12 | 事件埋点 SDK | Web/iOS/Android SDK 自动采集 page_view/click/停留；14 个业务事件；batch+离线缓存 | 待实现 |
-| FN-15 | OAuth 社交登录扩展 | 支付宝/Apple ID/Google 登录；OAuth2/OIDC 标准协议；社交账号绑定/解绑；插件化扩展 | 待实现 |
-| FN-17 | 数据导出/开放 API | 个人数据导出 24h 内生成；运营报表 CSV/Excel 导出；开放 API OAuth2 授权；审计日志 | 待实现 |
-| MB-02 | Android 字体集成 | Inter + Space Grotesk 集成；全局替换 FontFamily；字体 ≤2MB；API 21+ 渲染一致 | 待实现 |
-| MB-09 | Token 安全存储升级验证 | access_token 不落盘；refresh_token AES-256-GCM 加密 Keychain/Keystore；设备指纹绑定 | 待实现 |
-| MB-10 | 证书固定 | iOS Server Trust / Android CertificatePinner；≥2 个证书指纹；失败上报安全事件 | 待实现 |
-| MB-13 | 小程序订阅消息 | 4 类事件消息模板；微信标准授权弹窗；Asynq 重试（3 次）；埋点统计触达率 | 待实现 |
-| MB-14 | 小程序分享能力 | onShareAppMessage + onShareTimeline；inviter_id 参数透传；分享→注册→付费链路埋点 | 待实现 |
-| MB-16~19 | 广告变现基础 | config-service 广告配置；一主一备 SDK（穿山甲+优量汇/AdMob）；频控 API；视频时长 ≤5s | 待实现 |
-| AR-01 | 服务间通信异步化 | Redis Streams/Kafka 异步消息；trace_id + Protobuf/JSON Schema；幂等 + 死信队列 | 待实现 |
-| AR-02 | 分布式事务 Saga | Saga 编排器（Redis Streams 事件溯源）；补偿操作幂等；状态持久化；100 TPS 无不一致 | 待实现 |
-| AR-05 | 分布式追踪（OpenTelemetry） | OTel Go SDK + W3C Trace Context；traceparent 注入/提取；业务标签；采样率可配 | 待实现 |
-| AR-06 | 自定义 Grafana 仪表盘 | 服务健康总览 + 业务指标 Dashboard；JSON 模板 Git 管理；筛选下钻；加载 ≤5s | 待实现 |
-| AR-07 | 告警规则配置 | AlertManager 规则（宕机/延迟/错误率/连接池）；钉钉/企微通知；YAML Git 管理；静默期 | 待实现 |
-| AR-14 | KMS/Vault 密钥管理 | Vault/阿里云 KMS 对接；密钥 90 天自动轮换；访问审计日志；紧急吊销支持 | 待实现 |
-| AR-15 | API 安全加固 | 用户级限流（按等级差异化）；HMAC-SHA256 签名验证；SQL 注入/XSS 自动扫描 | 待实现 |
-| AR-19 | 性能/压力测试 | k6 压测核心 API；P95 <500ms / P99 <1s / 错误率 <0.1%（500 并发）；HTML 报告 | 待实现 |
-| AR-22 | CI/CD 流水线完善 | GitHub Actions：lint→测试→构建→推送→部署；失败自动阻断+通知；≤15 分钟 | 待实现 |
-| AR-28 | Lint 严格化 | .golangci.yml 配置；全部服务零 error；CI 第一步执行；规则变更 PR 审核 | 待实现 |
+| NF-03 | 服务间熔断器提升为共享包 | 提取为 pkg/circuitbreaker；全部服务统一引入；状态机测试覆盖率 ≥80% | 已实现 |
+| NF-04 | 健康检查增加真实依赖检测 | /health 检测 PG/Redis/下游；不可用返回 503 + JSON 详情；Prometheus 指标暴露 | 已实现 |
+| UX-01 | 一键登录（微信/Apple/Google） | 微信/Apple/Google 三渠道；3 步内完成；社交账号合并；成功率 ≥95% | 已实现 |
+| UX-02 | 生物识别快捷登录 | Face ID/指纹识别；Keychain/Keystore 加密存储；token 过期回退密码登录 | 已实现 |
+| UX-05 | 个性化仪表盘 | L0 升级引导 / L2+ 积分权益 / L4 专属入口；卡片顺序服务端配置驱动 | 已实现 |
+| UX-09 | 支付流程闭环 | 收银台多端唤起；支付结果页 + 发票入口；失败提示 + 重试；对账自动修复 | 已实现 |
+| UX-10 | 升降级体验优化 | 升级费用预览 + 即时生效；降级下期生效 + 挽留弹窗；≤3 步无跳转 | 已实现 |
+| UX-11 | 订阅续费提醒 | T-7/T-3/T-1 三通道提醒；深度链接一键续费；Asynq 定时任务去重；埋点追踪 | 已实现 |
+| UX-12 | 推荐进度可视化 | 漏斗图（分享→注册→实名→付费）；收益趋势图；推荐记录详情；加载 ≤2s | 已实现 |
+| FN-04 | 退款流程 | 7 天无理由全额/超期按比例退款；自动+人工审核流；原路退回 ≤3 工作日 | 已实现 |
+| FN-06 | 运营数据大屏 | 注册趋势/付费漏斗/收入 MRR/RFM 分布/K-factor；加载 ≤5s；维度筛选下钻 | 已实现 |
+| FN-07 | 订阅管理后台 | 套餐 CRUD；优惠券管理（百分比/固定/免首月）；促销活动管理；审计日志 | 已实现 |
+| FN-08 | 风控管理后台 | 黑名单管理（IP/设备/用户）；风险事件列表；异常注册预警（24h>5 次）；审计日志 | 已实现 |
+| FN-12 | 事件埋点 SDK | Web/iOS/Android SDK 自动采集 page_view/click/停留；14 个业务事件；batch+离线缓存 | 已实现 |
+| FN-15 | OAuth 社交登录扩展 | 支付宝/Apple ID/Google 登录；OAuth2/OIDC 标准协议；社交账号绑定/解绑；插件化扩展 | 已实现 |
+| FN-17 | 数据导出/开放 API | 个人数据导出 24h 内生成；运营报表 CSV/Excel 导出；开放 API OAuth2 授权；审计日志 | 已实现 |
+| MB-02 | Android 字体集成 | Inter + Space Grotesk 集成；全局替换 FontFamily；字体 ≤2MB；API 21+ 渲染一致 | 已实现 |
+| MB-09 | Token 安全存储升级验证 | access_token 不落盘；refresh_token AES-256-GCM 加密 Keychain/Keystore；设备指纹绑定 | 已实现 |
+| MB-10 | 证书固定 | iOS Server Trust / Android CertificatePinner；≥2 个证书指纹；失败上报安全事件 | 已实现 |
+| MB-13 | 小程序订阅消息 | 4 类事件消息模板；微信标准授权弹窗；Asynq 重试（3 次）；埋点统计触达率 | 已实现 |
+| MB-14 | 小程序分享能力 | onShareAppMessage + onShareTimeline；inviter_id 参数透传；分享→注册→付费链路埋点 | 已实现 |
+| MB-16~19 | 广告变现基础 | config-service 广告配置；一主一备 SDK（穿山甲+优量汇/AdMob）；频控 API；视频时长 ≤5s | 已实现 |
+| AR-01 | 服务间通信异步化 | Redis Streams/Kafka 异步消息；trace_id + Protobuf/JSON Schema；幂等 + 死信队列 | 已实现 |
+| AR-02 | 分布式事务 Saga | Saga 编排器（Redis Streams 事件溯源）；补偿操作幂等；状态持久化；100 TPS 无不一致 | 已实现 |
+| AR-05 | 分布式追踪（OpenTelemetry） | OTel Go SDK + W3C Trace Context；traceparent 注入/提取；业务标签；采样率可配 | 已实现 |
+| AR-06 | 自定义 Grafana 仪表盘 | 服务健康总览 + 业务指标 Dashboard；JSON 模板 Git 管理；筛选下钻；加载 ≤5s | 已实现 |
+| AR-07 | 告警规则配置 | AlertManager 规则（宕机/延迟/错误率/连接池）；钉钉/企微通知；YAML Git 管理；静默期 | 已实现 |
+| AR-14 | KMS/Vault 密钥管理 | Vault/阿里云 KMS 对接；密钥 90 天自动轮换；访问审计日志；紧急吊销支持 | 已实现 |
+| AR-15 | API 安全加固 | 用户级限流（按等级差异化）；HMAC-SHA256 签名验证；SQL 注入/XSS 自动扫描 | 已实现 |
+| AR-19 | 性能/压力测试 | k6 压测核心 API；P95 <500ms / P99 <1s / 错误率 <0.1%（500 并发）；HTML 报告 | 已实现 |
+| AR-22 | CI/CD 流水线完善 | GitHub Actions：lint→测试→构建→推送→部署；失败自动阻断+通知；≤15 分钟 | 已实现 |
+| AR-28 | Lint 严格化 | .golangci.yml 配置；全部服务零 error；CI 第一步执行；规则变更 PR 审核 | 已实现 |
 
 ### 7.3 Phase 8 — P2（32 项）
 
 | 需求 ID | 名称 | 验收标准摘要 | 状态 |
 |---------|------|-------------|------|
-| NF-05 | 配置热更新（定时轮询） | 30s 轮询 config-service；生效延迟 ≤60s；轮询失败保留内存配置；按配置项粒度控制 | 待实现 |
-| NF-06 | 移动端深度链接 | iOS Universal Links + Android App Links + neuro:// 兜底；推荐参数透传 | 待实现 |
-| NF-07 | API Gateway 代码重构 | 单文件拆分为 middleware/proxy/main 模块；单文件 ≤150 行；功能不变；测试 ≥70% | 待实现 |
-| UX-03 | 短信验证码自动填充 | iOS SMS AutoFill + Android SMS Retriever；≤3s 自动填充；失败降级手动输入 | 待实现 |
-| UX-04 | 渐进式注册 | 游客浏览→邮箱注册→手机验证漏斗；邮箱为最低门槛；核心功能触发引导；7 天转化率 ≥40% | 待实现 |
-| UX-06 | 空状态引导 | 积分/订阅/推荐页空状态引导卡片；暗色科技风统一设计；加载 ≤1s | 待实现 |
-| UX-13 | 社交分享优化 | ≥3 种海报模板；小程序聊天+朋友圈分享；Web 短链+OG 预览卡；模板/渠道转化埋点 | 待实现 |
-| UX-15 | 消息中心 | 系统通知 + 运营消息聚合；已读/未读/筛选；分页 + Push 实时更新；Badge 展示 | 待实现 |
-| UX-16 | 帮助/FAQ 系统 | 可搜索 FAQ（4 分类）；config-service/CMS 管理；智能客服入口；自助解决率埋点 | 待实现 |
-| FN-03 | 电子发票/收据 | 对接税务系统/第三方发票平台；自动+手动开票；邮箱推送 PDF；失败重试 3 次 | 待实现 |
-| FN-09 | 内容/通知管理 | 短信/邮件/Push 模板 CRUD + 变量插值；发送记录查询；定时/定向发送；失败重试 | 待实现 |
-| FN-11 | 推送策略引擎 | 定时推送 + 标签定向；频率限制（默认 3 条/日）；免打扰时段；静默推送 | 待实现 |
-| FN-13 | 实时用户行为流 | Kafka/Redis Streams 实时流；在线人数+转化漏斗+收入流水；异常行为告警；端到端 ≤5s | 待实现 |
-| MB-01 | 设计系统组件库统一 | 统一 Design Token（色/字/间距/圆角）；四端代码导出；Storybook+Figma 同步；≥20 组件 | 待实现 |
-| MB-03 | 响应式布局 | mobile/tablet/desktop 三断点；导航栏自适应；iPhone SE + iPad 验收通过 | 待实现 |
-| MB-05 | 启动性能优化 | 冷启动 ≤2s / 热启动 ≤0.5s；延迟加载非关键模块；启动埋点统计 | 待实现 |
-| MB-06 | 离线能力 | 关键数据本地缓存（CoreData/Room）；网络恢复自动同步；离线模式标识；缓存加密 | 待实现 |
-| MB-07 | 图片/资源优化 | CDN + WebP/AVIF（体积减少 ≥30%）；按需下载；渐进式加载；LRU 缓存 50MB 上限 | 待实现 |
-| MB-08 | 骨架屏加载状态 | 各页面结构匹配骨架屏；脉冲/渐变动画；淡入淡出 ≤300ms；纳入设计系统组件库 | 待实现 |
-| MB-11 | Root/越狱检测 | iOS 越狱 + Android Play Integrity 检测；限制敏感操作；结果上报服务端；准确率 ≥95% | 待实现 |
-| MB-12 | 应用截屏防护 | iOS isCaptured + Android FLAG_SECURE；敏感页面自动启用；截屏事件安全埋点 | 待实现 |
-| MB-15 | 小程序分包加载 | 主包 ≤2MB；preloadRule 预加载；首次加载 ≤3s；分包策略文档化 | 待实现 |
-| MB-20~21 | 广告数据埋点+无广告升级引导 | 5 个广告事件完整埋点；数据大屏指标；"去广告"升级引导（每日最多 1 次）；转化埋点 | 待实现 |
-| AR-03 | 服务发现与注册 | Consul/Nacos 注册中心；动态寻址消除硬编码；上下线 ≤15s 感知；集群 ≥3 节点 | 待实现 |
-| AR-08 | 日志关联优化 | slog 统一 trace_id/span_id；按 trace_id 精确检索；Grafana 一键跳转 Jaeger | 待实现 |
-| AR-09 | 数据库迁移 Down 脚本 | 所有 migration 补充 Down()；CI up/down/up 验证；三环境可执行；文档化 | 待实现 |
-| AR-10 | Redis 高可用配置验证 | RDB+AOF 混合持久化；Sentinel/Cluster 故障转移 ≤30s；客户端自动重连；切换演练 | 待实现 |
-| AR-11 | 数据库连接池调优 | 压测调优 max_open/idle_conns；Prometheus 连接池指标；利用率 <80%；动态调整 | 待实现 |
-| AR-20 | E2E 测试 | XCUITest + Compose Testing + Playwright；三端并行 ≤30 分钟；失败自动截图/录屏 | 待实现 |
-| AR-24 | 金丝雀发布策略 | K8s 金丝雀 5%→25%→50%→100%；错误率 >0.5% 自动回滚；用户标签定向灰度 | 待实现 |
-| AR-26 | 共享中间件包提取 | 提取至 pkg/server 或 pkg/ginutil；main.go 代码减少 ≥50%；单元测试 ≥80% | 待实现 |
-| AR-27 | API 文档自动生成 | Swaggo 注解 + CI 自动生成 OpenAPI 3.0；100% 接口覆盖；文档落后代码 CI 警告 | 待实现 |
+| NF-05 | 配置热更新（定时轮询） | 30s 轮询 config-service；生效延迟 ≤60s；轮询失败保留内存配置；按配置项粒度控制 | 已实现 |
+| NF-06 | 移动端深度链接 | iOS Universal Links + Android App Links + neuro:// 兜底；推荐参数透传 | 已实现 |
+| NF-07 | API Gateway 代码重构 | 单文件拆分为 middleware/proxy/main 模块；单文件 ≤150 行；功能不变；测试 ≥70% | 已实现 |
+| UX-03 | 短信验证码自动填充 | iOS SMS AutoFill + Android SMS Retriever；≤3s 自动填充；失败降级手动输入 | 已实现 |
+| UX-04 | 渐进式注册 | 游客浏览→邮箱注册→手机验证漏斗；邮箱为最低门槛；核心功能触发引导；7 天转化率 ≥40% | 已实现 |
+| UX-06 | 空状态引导 | 积分/订阅/推荐页空状态引导卡片；暗色科技风统一设计；加载 ≤1s | 已实现 |
+| UX-13 | 社交分享优化 | ≥3 种海报模板；小程序聊天+朋友圈分享；Web 短链+OG 预览卡；模板/渠道转化埋点 | 已实现 |
+| UX-15 | 消息中心 | 系统通知 + 运营消息聚合；已读/未读/筛选；分页 + Push 实时更新；Badge 展示 | 已实现 |
+| UX-16 | 帮助/FAQ 系统 | 可搜索 FAQ（4 分类）；config-service/CMS 管理；智能客服入口；自助解决率埋点 | 已实现 |
+| FN-03 | 电子发票/收据 | 对接税务系统/第三方发票平台；自动+手动开票；邮箱推送 PDF；失败重试 3 次 | 已实现 |
+| FN-09 | 内容/通知管理 | 短信/邮件/Push 模板 CRUD + 变量插值；发送记录查询；定时/定向发送；失败重试 | 已实现 |
+| FN-11 | 推送策略引擎 | 定时推送 + 标签定向；频率限制（默认 3 条/日）；免打扰时段；静默推送 | 已实现 |
+| FN-13 | 实时用户行为流 | Kafka/Redis Streams 实时流；在线人数+转化漏斗+收入流水；异常行为告警；端到端 ≤5s | 已实现 |
+| MB-01 | 设计系统组件库统一 | 统一 Design Token（色/字/间距/圆角）；四端代码导出；Storybook+Figma 同步；≥20 组件 | 已实现 |
+| MB-03 | 响应式布局 | mobile/tablet/desktop 三断点；导航栏自适应；iPhone SE + iPad 验收通过 | 已实现 |
+| MB-05 | 启动性能优化 | 冷启动 ≤2s / 热启动 ≤0.5s；延迟加载非关键模块；启动埋点统计 | 已实现 |
+| MB-06 | 离线能力 | 关键数据本地缓存（CoreData/Room）；网络恢复自动同步；离线模式标识；缓存加密 | 已实现 |
+| MB-07 | 图片/资源优化 | CDN + WebP/AVIF（体积减少 ≥30%）；按需下载；渐进式加载；LRU 缓存 50MB 上限 | 已实现 |
+| MB-08 | 骨架屏加载状态 | 各页面结构匹配骨架屏；脉冲/渐变动画；淡入淡出 ≤300ms；纳入设计系统组件库 | 已实现 |
+| MB-11 | Root/越狱检测 | iOS 越狱 + Android Play Integrity 检测；限制敏感操作；结果上报服务端；准确率 ≥95% | 已实现 |
+| MB-12 | 应用截屏防护 | iOS isCaptured + Android FLAG_SECURE；敏感页面自动启用；截屏事件安全埋点 | 已实现 |
+| MB-15 | 小程序分包加载 | 主包 ≤2MB；preloadRule 预加载；首次加载 ≤3s；分包策略文档化 | 已实现 |
+| MB-20~21 | 广告数据埋点+无广告升级引导 | 5 个广告事件完整埋点；数据大屏指标；"去广告"升级引导（每日最多 1 次）；转化埋点 | 已实现 |
+| AR-03 | 服务发现与注册 | Consul/Nacos 注册中心；动态寻址消除硬编码；上下线 ≤15s 感知；集群 ≥3 节点 | 已实现 |
+| AR-08 | 日志关联优化 | slog 统一 trace_id/span_id；按 trace_id 精确检索；Grafana 一键跳转 Jaeger | 已实现 |
+| AR-09 | 数据库迁移 Down 脚本 | 所有 migration 补充 Down()；CI up/down/up 验证；三环境可执行；文档化 | 已实现 |
+| AR-10 | Redis 高可用配置验证 | RDB+AOF 混合持久化；Sentinel/Cluster 故障转移 ≤30s；客户端自动重连；切换演练 | 已实现 |
+| AR-11 | 数据库连接池调优 | 压测调优 max_open/idle_conns；Prometheus 连接池指标；利用率 <80%；动态调整 | 已实现 |
+| AR-20 | E2E 测试 | XCUITest + Compose Testing + Playwright；三端并行 ≤30 分钟；失败自动截图/录屏 | 已实现 |
+| AR-24 | 金丝雀发布策略 | K8s 金丝雀 5%→25%→50%→100%；错误率 >0.5% 自动回滚；用户标签定向灰度 | 已实现 |
+| AR-26 | 共享中间件包提取 | 提取至 pkg/server 或 pkg/ginutil；main.go 代码减少 ≥50%；单元测试 ≥80% | 已实现 |
+| AR-27 | API 文档自动生成 | Swaggo 注解 + CI 自动生成 OpenAPI 3.0；100% 接口覆盖；文档落后代码 CI 警告 | 已实现 |
 
 ### 7.4 Phase 9 — P3（8 项）
 
 | 需求 ID | 名称 | 验收标准摘要 | 状态 |
 |---------|------|-------------|------|
-| UX-07 | 搜索/快捷操作 | 全局搜索（关键词/拼音/模糊匹配）；快捷操作面板动态排序；响应 ≤300ms | 待实现 |
-| UX-14 | 排行榜/社交证明 | Top 20 推荐达人榜；"好友已加入"社交证明；周/月切换；隐私开关 | 待实现 |
-| UX-17 | 多语言 i18n 架构 | vue-i18n + String Catalog + 资源限定符；文本提取至语言资源文件；日期/数字 locale 适配 | 待实现 |
-| FN-14 | A/B 测试框架 | 分组引擎 + 前端 SDK API；统计显著性判断 + 自动报告；管理后台创建/启停 | 待实现 |
-| FN-16 | 企业微信/钉钉集成 | 企微/钉钉扫码登录；通讯录同步；审批流集成回调；企业级权限管理 | 待实现 |
-| MB-04 | 无障碍 Accessibility | VoiceOver/TalkBack/ARIA 标注完整；WCAG 2.1 AA 级验证；动态字体 + 对比度 ≥4.5:1 | 待实现 |
-| AR-04 | API v2 版本管理 | /api/v1 + /api/v2 路由并存；版本生命周期管理（Active→Deprecated→Retired） | 待实现 |
-| AR-12 | 读写分离 | data-product-service 双数据源；只读副本同步延迟 ≤1s；降级自动切主库；性能提升 ≥50% | 待实现 |
+| UX-07 | 搜索/快捷操作 | 全局搜索（关键词/拼音/模糊匹配）；快捷操作面板动态排序；响应 ≤300ms | 已实现 |
+| UX-14 | 排行榜/社交证明 | Top 20 推荐达人榜；"好友已加入"社交证明；周/月切换；隐私开关 | 已实现 |
+| UX-17 | 多语言 i18n 架构 | vue-i18n + String Catalog + 资源限定符；文本提取至语言资源文件；日期/数字 locale 适配 | 已实现 |
+| FN-14 | A/B 测试框架 | 分组引擎 + 前端 SDK API；统计显著性判断 + 自动报告；管理后台创建/启停 | 已实现 |
+| FN-16 | 企业微信/钉钉集成 | 企微/钉钉扫码登录；通讯录同步；审批流集成回调；企业级权限管理 | 已实现 |
+| MB-04 | 无障碍 Accessibility | VoiceOver/TalkBack/ARIA 标注完整；WCAG 2.1 AA 级验证；动态字体 + 对比度 ≥4.5:1 | 已实现 |
+| AR-04 | API v2 版本管理 | /api/v1 + /api/v2 路由并存；版本生命周期管理（Active→Deprecated→Retired） | 已实现 |
+| AR-12 | 读写分离 | data-product-service 双数据源；只读副本同步延迟 ≤1s；降级自动切主库；性能提升 ≥50% | 已实现 |
 
 ## 8. 附录
 

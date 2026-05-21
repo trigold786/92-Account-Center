@@ -10,7 +10,7 @@ import (
 
 	"github.com/trigold786/92-Account-Center/notification-service/internal/provider"
 	"github.com/trigold786/92-Account-Center/notification-service/internal/svcconfig"
-	"github.com/trigold786/92-Account-Center/notification-service/pkg/circuitbreaker"
+	circuitbreaker "github.com/trigold786/92-Account-Center/pkg/circuitbreaker"
 )
 
 var (

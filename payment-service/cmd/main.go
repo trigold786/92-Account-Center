@@ -23,12 +23,13 @@ import (
 	"github.com/trigold786/92-Account-Center/payment-service/internal/service"
 	"github.com/trigold786/92-Account-Center/payment-service/internal/svcconfig"
 	"github.com/trigold786/92-Account-Center/pkg/config"
+	healthpkg "github.com/trigold786/92-Account-Center/pkg/health"
 	"github.com/trigold786/92-Account-Center/pkg/logging"
 )
 
 var logger *slog.Logger
 
-func init() { slog.SetDefault(logger) }
+func init() {}
 
 var (
 	requestCount    uint64
@@ -58,6 +59,17 @@ func main() {
 	}
 	logger.Info("connected to database")
 
+	var healthCheckers []healthpkg.Checker
+	if db != nil {
+		healthCheckers = append(healthCheckers, &healthpkg.PostgresChecker{
+			Ping: func(ctx context.Context) error {
+				_, err := db.ExecContext(ctx, "SELECT 1")
+				return err
+			},
+		})
+	}
+	compositeHealth := healthpkg.CompositeChecker{Checkers: healthCheckers}
+
 	configURL := getEnv("CONFIG_SERVICE_URL", "http://localhost:30315")
 	configClient := config.NewClient(configURL)
 	svcCfg, err := svcconfig.Load(configClient)
@@ -69,6 +81,16 @@ func main() {
 	orderRepo := repository.NewOrderRepository(db)
 	orderSvc := service.NewOrderService(orderRepo, svcCfg)
 	orderHandler := handler.NewOrderHandler(orderSvc)
+
+	invoiceRepo := repository.NewInvoiceRepository(db)
+	invoiceHandler := handler.NewInvoiceHandler(invoiceRepo)
+	invoiceSvc := service.NewInvoiceService(nil)
+	invoiceSvcHandler := handler.NewInvoiceServiceHandler(invoiceSvc)
+	paymentFlowHandler := handler.NewPaymentFlowHandler()
+
+	refundRepo := repository.NewRefundRepository(db)
+	refundSvc := service.NewRefundService(refundRepo, nil, nil)
+	refundHandler := handler.NewRefundHandler(refundSvc)
 
 	providerRegistry := provider.NewProviderRegistry()
 	wechatProvider := service.NewWeChatPayProvider(service.WeChatPayConfig{
@@ -111,6 +133,27 @@ func main() {
 		ordersGroup.GET("", orderHandler.ListOrders)
 		ordersGroup.PUT("/:id/status", orderHandler.UpdateStatus)
 		ordersGroup.GET("/export/csv", orderHandler.ExportCSV)
+	}
+
+	invoiceGroup := r.Group("/api/v1/invoices")
+	{
+		invoiceGroup.POST("", invoiceHandler.CreateInvoice)
+		invoiceGroup.GET("", invoiceHandler.ListInvoices)
+		invoiceGroup.GET("/:id", invoiceSvcHandler.GetInvoiceSvc)
+		invoiceGroup.POST("/svc", invoiceSvcHandler.CreateInvoiceSvc)
+	}
+
+	paymentFlowGroup := r.Group("/api/v1/payment-flow")
+	{
+		paymentFlowGroup.GET("/result/:order_no", paymentFlowHandler.GetPaymentResult)
+		paymentFlowGroup.POST("/retry/:order_no", paymentFlowHandler.RetryPayment)
+	}
+
+	refundGroup := r.Group("/api/v1/refunds")
+	{
+		refundGroup.POST("", refundHandler.RequestRefund)
+		refundGroup.PUT("/:id/approve", refundHandler.ApproveRefund)
+		refundGroup.PUT("/:id/reject", refundHandler.RejectRefund)
 	}
 
 	paymentGroup := r.Group("/api/v1/payment")
@@ -162,7 +205,13 @@ func main() {
 	})
 
 	r.Any("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok"})
+		result := compositeHealth.Check(c.Request.Context())
+		resp := healthpkg.BuildResponse(result.Checks)
+		statusCode := 200
+		if result.Status == healthpkg.StatusDown {
+			statusCode = 503
+		}
+		c.JSON(statusCode, resp)
 	})
 
 	port := getEnv("PORT", "30316")

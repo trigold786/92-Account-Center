@@ -1,0 +1,9 @@
+{
+  "title": "系统健康总览",
+  "uid": "system-health",
+  "panels": [
+    {"title": "服务状态", "type": "stat", "targets": [{"expr": "up{job=~\"account|auth|payment|notification|credit|compliance|config|data-product|gateway\"}"}]},
+    {"title": "PG 连接数", "type": "graph", "targets": [{"expr": "pg_connections"}]},
+    {"title": "Redis 内存", "type": "graph", "targets": [{"expr": "redis_memory_bytes"}]}
+  ]
+}

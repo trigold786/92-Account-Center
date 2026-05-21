@@ -28,6 +28,7 @@ import (
 	"github.com/trigold786/92-Account-Center/account-service/internal/worker"
 	"github.com/trigold786/92-Account-Center/account-service/pkg/sms"
 	"github.com/trigold786/92-Account-Center/pkg/config"
+	healthpkg "github.com/trigold786/92-Account-Center/pkg/health"
 	"github.com/trigold786/92-Account-Center/pkg/logging"
 )
 
@@ -73,6 +74,24 @@ func main() {
 
 	logger.Info("connected to redis")
 
+	var healthCheckers []healthpkg.Checker
+	if db != nil {
+		healthCheckers = append(healthCheckers, &healthpkg.PostgresChecker{
+			Ping: func(ctx context.Context) error {
+				_, err := db.ExecContext(ctx, "SELECT 1")
+				return err
+			},
+		})
+	}
+	if rdb != nil {
+		healthCheckers = append(healthCheckers, &healthpkg.RedisChecker{
+			Ping: func(ctx context.Context) error {
+				return rdb.Ping(ctx).Err()
+			},
+		})
+	}
+	compositeHealth := healthpkg.CompositeChecker{Checkers: healthCheckers}
+
 	configURL := getEnv("CONFIG_SERVICE_URL", "http://localhost:30315")
 	configClient := config.NewClient(configURL)
 	svcCfg, err := svcconfig.Load(configClient)
@@ -95,12 +114,15 @@ func main() {
 	deletionService := service.NewDeletionService(userRepo, entitlementRepo, rdb, logger)
 	deletionWorker := worker.NewDeletionWorker(deletionService, logger)
 
+	renewalSvc := service.NewRenewalService(nil, nil)
+	renewalWorker := worker.NewRenewalWorker(renewalSvc)
+
 	redisAddr := getEnv("REDIS_ADDR", "localhost:6379")
 	asynqServer := asynq.NewServer(
 		asynq.RedisClientOpt{Addr: redisAddr},
 		asynq.Config{Concurrency: 5},
 	)
-	asynqMux := worker.NewServeMux(deletionWorker)
+	asynqMux := worker.NewServeMux(deletionWorker, renewalWorker)
 
 	scheduler, err := worker.NewScheduler(redisAddr)
 	if err != nil {
@@ -137,6 +159,28 @@ func main() {
 	entitlementHandler := handler.NewEntitlementHandler(entitlementService)
 	subscriptionHandler := handler.NewSubscriptionHandler(subscriptionService)
 	pricingHandler := handler.NewPricingHandler()
+
+	dashboardSvc := service.NewDashboardService(nil)
+	dashboardHandler := handler.NewDashboardHandler(dashboardSvc)
+
+	upgradeSvc := service.NewUpgradeService(nil, nil)
+	upgradeHandler := handler.NewUpgradeHandler(upgradeSvc)
+
+	subAdminRepo := repository.NewSubscriptionAdminRepository(db)
+	subAdminSvc := service.NewSubscriptionAdminService(subAdminRepo)
+	subAdminHandler := handler.NewSubscriptionAdminHandler(subAdminSvc)
+
+	exportSvc := service.NewExportService(nil, "")
+	exportHandler := handler.NewExportHandler(exportSvc)
+
+	openAPISvc := service.NewOpenAPIService()
+	openAPIHandler := handler.NewOpenAPIHandler(openAPISvc)
+
+	searchSvc := service.NewSearchService(nil)
+	searchHandler := handler.NewSearchHandler(searchSvc)
+
+	leaderboardSvc := service.NewLeaderboardService(nil)
+	leaderboardHandler := handler.NewLeaderboardHandler(leaderboardSvc)
 
 	adminRepo := repository.NewAdminRepository(db)
 	var creditClient service.CreditClient
@@ -208,6 +252,15 @@ func main() {
 		pricingGroup.POST("/calculate-discount", pricingHandler.CalculateDiscount)
 	}
 
+	r.GET("/api/v1/dashboard", dashboardHandler.GetDashboard)
+
+	upgradeGroup := r.Group("/api/v1/upgrade")
+	{
+		upgradeGroup.POST("/preview", upgradeHandler.PreviewUpgrade)
+		upgradeGroup.POST("/downgrade/preview", upgradeHandler.PreviewDowngrade)
+		upgradeGroup.POST("/execute", upgradeHandler.ExecuteUpgrade)
+	}
+
 	jwtSecret := getEnv("JWT_SECRET", "default-secret")
 
 	adminGroup := r.Group("/api/v1/admin")
@@ -219,7 +272,31 @@ func main() {
 		adminGroup.PUT("/users/:user_id/tier", adminHandler.AdjustIdentityTier)
 		adminGroup.POST("/users/:user_id/credits", adminHandler.AdjustCredits)
 		adminGroup.GET("/users/:user_id/audit-log", adminHandler.GetAuditLog)
+
+		adminGroup.POST("/plans", subAdminHandler.CreatePlan)
+		adminGroup.GET("/plans", subAdminHandler.ListPlans)
+		adminGroup.DELETE("/plans/:id", subAdminHandler.DeletePlan)
+
+		adminGroup.POST("/coupons", subAdminHandler.CreateCoupon)
+		adminGroup.GET("/coupons", subAdminHandler.ListCoupons)
 	}
+
+	exportGroup := r.Group("/api/v1/export")
+	{
+		exportGroup.GET("/personal", exportHandler.ExportPersonalData)
+		exportGroup.POST("/request", exportHandler.RequestExport)
+	}
+
+	openAPIGroup := r.Group("/api/v1/openapi")
+	{
+		openAPIGroup.POST("/token", openAPIHandler.IssueToken)
+	}
+
+	r.GET("/api/v1/search", searchHandler.Search)
+	r.GET("/api/v1/quick-actions", searchHandler.QuickActions)
+
+	r.GET("/api/v1/leaderboard", leaderboardHandler.GetLeaderboard)
+	r.GET("/api/v1/leaderboard/me", leaderboardHandler.GetMyRank)
 
 	r.Any("/metrics", func(c *gin.Context) {
 		var buf bytes.Buffer
@@ -239,7 +316,13 @@ func main() {
 	})
 
 	r.Any("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok"})
+		result := compositeHealth.Check(c.Request.Context())
+		resp := healthpkg.BuildResponse(result.Checks)
+		statusCode := 200
+		if result.Status == healthpkg.StatusDown {
+			statusCode = 503
+		}
+		c.JSON(statusCode, resp)
 	})
 
 	port := getEnv("PORT", "30301")

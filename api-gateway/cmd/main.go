@@ -3,11 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/hmac"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -15,10 +10,8 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
-	"regexp"
 	"runtime"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -29,155 +22,19 @@ import (
 	proxyutil "github.com/trigold786/92-Account-Center/api-gateway/internal/proxy"
 	"github.com/trigold786/92-Account-Center/api-gateway/internal/svcconfig"
 	"github.com/trigold786/92-Account-Center/pkg/config"
+	healthpkg "github.com/trigold786/92-Account-Center/pkg/health"
 	"github.com/trigold786/92-Account-Center/pkg/logging"
 )
 
-type tokenBucket struct {
-	tokens  float64
-	lastRef time.Time
-	mu      sync.Mutex
-}
-
-type ipRateLimiter struct {
-	buckets sync.Map
-	rps     float64
-}
-
-func newIPRateLimiter(rps int) *ipRateLimiter {
-	return &ipRateLimiter{rps: float64(rps)}
-}
-
-func (l *ipRateLimiter) getBucket(ip string) *tokenBucket {
-	val, _ := l.buckets.LoadOrStore(ip, &tokenBucket{
-		tokens:  l.rps,
-		lastRef: time.Now(),
-	})
-	return val.(*tokenBucket)
-}
-
-func (l *ipRateLimiter) allow(ip string) bool {
-	b := l.getBucket(ip)
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	now := time.Now()
-	elapsed := now.Sub(b.lastRef).Seconds()
-	b.lastRef = now
-	b.tokens += elapsed * l.rps
-	if b.tokens > l.rps {
-		b.tokens = l.rps
-	}
-	if b.tokens < 1 {
-		return false
-	}
-	b.tokens--
-	return true
-}
-
-func cacheControlMiddleware(maxAge int) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		if c.Request.Method == http.MethodGet {
-			c.Header("Cache-Control", fmt.Sprintf("public, max-age=%d", maxAge))
-		}
-		c.Next()
-	}
-}
-
-func jwtAuthMiddleware(secret string) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		if c.Request.URL.Path == "/health" {
-			c.Next()
-			return
-		}
-
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing authorization header"})
-			return
-		}
-
-		parts := strings.SplitN(authHeader, " ", 2)
-		if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid authorization header format"})
-			return
-		}
-
-		tokenStr := parts[1]
-		segments := strings.Split(tokenStr, ".")
-		if len(segments) != 3 {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token format"})
-			return
-		}
-
-		signingInput := segments[0] + "." + segments[1]
-		mac := hmac.New(sha256.New, []byte(secret))
-		mac.Write([]byte(signingInput))
-		expectedSig := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
-
-		if !hmac.Equal([]byte(segments[2]), []byte(expectedSig)) {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token signature"})
-			return
-		}
-
-		payloadBytes, err := base64.RawURLEncoding.DecodeString(segments[1])
-		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token payload"})
-			return
-		}
-
-		var claims map[string]interface{}
-		if err := json.Unmarshal(payloadBytes, &claims); err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token claims"})
-			return
-		}
-
-		if exp, ok := claims["exp"].(float64); ok {
-			if time.Now().Unix() > int64(exp) {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "token expired"})
-				return
-			}
-		}
-
-		userID, _ := claims["sub"].(string)
-		if userID == "" {
-			userID, _ = claims["user_id"].(string)
-		}
-		c.Set("user_id", userID)
-		c.Next()
-	}
-}
-
-func rateLimitMiddleware(rps int) gin.HandlerFunc {
-	limiter := newIPRateLimiter(rps)
-	return func(c *gin.Context) {
-		ip := c.ClientIP()
-		if !limiter.allow(ip) {
-			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"error": "rate limit exceeded"})
-			return
-		}
-		c.Next()
-	}
-}
-
-func generateRequestID() string {
-	b := make([]byte, 16)
-	rand.Read(b)
-	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
-}
-
-func requestIDMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		requestID := c.GetHeader("X-Request-ID")
-		if requestID == "" {
-			requestID = generateRequestID()
-		}
-		c.Header("X-Request-ID", requestID)
-		c.Next()
-	}
-}
-
 var logger *slog.Logger
 
-func init() { slog.SetDefault(logger) }
+func init() {}
+
+var (
+	gatewayRequestCount uint64
+	durationSumNano     uint64
+	durationCount       uint64
+)
 
 func main() {
 	logger = logging.NewLogger("api-gateway")
@@ -185,9 +42,11 @@ func main() {
 	configClient := config.NewClient(configURL)
 	svcCfg, err := svcconfig.Load(configClient)
 	if err != nil {
-	logger.Warn("config-service unavailable, continuing with env/defaults", "error", err)
-}
+		logger.Warn("config-service unavailable, continuing with env/defaults", "error", err)
+	}
 	logger.Info("gateway config loaded successfully")
+
+	compositeHealth := healthpkg.CompositeChecker{}
 
 	r := gin.New()
 	r.Use(gin.RecoveryWithWriter(os.Stderr, func(c *gin.Context, err any) {
@@ -203,9 +62,10 @@ func main() {
 		atomic.AddUint64(&durationCount, 1)
 	})
 
-	r.Use(requestIDMiddleware())
-	r.Use(corsMiddleware())
-	r.Use(rateLimitMiddleware(svcCfg.RateLimitRPS))
+	r.Use(middleware.RequestIDMiddleware())
+	r.Use(middleware.CORSMiddleware())
+	r.Use(middleware.VersionMiddleware())
+	r.Use(middleware.RateLimitMiddleware(svcCfg.RateLimitRPS))
 	r.Use(cacheControlMiddleware(svcCfg.CacheMaxAge))
 	r.Use(middleware.TimeoutMiddleware(svcCfg.GlobalRequestTimeoutSec))
 
@@ -233,10 +93,12 @@ func main() {
 			c.Next()
 			return
 		}
-		jwtAuthMiddleware(svcCfg.JWTSecret)(c)
+		middleware.JWTAuthMiddleware(svcCfg.JWTSecret)(c)
 	})
 
-	r.Use(desensitizeMiddleware(svcCfg.MaxDesensitizeBodySize))
+	r.Use(middleware.DesensitizeMiddleware(svcCfg.MaxDesensitizeBodySize))
+	r.Use(middleware.HMACVerifyMiddleware(svcCfg.JWTSecret))
+	r.Use(middleware.SanitizeInputMiddleware())
 
 	r.Any("/api/v1/account/*path", proxyHandler(svcCfg.AccountServiceURL, svcCfg))
 	r.Any("/api/v1/entitlements/*path", proxyHandler(svcCfg.AccountServiceURL, svcCfg))
@@ -254,6 +116,27 @@ func main() {
 	r.Any("/api/v1/audit/*path", proxyHandler(svcCfg.ComplianceServiceURL, svcCfg))
 	r.Any("/api/v1/kyb/*path", proxyHandler(svcCfg.ComplianceServiceURL, svcCfg))
 	r.Any("/api/v1/data/*path", proxyHandler(svcCfg.DataProductServiceURL, svcCfg))
+
+	v2Routes := []struct {
+		prefix  string
+		target  string
+	}{
+		{"/api/v2/account", svcCfg.AccountServiceURL},
+		{"/api/v2/entitlements", svcCfg.AccountServiceURL},
+		{"/api/v2/subscriptions", svcCfg.AccountServiceURL},
+		{"/api/v2/auth", svcCfg.AuthServiceURL},
+		{"/api/v2/session", svcCfg.AuthServiceURL},
+		{"/api/v2/device", svcCfg.AuthServiceURL},
+		{"/api/v2/credits", svcCfg.CreditServiceURL},
+		{"/api/v2/data", svcCfg.DataProductServiceURL},
+	}
+	for _, route := range v2Routes {
+		r.Any(route.prefix+"/*path", v2ProxyHandler(route.target, svcCfg))
+	}
+
+	r.GET("/api/v1/security/pins", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"pins": []string{"sha256/AAAA...", "sha256/BBBB..."}})
+	})
 
 	r.Any("/metrics", func(c *gin.Context) {
 		var buf bytes.Buffer
@@ -273,7 +156,13 @@ func main() {
 	})
 
 	r.Any("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+		result := compositeHealth.Check(c.Request.Context())
+		resp := healthpkg.BuildResponse(result.Checks)
+		statusCode := 200
+		if result.Status == healthpkg.StatusDown {
+			statusCode = 503
+		}
+		c.JSON(statusCode, resp)
 	})
 
 	srv := &http.Server{
@@ -296,6 +185,15 @@ func main() {
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		logger.Error("failed to start server", "error", err.Error())
 		os.Exit(1)
+	}
+}
+
+func cacheControlMiddleware(maxAge int) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.Request.Method == http.MethodGet {
+			c.Header("Cache-Control", fmt.Sprintf("public, max-age=%d", maxAge))
+		}
+		c.Next()
 	}
 }
 
@@ -325,28 +223,34 @@ func proxyHandler(target string, cfg *svcconfig.GatewayConfig) gin.HandlerFunc {
 	}
 }
 
-func corsMiddleware() gin.HandlerFunc {
+func v2ProxyHandler(target string, cfg *svcconfig.GatewayConfig) gin.HandlerFunc {
+	targetURL, err := url.Parse(target)
+	if err != nil {
+		logger.Error("invalid target URL", "error", err.Error())
+		os.Exit(1)
+	}
+
+	proxy := httputil.NewSingleHostReverseProxy(targetURL)
+	proxy.Transport = proxyutil.NewTransport(cfg.ResponseHeaderTimeoutSec, cfg.IdleConnTimeoutSec)
+	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+		logger.Error("proxy error", "target", target, "error", err.Error())
+		http.Error(w, "Service unavailable", http.StatusServiceUnavailable)
+	}
+
 	return func(c *gin.Context) {
-		origin := c.GetHeader("Origin")
-		allowedOrigins := map[string]bool{
-			"http://localhost:30317": true,
-			"http://localhost:30316": true,
-			getEnv("WEB_UI_ORIGIN", ""): true,
-		}
-		if allowedOrigins[origin] {
-			c.Header("Access-Control-Allow-Origin", origin)
-		} else {
-			c.Header("Access-Control-Allow-Origin", "http://localhost:30317")
-		}
-		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID")
+		c.Request.URL.Host = targetURL.Host
+		c.Request.URL.Scheme = targetURL.Scheme
+		c.Request.Host = targetURL.Host
+		c.Request.Header.Set("X-API-Version", "2")
 
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(http.StatusNoContent)
-			return
-		}
+		rewrittenPath := strings.Replace(c.Request.URL.Path, "/api/v2/", "/api/v1/", 1)
+		c.Request.URL.Path = rewrittenPath
 
-		c.Next()
+		c.Header("X-Request-ID", c.GetHeader("X-Request-ID"))
+		c.Header("X-Forwarded-For", c.ClientIP())
+		c.Header("X-API-Version", "2")
+
+		proxy.ServeHTTP(wrapWriter(c), c.Request)
 	}
 }
 
@@ -362,93 +266,6 @@ func wrapWriter(c *gin.Context) http.ResponseWriter {
 	return &responseWriter{ResponseWriter: c.Writer}
 }
 
-type responseCaptureWriter struct {
-	gin.ResponseWriter
-	body []byte
-	code int
-}
-
-func (w *responseCaptureWriter) Status() int {
-	return w.code
-}
-
-func (w *responseCaptureWriter) Write(b []byte) (int, error) {
-	w.body = append(w.body, b...)
-	return len(b), nil
-}
-
-func (w *responseCaptureWriter) WriteHeader(code int) {
-	w.code = code
-}
-
-var (
-	gatewayRequestCount uint64
-	durationSumNano     uint64
-	durationCount       uint64
-)
-
-var phoneRegex = regexp.MustCompile(`"phone_number"\s*:\s*"(\d{3})\d{4}(\d{4})"`)
-var emailRegex = regexp.MustCompile(`"email"\s*:\s*"([a-zA-Z0-9])[a-zA-Z0-9._%+\-]*@([^"]+)"`)
-var ipAddrRegex = regexp.MustCompile(`"ip_address"\s*:\s*"(\d{1,3}\.)\d{1,3}\.\d{1,3}(\.\d{1,3})"`)
-
-func desensitizeMiddleware(maxBodySize int64) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		path := c.Request.URL.Path
-		if path == "/health" || path == "/metrics" || strings.HasPrefix(path, "/internal/") {
-			c.Next()
-			return
-		}
-
-		captureWriter := &responseCaptureWriter{ResponseWriter: c.Writer}
-		c.Writer = captureWriter
-
-		c.Next()
-
-		status := captureWriter.code
-
-		flush := func(data []byte) {
-			captureWriter.ResponseWriter.WriteHeader(status)
-			captureWriter.ResponseWriter.Write(data)
-		}
-
-		if status < 200 || status >= 300 {
-			flush(captureWriter.body)
-			return
-		}
-
-		contentType := c.Writer.Header().Get("Content-Type")
-		if !strings.Contains(contentType, "application/json") {
-			flush(captureWriter.body)
-			return
-		}
-
-		if int64(len(captureWriter.body)) > maxBodySize {
-			flush(captureWriter.body)
-			return
-		}
-
-		accountID, _ := c.Get("user_id")
-		if accountIDStr, ok := accountID.(string); ok && strings.HasPrefix(accountIDStr, "admin_") {
-			flush(captureWriter.body)
-			return
-		}
-
-		body := string(captureWriter.body)
-		masked := phoneRegex.ReplaceAllString(body, `"phone_number":"$1****$2"`)
-		masked = emailRegex.ReplaceAllString(masked, `"email":"$1***@$2"`)
-		masked = ipAddrRegex.ReplaceAllString(masked, `"ip_address":"$1*.*$2"`)
-
-		if masked != body {
-			c.Header("X-Desensitized", "true")
-			captureWriter.ResponseWriter.Header().Del("Content-Length")
-			captureWriter.ResponseWriter.WriteHeader(status)
-			captureWriter.ResponseWriter.Write([]byte(masked))
-		} else {
-			flush(captureWriter.body)
-		}
-	}
-}
-
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
@@ -462,4 +279,40 @@ func getEnvSecret(key, defaultValue string) string {
 	}
 	logger.Warn("environment variable not set, using insecure default", "key", key)
 	return defaultValue
+}
+
+func sanitizeInputMiddleware() gin.HandlerFunc {
+	return middleware.SanitizeInputMiddleware()
+}
+
+func hmacVerifyMiddleware(secret string) gin.HandlerFunc {
+	return middleware.HMACVerifyMiddleware(secret)
+}
+
+func desensitizeMiddleware(maxBodySize int64) gin.HandlerFunc {
+	return middleware.DesensitizeMiddleware(maxBodySize)
+}
+
+func jwtAuthMiddleware(secret string) gin.HandlerFunc {
+	return middleware.JWTAuthMiddleware(secret)
+}
+
+func rateLimitMiddleware(rps int) gin.HandlerFunc {
+	return middleware.RateLimitMiddleware(rps)
+}
+
+func corsMiddleware() gin.HandlerFunc {
+	return middleware.CORSMiddleware()
+}
+
+func requestIDMiddleware() gin.HandlerFunc {
+	return middleware.RequestIDMiddleware()
+}
+
+func generateRequestID() string {
+	return middleware.GenerateRequestID()
+}
+
+func sanitizeString(s string) string {
+	return middleware.SanitizeString(s)
 }

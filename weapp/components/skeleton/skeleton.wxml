@@ -1,0 +1,33 @@
+<view class="skeleton" wx:if="{{loading}}">
+  <view class="skeleton-layout">
+    <block wx:if="{{layout === 'dashboard'}}">
+      <view class="skeleton-line skeleton-pulse" style="width: 40%; height: 48rpx; margin-bottom: 48rpx;"></view>
+      <view class="skeleton-grid">
+        <view class="skeleton-card skeleton-pulse" wx:for="{{4}}" wx:key="*this">
+          <view class="skeleton-circle skeleton-pulse" style="width: 80rpx; height: 80rpx;"></view>
+          <view class="skeleton-line skeleton-pulse" style="width: 60%; height: 32rpx; margin-top: 24rpx;"></view>
+          <view class="skeleton-line skeleton-pulse" style="width: 40%; height: 48rpx; margin-top: 16rpx;"></view>
+        </view>
+      </view>
+      <view class="skeleton-card skeleton-pulse" style="margin-top: 32rpx; height: 400rpx;"></view>
+    </block>
+
+    <block wx:elif="{{layout === 'credits'}}">
+      <view class="skeleton-line skeleton-pulse" style="width: 30%; height: 48rpx; margin-bottom: 48rpx;"></view>
+      <view class="skeleton-card skeleton-pulse" style="height: 240rpx; margin-bottom: 32rpx;">
+        <view class="skeleton-line skeleton-pulse" style="width: 50%; height: 64rpx;"></view>
+        <view class="skeleton-line skeleton-pulse" style="width: 30%; height: 32rpx; margin-top: 16rpx;"></view>
+      </view>
+      <view class="skeleton-card skeleton-pulse" wx:for="{{5}}" wx:key="*this" style="height: 128rpx; margin-bottom: 16rpx;"></view>
+    </block>
+
+    <block wx:else>
+      <view class="skeleton-line skeleton-pulse" style="width: 40%; height: 48rpx; margin-bottom: 48rpx;"></view>
+      <view class="skeleton-card skeleton-pulse" wx:for="{{3}}" wx:key="*this" style="height: 200rpx; margin-bottom: 24rpx;"></view>
+    </block>
+  </view>
+</view>
+
+<view class="skeleton-content" wx:else>
+  <slot></slot>
+</view>

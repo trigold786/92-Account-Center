@@ -1,0 +1,4 @@
+{
+  "title": "MRR 分析",
+  "panels": [{"title": "月度经常性收入", "type": "graph", "targets": [{"expr": "mrr_total"}]}]
+}

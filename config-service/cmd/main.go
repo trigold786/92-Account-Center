@@ -19,6 +19,7 @@ import (
 
 	"github.com/trigold786/92-Account-Center/config-service/internal/handler"
 	"github.com/trigold786/92-Account-Center/config-service/internal/model"
+	healthpkg "github.com/trigold786/92-Account-Center/pkg/health"
 	"github.com/trigold786/92-Account-Center/config-service/internal/repository"
 	"github.com/trigold786/92-Account-Center/config-service/internal/service"
 	"github.com/trigold786/92-Account-Center/pkg/logging"
@@ -26,7 +27,7 @@ import (
 
 var logger *slog.Logger
 
-func init() { slog.SetDefault(logger) }
+func init() {}
 
 var (
 	requestCount    uint64
@@ -57,6 +58,17 @@ func main() {
 	}
 	logger.Info("connected to database")
 
+	var healthCheckers []healthpkg.Checker
+	if db != nil {
+		healthCheckers = append(healthCheckers, &healthpkg.PostgresChecker{
+			Ping: func(ctx context.Context) error {
+				_, err := db.ExecContext(ctx, "SELECT 1")
+				return err
+			},
+		})
+	}
+	compositeHealth := healthpkg.CompositeChecker{Checkers: healthCheckers}
+
 	// Repositories
 	configRepo := repository.NewConfigRepository(db)
 	releaseRepo := repository.NewReleaseRepository(db)
@@ -74,6 +86,11 @@ func main() {
 	releaseH := handler.NewReleaseHandler(releaseSvc)
 	auditH := handler.NewAuditHandler(auditSvc)
 	permH := handler.NewPermissionHandler(permSvc)
+	adConfigSvc := service.NewAdConfigService(nil)
+	adConfigH := handler.NewAdConfigHandler(adConfigSvc)
+
+	faqSvc := service.NewFAQService(nil)
+	faqH := handler.NewFAQHandler(faqSvc)
 
 	r := gin.New()
 	r.Use(gin.RecoveryWithWriter(os.Stderr, func(c *gin.Context, err any) {
@@ -192,6 +209,19 @@ func main() {
 		internalGroup.GET("/items/:code", configH.GetItemByCode)
 	}
 
+	adGroup := r.Group("/api/v1/ad")
+	{
+		adGroup.GET("/config", adConfigH.GetAdConfig)
+		adGroup.GET("/frequency", adConfigH.CheckFrequency)
+	}
+
+	faqGroup := r.Group("/api/v1/faqs")
+	{
+		faqGroup.GET("", faqH.ListFAQs)
+		faqGroup.GET("/search", faqH.SearchFAQs)
+		faqGroup.POST("", faqH.CreateFAQ)
+	}
+
 	r.Any("/metrics", func(c *gin.Context) {
 		var buf bytes.Buffer
 		fmt.Fprintf(&buf, "# HELP http_requests_total Total HTTP requests\n")
@@ -210,7 +240,13 @@ func main() {
 	})
 
 	r.Any("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok"})
+		result := compositeHealth.Check(c.Request.Context())
+		resp := healthpkg.BuildResponse(result.Checks)
+		statusCode := 200
+		if result.Status == healthpkg.StatusDown {
+			statusCode = 503
+		}
+		c.JSON(statusCode, resp)
 	})
 
 	port := getEnv("PORT", "30315")

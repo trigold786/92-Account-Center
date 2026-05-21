@@ -19,11 +19,13 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/trigold786/92-Account-Center/auth-service/internal/handler"
+	"github.com/trigold786/92-Account-Center/auth-service/internal/provider"
 	"github.com/trigold786/92-Account-Center/auth-service/internal/repository"
 	"github.com/trigold786/92-Account-Center/auth-service/internal/service"
 	"github.com/trigold786/92-Account-Center/auth-service/internal/svcconfig"
 	"github.com/trigold786/92-Account-Center/auth-service/pkg/jwt"
 	"github.com/trigold786/92-Account-Center/pkg/config"
+	healthpkg "github.com/trigold786/92-Account-Center/pkg/health"
 	"github.com/trigold786/92-Account-Center/pkg/logging"
 )
 
@@ -89,6 +91,24 @@ func main() {
 	})
 	defer rdb.Close()
 
+	var healthCheckers []healthpkg.Checker
+	if db != nil {
+		healthCheckers = append(healthCheckers, &healthpkg.PostgresChecker{
+			Ping: func(ctx context.Context) error {
+				_, err := db.ExecContext(ctx, "SELECT 1")
+				return err
+			},
+		})
+	}
+	if rdb != nil {
+		healthCheckers = append(healthCheckers, &healthpkg.RedisChecker{
+			Ping: func(ctx context.Context) error {
+				return rdb.Ping(ctx).Err()
+			},
+		})
+	}
+	compositeHealth := healthpkg.CompositeChecker{Checkers: healthCheckers}
+
 	authService := service.NewAuthService(userRepo, jwtMgr, rdb, authCfg)
 	loginHandler := handler.NewLoginHandler(authService, authCfg.LoginRateLimitPerIP)
 
@@ -102,6 +122,48 @@ func main() {
 
 	qrcodeSvc := service.NewQRCodeService(rdb, jwtMgr, authCfg.QRCodeExpire)
 	qrcodeHandler := handler.NewQRCodeHandler(qrcodeSvc)
+
+	oauthRegistry := service.NewOAuthProviderRegistry()
+	oauthRegistry.Register(service.NewWeChatOAuthProvider(
+		getEnvSecret("WECHAT_APP_ID", authCfg.WeChatAppID),
+		getEnvSecret("WECHAT_SECRET", authCfg.WeChatSecret),
+		getEnv("OAUTH_REDIRECT_URI", authCfg.OAuthRedirectURI),
+	))
+	oauthRegistry.Register(service.NewAppleOAuthProvider(
+		getEnvSecret("APPLE_CLIENT_ID", authCfg.AppleClientID),
+		getEnvSecret("APPLE_TEAM_ID", authCfg.AppleTeamID),
+		getEnvSecret("APPLE_KEY_ID", authCfg.AppleKeyID),
+		getEnv("OAUTH_REDIRECT_URI", authCfg.OAuthRedirectURI),
+	))
+	oauthRegistry.Register(service.NewGoogleOAuthProvider(
+		getEnvSecret("GOOGLE_CLIENT_ID", authCfg.GoogleClientID),
+		getEnvSecret("GOOGLE_SECRET", authCfg.GoogleSecret),
+		getEnv("OAUTH_REDIRECT_URI", authCfg.OAuthRedirectURI),
+	))
+	oauthRegistry.Register(service.NewAlipayOAuthProvider(
+		getEnvSecret("ALIPAY_APP_ID", ""),
+		getEnvSecret("ALIPAY_PRIVATE_KEY", ""),
+		getEnv("OAUTH_REDIRECT_URI", ""),
+	))
+	oauthSvc := service.NewOAuthService(oauthRegistry, userRepo)
+	oauthH := handler.NewOAuthHandler(oauthSvc)
+
+	guestSvc := service.NewGuestService(nil)
+	guestHandler := handler.NewGuestHandler(guestSvc)
+
+	entOAuthSvc := service.NewEnterpriseOAuthService()
+	entOAuthSvc.Register(provider.NewWorkWeChatProvider(
+		getEnvSecret("WORK_WECHAT_CORP_ID", ""),
+		getEnv("WORK_WECHAT_AGENT_ID", ""),
+		getEnvSecret("WORK_WECHAT_CORP_SECRET", ""),
+		getEnv("ENTERPRISE_OAUTH_REDIRECT_URI", ""),
+	))
+	entOAuthSvc.Register(provider.NewDingTalkProvider(
+		getEnvSecret("DINGTALK_APP_KEY", ""),
+		getEnvSecret("DINGTALK_APP_SECRET", ""),
+		getEnv("ENTERPRISE_OAUTH_REDIRECT_URI", ""),
+	))
+	entOAuthHandler := handler.NewEnterpriseOAuthHandler(entOAuthSvc)
 
 	r := gin.New()
 	r.Use(gin.RecoveryWithWriter(os.Stderr, func(c *gin.Context, err any) {
@@ -124,6 +186,17 @@ func main() {
 		authGroup.POST("/logout", loginHandler.Logout)
 		authGroup.POST("/biometric/register", loginHandler.RegisterBiometric)
 		authGroup.POST("/biometric/login", loginHandler.LoginWithBiometric)
+		authGroup.GET("/oauth/authorize", oauthH.Authorize)
+		authGroup.POST("/oauth/callback", oauthH.Callback)
+		authGroup.POST("/guest", guestHandler.CreateGuest)
+		authGroup.POST("/guest/upgrade", guestHandler.UpgradeGuest)
+	}
+
+	enterpriseGroup := r.Group("/api/v1/auth/enterprise")
+	{
+		enterpriseGroup.GET("/work-wechat", entOAuthHandler.WorkWeChatAuth)
+		enterpriseGroup.GET("/dingtalk", entOAuthHandler.DingTalkAuth)
+		enterpriseGroup.GET("/callback", entOAuthHandler.Callback)
 	}
 
 	sessionGroup := r.Group("/api/v1/session")
@@ -171,7 +244,13 @@ func main() {
 	})
 
 	r.Any("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok"})
+		result := compositeHealth.Check(c.Request.Context())
+		resp := healthpkg.BuildResponse(result.Checks)
+		statusCode := 200
+		if result.Status == healthpkg.StatusDown {
+			statusCode = 503
+		}
+		c.JSON(statusCode, resp)
 	})
 
 	port := getEnv("PORT", "30302")

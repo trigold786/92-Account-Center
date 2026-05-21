@@ -26,6 +26,9 @@ type UserRepository interface {
 	GetByEmail(ctx context.Context, email string) (*model.User, error)
 	GetByAccountID(ctx context.Context, accountID string) (*model.User, error)
 	UpdatePasswordHash(ctx context.Context, userID int64, passwordHash string) error
+	FindBySocialAccount(ctx context.Context, provider, providerUID string) (*model.User, error)
+	CreateFromSocial(ctx context.Context, info *model.SocialUserInfo) (*model.User, error)
+	LinkSocialAccount(ctx context.Context, userID int64, provider, providerUID, email, avatar, accessToken, refreshToken string) error
 }
 
 type AuthService interface {
@@ -336,6 +339,13 @@ func (s *authService) LoginWithBiometric(ctx context.Context, req *model.Biometr
 		}
 	}
 	return nil, errors.New("生物识别验证失败")
+}
+
+func (s *authService) ValidateDeviceFingerprint(ctx context.Context, userID int64, fingerprint string) bool {
+	if fingerprint == "" {
+		return false
+	}
+	return len(fingerprint) == 64
 }
 
 func subtleCompare(a, b string) bool {

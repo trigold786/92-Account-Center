@@ -66,3 +66,16 @@ deploy: helm-lint
 
 clean:
 	rm -rf bin/
+
+.PHONY: perf-test perf-smoke perf-load perf-stress
+
+perf-test: perf-smoke perf-load perf-stress
+
+perf-smoke:
+	k6 run tests/perf/smoke.js
+
+perf-load:
+	k6 run tests/perf/load.js
+
+perf-stress:
+	k6 run tests/perf/stress.js

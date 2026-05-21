@@ -24,12 +24,13 @@ import (
 	"github.com/trigold786/92-Account-Center/credit-service/internal/svcconfig"
 	"github.com/trigold786/92-Account-Center/credit-service/internal/worker"
 	"github.com/trigold786/92-Account-Center/pkg/config"
+	healthpkg "github.com/trigold786/92-Account-Center/pkg/health"
 	"github.com/trigold786/92-Account-Center/pkg/logging"
 )
 
 var logger *slog.Logger
 
-func init() { slog.SetDefault(logger) }
+func init() {}
 
 var (
 	requestCount    uint64
@@ -66,6 +67,24 @@ func main() {
 		logger.Warn("redis not available", "error", err.Error())
 	}
 
+	var healthCheckers []healthpkg.Checker
+	if db != nil {
+		healthCheckers = append(healthCheckers, &healthpkg.PostgresChecker{
+			Ping: func(ctx context.Context) error {
+				_, err := db.ExecContext(ctx, "SELECT 1")
+				return err
+			},
+		})
+	}
+	if rdb != nil {
+		healthCheckers = append(healthCheckers, &healthpkg.RedisChecker{
+			Ping: func(ctx context.Context) error {
+				return rdb.Ping(ctx).Err()
+			},
+		})
+	}
+	compositeHealth := healthpkg.CompositeChecker{Checkers: healthCheckers}
+
 	configURL := getEnv("CONFIG_SERVICE_URL", "http://localhost:30315")
 	configClient := config.NewClient(configURL)
 	svcCfg, err := svcconfig.Load(configClient)
@@ -88,6 +107,9 @@ func main() {
 
 	creditHandler := handler.NewCreditHandler(creditSvc)
 	referralHandler := handler.NewReferralHandler(referralSvc)
+
+	referralDashboardSvc := service.NewReferralDashboardService(nil)
+	referralDashboardHandler := handler.NewReferralDashboardHandler(referralDashboardSvc)
 
 	r := gin.New()
 	r.Use(gin.RecoveryWithWriter(os.Stderr, func(c *gin.Context, err any) {
@@ -124,6 +146,9 @@ func main() {
 		referralGroup.GET("/:user_id/summary", referralHandler.GetSummary)
 	}
 
+	r.GET("/api/v1/referral-dashboard/funnel", referralDashboardHandler.GetFunnel)
+	r.GET("/api/v1/referral-dashboard/earnings-trend", referralDashboardHandler.GetEarningsTrend)
+
 	r.Any("/metrics", func(c *gin.Context) {
 		var buf bytes.Buffer
 		fmt.Fprintf(&buf, "# HELP http_requests_total Total HTTP requests\n")
@@ -142,7 +167,13 @@ func main() {
 	})
 
 	r.Any("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok"})
+		result := compositeHealth.Check(c.Request.Context())
+		resp := healthpkg.BuildResponse(result.Checks)
+		statusCode := 200
+		if result.Status == healthpkg.StatusDown {
+			statusCode = 503
+		}
+		c.JSON(statusCode, resp)
 	})
 
 	port := getEnv("PORT", "30312")

@@ -1,0 +1,13 @@
+{
+  "baseUrl": "http://localhost:30300",
+  "thresholds": {
+    "p95": 500,
+    "p99": 1000,
+    "errorRate": 0.1
+  },
+  "scenarios": {
+    "smoke": { "vus": 10, "duration": "30s" },
+    "load": { "stages": [{ "target": 100, "duration": "1m" }, { "target": 500, "duration": "3m" }, { "target": 0, "duration": "1m" }] },
+    "stress": { "stages": [{ "target": 500, "duration": "3m" }, { "target": 1000, "duration": "5m" }, { "target": 0, "duration": "2m" }] }
+  }
+}

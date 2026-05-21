@@ -58,8 +58,9 @@ func NewScheduler(redisAddr string) (*asynq.Scheduler, error) {
 	return scheduler, nil
 }
 
-func NewServeMux(w *DeletionWorker) *asynq.ServeMux {
+func NewServeMux(w *DeletionWorker, rw *RenewalWorker) *asynq.ServeMux {
 	mux := asynq.NewServeMux()
 	mux.HandleFunc(TaskProcessDeletions, w.HandleTask)
+	mux.HandleFunc(TypeRenewalReminder, rw.HandleReminder)
 	return mux
 }

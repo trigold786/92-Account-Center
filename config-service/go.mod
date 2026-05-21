@@ -6,8 +6,11 @@ require (
 	github.com/gin-gonic/gin v1.9.1
 	github.com/lib/pq v1.10.9
 	github.com/trigold786/92-Account-Center/pkg/config v0.0.0-20260517004639-57863e1700cf // indirect
+	github.com/trigold786/92-Account-Center/pkg/health v0.0.0-00010101000000-000000000000
 	github.com/trigold786/92-Account-Center/pkg/logging v0.0.0-20260517004639-57863e1700cf // indirect
 )
+
+replace github.com/trigold786/92-Account-Center/pkg/health => ../pkg/health
 
 replace github.com/trigold786/92-Account-Center/pkg/config => ../pkg/config
 

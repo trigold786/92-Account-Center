@@ -1,0 +1,54 @@
+page {
+  --color-bg-primary: #0D1117;
+  --color-bg-secondary: #161B22;
+  --color-bg-card: #1C2333;
+  --color-bg-input: #161B22;
+
+  --color-brand-primary: #6C63FF;
+  --color-brand-secondary: #00D4FF;
+
+  --color-text-primary: #E6EDF3;
+  --color-text-secondary: #8B949E;
+  --color-text-disabled: #484F58;
+
+  --color-border-default: #30363D;
+  --color-border-muted: #21262D;
+
+  --color-success: #2ED573;
+  --color-warning: #FFA502;
+  --color-danger: #FF4757;
+  --color-info: #00D4FF;
+
+  --color-tier-free: #8B949E;
+  --color-tier-basic: #6C63FF;
+  --color-tier-premium: #FF9800;
+  --color-tier-enterprise: #7B1FA2;
+
+  --font-size-xs: 24rpx;
+  --font-size-sm: 28rpx;
+  --font-size-md: 32rpx;
+  --font-size-lg: 36rpx;
+  --font-size-xl: 40rpx;
+  --font-size-2xl: 48rpx;
+  --font-size-3xl: 64rpx;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --spacing-xs: 8rpx;
+  --spacing-sm: 16rpx;
+  --spacing-md: 32rpx;
+  --spacing-lg: 48rpx;
+  --spacing-xl: 64rpx;
+  --spacing-2xl: 96rpx;
+
+  --card-radius: 24rpx;
+  --radius-sm: 8rpx;
+  --radius-md: 16rpx;
+  --radius-lg: 24rpx;
+  --radius-xl: 32rpx;
+
+  --shadow-card: 0 4rpx 16rpx rgba(0, 0, 0, 0.3);
+}

@@ -1,0 +1,10 @@
+{
+  "title": "API 性能",
+  "uid": "api-performance",
+  "panels": [
+    {"title": "P95 延迟", "type": "graph", "targets": [{"expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, service))"}]},
+    {"title": "P99 延迟", "type": "graph", "targets": [{"expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, service))"}]},
+    {"title": "错误率", "type": "graph", "targets": [{"expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m])) * 100"}]},
+    {"title": "QPS", "type": "graph", "targets": [{"expr": "sum(rate(http_requests_total[5m])) by (service)"}]}
+  ]
+}

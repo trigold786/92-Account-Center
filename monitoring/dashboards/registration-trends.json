@@ -1,0 +1,15 @@
+{
+  "title": "注册趋势",
+  "panels": [
+    {
+      "title": "每日注册量",
+      "type": "graph",
+      "targets": [{"expr": "sum(rate(registrations_total[1d]))", "legendFormat": "注册"}]
+    },
+    {
+      "title": "累计注册",
+      "type": "stat",
+      "targets": [{"expr": "registrations_total"}]
+    }
+  ]
+}

@@ -22,6 +22,7 @@ import (
 	"github.com/trigold786/92-Account-Center/data-product-service/internal/service"
 	"github.com/trigold786/92-Account-Center/data-product-service/internal/svcconfig"
 	"github.com/trigold786/92-Account-Center/pkg/config"
+	healthpkg "github.com/trigold786/92-Account-Center/pkg/health"
 	"github.com/trigold786/92-Account-Center/pkg/logging"
 )
 
@@ -33,7 +34,7 @@ var (
 
 var logger *slog.Logger
 
-func init() { slog.SetDefault(logger) }
+func init() {}
 
 func main() {
 	logger = logging.NewLogger("data-product-service")
@@ -56,6 +57,35 @@ func main() {
 	}
 	logger.Info("connected to database")
 
+	var replicaDB *sql.DB
+	readReplicaURL := getEnv("READ_REPLICA_URL", "")
+	if readReplicaURL != "" {
+		replicaDB, err = sql.Open("postgres", readReplicaURL)
+		if err != nil {
+			logger.Warn("failed to connect to read replica, falling back to primary", "error", err.Error())
+			replicaDB = nil
+		} else if err := replicaDB.Ping(); err != nil {
+			logger.Warn("read replica ping failed, falling back to primary", "error", err.Error())
+			replicaDB = nil
+		} else {
+			logger.Info("connected to read replica")
+		}
+	}
+
+	readReplica := repository.NewReadReplicaRepo(db, replicaDB)
+	_ = readReplica
+
+	var healthCheckers []healthpkg.Checker
+	if db != nil {
+		healthCheckers = append(healthCheckers, &healthpkg.PostgresChecker{
+			Ping: func(ctx context.Context) error {
+				_, err := db.ExecContext(ctx, "SELECT 1")
+				return err
+			},
+		})
+	}
+	compositeHealth := healthpkg.CompositeChecker{Checkers: healthCheckers}
+
 	configURL := getEnv("CONFIG_SERVICE_URL", "http://localhost:30315")
 	configClient := config.NewClient(configURL)
 	svcCfg, err := svcconfig.Load(configClient)
@@ -71,6 +101,23 @@ func main() {
 	rfmHandler := handler.NewRFMHandler(rfmSvc)
 	dashHandler := handler.NewDashboardHandler(dashSvc)
 	funnelHandler := handler.NewFunnelHandler(dashSvc)
+
+	eventRepo := repository.NewEventRepository(db)
+	eventSvc := service.NewEventService(eventRepo)
+	eventHandler := handler.NewEventHandler(eventSvc)
+
+	metricsRepo := repository.NewMetricsRepository(db)
+	metricsSvc := service.NewMetricsService(metricsRepo)
+	opsDashHandler := handler.NewOpsDashboardHandler(metricsSvc)
+
+	streamSvc := service.NewStreamService(nil)
+	streamHandler := handler.NewStreamHandler(streamSvc)
+
+	adEventSvc := service.NewAdEventService(nil)
+	adEventHandler := handler.NewAdEventHandler(adEventSvc)
+
+	abTestSvc := service.NewABTestService()
+	abTestHandler := handler.NewABTestHandler(abTestSvc)
 
 	r := gin.New()
 	r.Use(gin.RecoveryWithWriter(os.Stderr, func(c *gin.Context, err any) {
@@ -94,6 +141,42 @@ func main() {
 		dataGroup.GET("/funnel/subscription", funnelHandler.GetSubscriptionFunnel)
 	}
 
+	eventsGroup := r.Group("/api/v1/events")
+	{
+		eventsGroup.POST("", eventHandler.TrackEvent)
+		eventsGroup.POST("/batch", eventHandler.BatchTrack)
+	}
+
+	opsGroup := r.Group("/api/v1/ops")
+	{
+		opsGroup.GET("/registration-trends", opsDashHandler.GetRegistrationTrends)
+		opsGroup.GET("/conversion-funnel", opsDashHandler.GetConversionFunnel)
+		opsGroup.GET("/mrr", opsDashHandler.GetMRR)
+		opsGroup.GET("/k-factor", opsDashHandler.GetKFactor)
+		opsGroup.GET("/rfm-distribution", opsDashHandler.GetRFM)
+	}
+
+	streamGroup := r.Group("/api/v1/stream")
+	{
+		streamGroup.POST("/events", streamHandler.ProcessEvent)
+		streamGroup.GET("/online", streamHandler.GetOnlineCount)
+		streamGroup.GET("/funnel", streamHandler.GetRealtimeFunnel)
+	}
+
+	adGroup := r.Group("/api/v1/ad")
+	{
+		adGroup.POST("/events", adEventHandler.TrackAdEvent)
+		adGroup.GET("/metrics", adEventHandler.GetAdMetrics)
+	}
+
+	experimentGroup := r.Group("/api/v1/experiments")
+	{
+		experimentGroup.POST("", abTestHandler.CreateExperiment)
+		experimentGroup.GET("/:id/assign", abTestHandler.AssignVariant)
+		experimentGroup.POST("/:id/events", abTestHandler.RecordEvent)
+		experimentGroup.GET("/:id/results", abTestHandler.GetResults)
+	}
+
 	r.Any("/metrics", func(c *gin.Context) {
 		var buf bytes.Buffer
 		fmt.Fprintf(&buf, "# HELP http_requests_total Total HTTP requests\n")
@@ -112,7 +195,13 @@ func main() {
 	})
 
 	r.Any("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+		result := compositeHealth.Check(c.Request.Context())
+		resp := healthpkg.BuildResponse(result.Checks)
+		statusCode := 200
+		if result.Status == healthpkg.StatusDown {
+			statusCode = 503
+		}
+		c.JSON(statusCode, resp)
 	})
 
 	port := getEnv("PORT", "30314")

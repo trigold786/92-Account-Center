@@ -1,6 +1,9 @@
 {
   "description": "Account Center - WeChat Mini Program",
-  "packOptions": { "ignore": [], "include": [] },
+  "packOptions": {
+    "ignore": [],
+    "include": []
+  },
   "setting": {
     "bundle": false,
     "userConfirmedBundleSwitch": false,
@@ -29,16 +32,32 @@
     "useStaticServer": true,
     "showES6CompileOption": false,
     "checkInvalidKey": true,
-    "babelSetting": { "ignore": [], "disablePlugins": [], "outputPath": "" },
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    },
     "disableUseStrict": false,
-    "useCompilerPlugins": ["typescript"]
+    "useCompilerPlugins": [
+      "typescript"
+    ],
+    "compileWorklet": false,
+    "minifyWXML": true,
+    "localPlugins": false,
+    "condition": false,
+    "swc": false,
+    "disableSWC": true
   },
   "compileType": "miniprogram",
   "libVersion": "3.6.0",
   "appid": "wx0368b01fafbc2561",
   "projectname": "AccountCenter",
   "condition": {},
-  "editorSetting": { "tabIndent": "insertSpaces", "tabSize": 2 },
+  "editorSetting": {
+    "tabIndent": "insertSpaces",
+    "tabSize": 2
+  },
   "miniprogramRoot": "",
-  "srcMiniprogramRoot": ""
+  "srcMiniprogramRoot": "",
+  "simulatorPluginLibVersion": {}
 }

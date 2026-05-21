@@ -1,0 +1,10 @@
+{
+  "title": "业务指标",
+  "uid": "business-metrics",
+  "panels": [
+    {"title": "注册趋势", "type": "graph", "targets": [{"expr": "rate(registrations_total[1d])"}]},
+    {"title": "付费转化", "type": "stat", "targets": [{"expr": "subscriptions_total / registrations_total * 100"}]},
+    {"title": "MRR", "type": "graph", "targets": [{"expr": "mrr_total"}]},
+    {"title": "K-Factor", "type": "stat", "targets": [{"expr": "k_factor"}]}
+  ]
+}
