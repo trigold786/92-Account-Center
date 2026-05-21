@@ -59,3 +59,11 @@ func (m *mockRecoveryOrderRepo) GetPendingOrdersOlderThan(ctx context.Context, s
 func (m *mockRecoveryOrderRepo) UpdateOrderStatus(ctx context.Context, orderNo string, fromStatus, toStatus string) error {
 	return nil
 }
+
+func (m *mockRecoveryOrderRepo) GetByID(ctx context.Context, id int64) (*model.Order, error) {
+	return nil, nil
+}
+
+func (m *mockRecoveryOrderRepo) UpdateStatus(ctx context.Context, id int64, status string) error {
+	return nil
+}

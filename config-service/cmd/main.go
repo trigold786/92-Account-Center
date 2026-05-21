@@ -25,9 +25,7 @@ import (
 	"github.com/trigold786/92-Account-Center/pkg/logging"
 )
 
-var logger *slog.Logger
-
-func init() {}
+var logger = slog.Default()
 
 var (
 	requestCount    uint64
@@ -186,8 +184,7 @@ func main() {
 		ctx := c.Request.Context()
 		totalConfig, _ := configSvc.GetTotalCount(ctx)
 
-		pendingReleases, pendingTotal, _ := releaseSvc.ListReleases(ctx, "pending", 1, 1)
-		_ = pendingReleases
+		_, pendingTotal, _ := releaseSvc.ListReleases(ctx, "pending", 1, 1)
 
 		now := time.Now()
 		startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())

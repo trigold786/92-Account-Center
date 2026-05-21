@@ -24,7 +24,13 @@ func (h *AuditHandler) ListLogs(c *gin.Context) {
 	filter.OperationType = c.Query("operation_type")
 	filter.Operator = c.Query("operator")
 	filter.Page, _ = strconv.Atoi(c.DefaultQuery("page", "1"))
+	if filter.Page < 1 {
+		filter.Page = 1
+	}
 	filter.PageSize, _ = strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	if filter.PageSize < 1 {
+		filter.PageSize = 20
+	}
 
 	if startStr := c.Query("start_time"); startStr != "" {
 		t, err := strconv.ParseInt(startStr, 10, 64)

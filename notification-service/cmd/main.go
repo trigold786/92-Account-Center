@@ -33,9 +33,7 @@ var (
 	durationCount   uint64
 )
 
-var logger *slog.Logger
-
-func init() {}
+var logger = slog.Default()
 
 func main() {
 	logger = logging.NewLogger("notification-service")
@@ -122,12 +120,17 @@ func main() {
 	case "sendgrid":
 		emailProvider = provider.NewSendGridProvider(getEnv("SENDGRID_API_KEY", ""), fromAddress)
 	case "aws_ses":
-		emailProvider = provider.NewSESProvider(
+		sesProvider, sesErr := provider.NewSESProvider(
 			getEnv("AWS_REGION", "us-east-1"),
 			getEnv("AWS_ACCESS_KEY", ""),
 			getEnvSecret("AWS_SECRET_KEY", ""),
 			fromAddress,
 		)
+		if sesErr != nil {
+			logger.Warn("failed to initialize SES provider", "error", sesErr)
+		} else {
+			emailProvider = sesProvider
+		}
 	case "smtp":
 		emailProvider = provider.NewSMTPProvider(
 			getEnv("SMTP_HOST", "localhost"),

@@ -12,7 +12,7 @@
 |-----------|---------------|
 | Go | 1.26 (1.26.3) |
 | Gin | v1.12.0 |
-| Redis Server | 8.6-alpine |
+| Redis Server | 8.2-alpine (LTS) |
 | go-redis | v9.19.0 |
 | VictoriaMetrics | v1.143.0 |
 | Loki | 3.7.2 |
@@ -46,7 +46,7 @@
 
 **Target Versions:**
 - `postgres:18-alpine` → keep (already correct)
-- `redis:7-alpine` → `redis:8.6-alpine`
+- `redis:7-alpine` → `redis:8.2-alpine`
 - `victoriametrics/victoria-metrics:latest` → `victoriametrics/victoria-metrics:v1.143.0`
 - `grafana/loki:latest` → `grafana/loki:3.7.2`
 - `grafana/grafana:latest` → `grafana/grafana:13.0.1`
@@ -59,7 +59,7 @@ image: redis:7-alpine
 ```
 to:
 ```yaml
-image: redis:8.6-alpine
+image: redis:8.2-alpine
 ```
 
 Apply to BOTH redis service definitions (main redis at line ~34 and sentinel at `infra/redis/docker-compose-sentinel.yml`).
@@ -99,7 +99,7 @@ image: grafana/grafana:13.0.1
 
 - [ ] **Step 5: Update infra/redis/docker-compose-sentinel.yml**
 
-Change `redis:7-alpine` to `redis:8.6-alpine` in all Redis/Sentinel service definitions.
+Change `redis:7-alpine` to `redis:8.2-alpine` in all Redis/Sentinel service definitions.
 
 - [ ] **Step 6: Restart affected containers**
 
@@ -113,7 +113,7 @@ Verify with `docker ps` that all containers start and become healthy.
 
 ```bash
 git add docker-compose.yml infra/redis/docker-compose-sentinel.yml
-git commit -m "chore: pin infrastructure images to prescribed versions (Redis 8.6, VM v1.143.0, Loki 3.7.2, Grafana 13.0.1)"
+git commit -m "chore: pin infrastructure images to prescribed versions (Redis 8.2 LTS, VM v1.143.0, Loki 3.7.2, Grafana 13.0.1)"
 ```
 
 ---

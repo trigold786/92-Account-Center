@@ -28,9 +28,7 @@ import (
 	"github.com/trigold786/92-Account-Center/pkg/logging"
 )
 
-var logger *slog.Logger
-
-func init() {}
+var logger = slog.Default()
 
 var (
 	requestCount    uint64

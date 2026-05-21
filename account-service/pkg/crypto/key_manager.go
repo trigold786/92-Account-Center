@@ -21,7 +21,11 @@ type keyManager struct {
 
 func NewKeyManager() KeyManager {
 	km := &keyManager{}
-	km.currentKey, _ = km.GenerateKey()
+	key, err := km.GenerateKey()
+	if err != nil {
+		panic("failed to generate initial encryption key: " + err.Error())
+	}
+	km.currentKey = key
 	return km
 }
 

@@ -105,7 +105,13 @@ func (h *ConfigHandler) ListItems(c *gin.Context) {
 	filter.Name = c.Query("name")
 	filter.DataType = c.Query("data_type")
 	filter.Page, _ = strconv.Atoi(c.DefaultQuery("page", "1"))
+	if filter.Page < 1 {
+		filter.Page = 1
+	}
 	filter.PageSize, _ = strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	if filter.PageSize < 1 {
+		filter.PageSize = 20
+	}
 
 	items, total, err := h.configSvc.ListItems(c.Request.Context(), filter)
 	if err != nil {

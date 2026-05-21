@@ -37,7 +37,12 @@ func (h *InvoiceServiceHandler) CreateInvoiceSvc(c *gin.Context) {
 	case int64:
 		userID = v
 	case string:
-		userID, _ = strconv.ParseInt(v, 10, 64)
+		var err error
+		userID, err = strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user_id"})
+			return
+		}
 	case float64:
 		userID = int64(v)
 	}

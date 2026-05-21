@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/trigold786/92-Account-Center/account-service/internal/model"
@@ -178,7 +179,9 @@ func (s *subscriptionService) CheckExpired(ctx context.Context) error {
 		if err := s.subRepo.UpdateStatus(ctx, sub.ID, "EXPIRED"); err != nil {
 			continue
 		}
-		_ = s.userRepo.UpdateIdentityTier(ctx, sub.UserID, 0)
+		if err := s.userRepo.UpdateIdentityTier(ctx, sub.UserID, 0); err != nil {
+			slog.Warn("failed to reset identity tier for expired subscription", "user_id", sub.UserID, "subscription_id", sub.ID, "error", err)
+		}
 	}
 
 	return nil

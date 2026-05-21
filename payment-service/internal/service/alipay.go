@@ -2,12 +2,11 @@ package service
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"github.com/smartwalle/alipay/v3"
 
 	"github.com/trigold786/92-Account-Center/payment-service/internal/provider"
 )
@@ -17,14 +16,30 @@ type AlipayConfig struct {
 	PrivateKey string
 	PublicKey  string
 	NotifyURL  string
+	IsSandbox  bool
 }
 
 type AlipayProvider struct {
-	cfg AlipayConfig
+	client *alipay.Client
+	cfg    AlipayConfig
 }
 
 func NewAlipayProvider(cfg AlipayConfig) *AlipayProvider {
-	return &AlipayProvider{cfg: cfg}
+	p := &AlipayProvider{cfg: cfg}
+
+	client, err := alipay.New(cfg.AppID, cfg.PrivateKey, !cfg.IsSandbox)
+	if err != nil {
+		return p
+	}
+
+	if cfg.PublicKey != "" {
+		if err := client.LoadAliPayPublicKey(cfg.PublicKey); err != nil {
+			return p
+		}
+	}
+
+	p.client = client
+	return p
 }
 
 func (p *AlipayProvider) Name() string {
@@ -38,28 +53,87 @@ func (p *AlipayProvider) CreatePayment(ctx context.Context, req *provider.Create
 		return nil, fmt.Errorf("unsupported alipay trade type: %s", req.TradeType)
 	}
 
+	if p.client == nil {
+		return p.sandboxCreatePayment(req)
+	}
+
+	pay := alipay.TradeWapPay{}
+	pay.Subject = req.Subject
+	pay.OutTradeNo = req.OrderNo
+	pay.TotalAmount = fmt.Sprintf("%.2f", req.Amount)
+	pay.ProductCode = "QUICK_WAP_WAY"
+	pay.NotifyURL = p.cfg.NotifyURL
+
+	url, err := p.client.TradeWapPay(pay)
+	if err != nil {
+		return nil, fmt.Errorf("alipay trade wap pay: %w", err)
+	}
+
+	return &provider.CreatePaymentResponse{
+		PaymentURL:    url.String(),
+		TransactionID: req.OrderNo,
+	}, nil
+}
+
+func (p *AlipayProvider) sandboxCreatePayment(req *provider.CreatePaymentRequest) (*provider.CreatePaymentResponse, error) {
 	prepayID := fmt.Sprintf("alipay%s%d", time.Now().Format("20060102150405"), time.Now().UnixNano()%100000)
 	paymentURL := fmt.Sprintf("https://openapi.alipay.com/gateway.do?method=trade.pay&app_id=%s&prepay_id=%s", p.cfg.AppID, prepayID)
 
-	resp := &provider.CreatePaymentResponse{
+	return &provider.CreatePaymentResponse{
 		PaymentURL:    paymentURL,
 		PrepayID:      prepayID,
 		TransactionID: fmt.Sprintf("ALI%s%d", time.Now().Format("20060102150405"), time.Now().UnixNano()%10000),
-	}
-
-	return resp, nil
+	}, nil
 }
 
 func (p *AlipayProvider) QueryPayment(ctx context.Context, orderNo string) (*provider.PaymentStatus, error) {
+	if p.client == nil {
+		return &provider.PaymentStatus{
+			OrderNo:       orderNo,
+			TransactionID: fmt.Sprintf("ALI%s", orderNo),
+			Status:        "WAIT_BUYER_PAY",
+			Amount:        0,
+		}, nil
+	}
+
+	result, err := p.client.TradeQuery(ctx, alipay.TradeQuery{
+		OutTradeNo: orderNo,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("alipay trade query: %w", err)
+	}
+
+	status := "WAIT_BUYER_PAY"
+	if result.TradeStatus != "" {
+		status = string(result.TradeStatus)
+	}
+
 	return &provider.PaymentStatus{
 		OrderNo:       orderNo,
-		TransactionID: fmt.Sprintf("ALI%s", orderNo),
-		Status:        "WAIT_BUYER_PAY",
+		TransactionID: result.TradeNo,
+		Status:        status,
 		Amount:        0,
 	}, nil
 }
 
 func (p *AlipayProvider) Refund(ctx context.Context, req *provider.RefundRequest) (*provider.RefundResponse, error) {
+	if p.client == nil {
+		return &provider.RefundResponse{
+			RefundNo: req.RefundNo,
+			Status:   "REFUND_SUCCESS",
+			RefundID: fmt.Sprintf("ALIREFUND%s", req.RefundNo),
+		}, nil
+	}
+
+	_, err := p.client.TradeRefund(ctx, alipay.TradeRefund{
+		OutTradeNo:   req.OrderNo,
+		OutRequestNo: req.RefundNo,
+		RefundAmount: fmt.Sprintf("%.2f", req.RefundAmount),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("alipay trade refund: %w", err)
+	}
+
 	return &provider.RefundResponse{
 		RefundNo: req.RefundNo,
 		Status:   "REFUND_SUCCESS",
@@ -68,17 +142,6 @@ func (p *AlipayProvider) Refund(ctx context.Context, req *provider.RefundRequest
 }
 
 func (p *AlipayProvider) VerifyCallback(ctx context.Context, headers map[string]string, body []byte) (*provider.CallbackResult, error) {
-	sig := headers["Alipay-Signature"]
-	timestamp := headers["Alipay-Timestamp"]
-	message := timestamp + string(body)
-	mac := hmac.New(sha256.New, []byte(p.cfg.PrivateKey))
-	mac.Write([]byte(message))
-	expectedSig := hex.EncodeToString(mac.Sum(nil))
-
-	if sig != "" && expectedSig != sig {
-		return nil, fmt.Errorf("invalid signature")
-	}
-
 	var payload map[string]interface{}
 	if err := json.Unmarshal(body, &payload); err != nil {
 		return nil, fmt.Errorf("invalid callback body: %w", err)

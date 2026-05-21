@@ -20,7 +20,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ${{ github.repository }}
-  GO_VERSION: "1.24"
+  GO_VERSION: "1.26"
   NODE_VERSION: "20"
 
 jobs:

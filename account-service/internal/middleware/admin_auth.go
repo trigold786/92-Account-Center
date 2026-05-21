@@ -72,11 +72,15 @@ func AdminAuthMiddleware(jwtSecret string) gin.HandlerFunc {
 			return
 		}
 
-		userID, _ := claims["sub"].(string)
-		if userID == "" {
-			userID, _ = claims["user_id"].(string)
+	userID, ok := claims["sub"].(string)
+	if !ok || userID == "" {
+		userID, ok = claims["user_id"].(string)
+		if !ok || userID == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing user identity in token"})
+			return
 		}
-		accountID, _ := claims["account_id"].(string)
+	}
+	accountID, _ := claims["account_id"].(string)
 
 		c.Set("user_id", userID)
 		c.Set("admin_role", role)

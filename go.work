@@ -1,4 +1,4 @@
-go 1.24.0
+go 1.26
 
 use (
 	./account-service
@@ -10,17 +10,17 @@ use (
 	./data-product-service
 	./notification-service
 	./payment-service
-	./pkg/config
+	./pkg/async
 	./pkg/circuitbreaker
+	./pkg/config
+	./pkg/database
+	./pkg/discovery
 	./pkg/health
 	./pkg/logging
-	./pkg/trace
 	./pkg/saga
-	./pkg/async
-	./pkg/vault
-	./pkg/discovery
-	./pkg/database
 	./pkg/server
-	./tests/integration
+	./pkg/trace
+	./pkg/vault
 	./tests/e2e
+	./tests/integration
 )

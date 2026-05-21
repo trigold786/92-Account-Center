@@ -1,3 +1,4 @@
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -13,7 +14,7 @@ object DesignTokens {
         val BrandPrimary = Color(0xFF6C63FF)
         val BrandSecondary = Color(0xFF00D4FF)
 
-        val TextPrimary = Color(0xDEFFFFFF)
+        val TextPrimary = Color(0xFFE6EDF3)
         val TextSecondary = Color(0xFF8B949E)
         val TextDisabled = Color(0xFF484F58)
 
@@ -64,9 +65,22 @@ object DesignTokens {
         val XXL = 24.dp
     }
 
+    object Shadows {
+        val ShadowSM = 2
+        val ShadowMD = 4
+        val ShadowLG = 8
+    }
+
     object Motion {
         const val DurationFast = 150
         const val DurationNormal = 250
         const val DurationSlow = 350
+        val EaseIn = CubicBezierEasing(0.4f, 0f, 1f, 1f)
+        val EaseOut = CubicBezierEasing(0f, 0f, 0.2f, 1f)
+        val EaseDefault = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)
+    }
+
+    object RadiusFull {
+        val Full = 9999.dp
     }
 }

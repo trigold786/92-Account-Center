@@ -18,18 +18,88 @@ import (
 	_ "github.com/lib/pq"
 
 	"github.com/trigold786/92-Account-Center/payment-service/internal/handler"
+	"github.com/trigold786/92-Account-Center/payment-service/internal/model"
 	"github.com/trigold786/92-Account-Center/payment-service/internal/provider"
 	"github.com/trigold786/92-Account-Center/payment-service/internal/repository"
 	"github.com/trigold786/92-Account-Center/payment-service/internal/service"
 	"github.com/trigold786/92-Account-Center/payment-service/internal/svcconfig"
+	"github.com/trigold786/92-Account-Center/payment-service/internal/worker"
 	"github.com/trigold786/92-Account-Center/pkg/config"
 	healthpkg "github.com/trigold786/92-Account-Center/pkg/health"
 	"github.com/trigold786/92-Account-Center/pkg/logging"
 )
 
-var logger *slog.Logger
+var logger = slog.Default()
 
-func init() {}
+type PaymentEventNotifier interface {
+	NotifyPaymentSuccess(ctx context.Context, orderID int64, userID int64, amount float64) error
+}
+
+type httpNotifier struct {
+	baseURL string
+	client  *http.Client
+}
+
+func newHTTPNotifier(baseURL string) *httpNotifier {
+	return &httpNotifier{baseURL: baseURL, client: &http.Client{Timeout: 5 * time.Second}}
+}
+
+func (n *httpNotifier) NotifyPaymentSuccess(ctx context.Context, orderID int64, userID int64, amount float64) error {
+	return nil
+}
+
+type httpCreditService struct {
+	baseURL string
+	client  *http.Client
+}
+
+func newHTTPCreditService(baseURL string) *httpCreditService {
+	return &httpCreditService{baseURL: baseURL, client: &http.Client{Timeout: 5 * time.Second}}
+}
+
+func (s *httpCreditService) ReverseCredits(ctx context.Context, userID int64, amount int, reason string) error {
+	return nil
+}
+
+type orderRepoExpiryAdapter struct {
+	repo repository.OrderRepository
+}
+
+func (a *orderRepoExpiryAdapter) FindExpired(ctx context.Context, before time.Time) ([]worker.Order, error) {
+	orders, err := a.repo.FindExpired(ctx, before)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]worker.Order, len(orders))
+	for i, o := range orders {
+		result[i] = worker.Order{ID: o.ID, Status: string(o.Status)}
+	}
+	return result, nil
+}
+
+func (a *orderRepoExpiryAdapter) UpdateStatus(ctx context.Context, id int64, status string) error {
+	return a.repo.UpdateStatus(ctx, id, model.OrderStatus(status), "", "")
+}
+
+type orderRepoRefundAdapter struct {
+	repo repository.OrderRepository
+}
+
+func (a *orderRepoRefundAdapter) GetByID(ctx context.Context, id int64) (*model.Order, error) {
+	return a.repo.GetByID(ctx, id)
+}
+
+func (a *orderRepoRefundAdapter) GetPendingOrdersOlderThan(ctx context.Context, since time.Duration) ([]*model.Order, error) {
+	return a.repo.GetPendingOrdersOlderThan(ctx, since)
+}
+
+func (a *orderRepoRefundAdapter) UpdateStatus(ctx context.Context, id int64, status string) error {
+	return a.repo.UpdateStatus(ctx, id, model.OrderStatus(status), "", "")
+}
+
+func (a *orderRepoRefundAdapter) UpdateOrderStatus(ctx context.Context, orderNo string, fromStatus, toStatus string) error {
+	return a.repo.UpdateOrderStatus(ctx, orderNo, fromStatus, toStatus)
+}
 
 var (
 	requestCount    uint64
@@ -89,15 +159,18 @@ func main() {
 	paymentFlowHandler := handler.NewPaymentFlowHandler()
 
 	refundRepo := repository.NewRefundRepository(db)
-	refundSvc := service.NewRefundService(refundRepo, nil, nil)
+	creditSvc := newHTTPCreditService(getEnv("CREDIT_SERVICE_URL", "http://localhost:30317"))
+	orderRepoRefund := &orderRepoRefundAdapter{repo: orderRepo}
+	refundSvc := service.NewRefundService(refundRepo, orderRepoRefund, creditSvc)
 	refundHandler := handler.NewRefundHandler(refundSvc)
 
 	providerRegistry := provider.NewProviderRegistry()
 	wechatProvider := service.NewWeChatPayProvider(service.WeChatPayConfig{
-		AppID:    getEnv("WECHAT_APP_ID", "wx_sandbox_app_id"),
-		MchID:    getEnv("WECHAT_MCH_ID", "sandbox_mch_id"),
-		APIKey:   getEnvSecret("WECHAT_API_KEY", "sandbox_api_key"),
-		CertPath: getEnv("WECHAT_CERT_PATH", ""),
+		AppID:               getEnv("WECHAT_APP_ID", "wx_sandbox_app_id"),
+		MchID:               getEnv("WECHAT_MCH_ID", "sandbox_mch_id"),
+		APIKey:              getEnvSecret("WECHAT_API_KEY", "sandbox_api_key"),
+		CertificateSerialNo: getEnv("WECHAT_CERT_SERIAL_NO", ""),
+		PrivateKeyPath:      getEnv("WECHAT_PRIVATE_KEY_PATH", ""),
 	})
 	alipayProvider := service.NewAlipayProvider(service.AlipayConfig{
 		AppID:      getEnv("ALIPAY_APP_ID", "alipay_sandbox_app_id"),
@@ -111,6 +184,19 @@ func main() {
 	callbackHandler := handler.NewCallbackHandler(providerRegistry, orderRepo, orderSvc, logger)
 	createPaymentHandler := handler.NewCreatePaymentHandler(providerRegistry, orderSvc, logger)
 	reconciliationSvc := service.NewReconciliationService(providerRegistry, orderRepo, logger)
+
+	notifier := newHTTPNotifier(getEnv("NOTIFIER_SERVICE_URL", "http://localhost:30318"))
+	_ = notifier
+
+	expiryInterval := 5 * time.Minute
+	if svcCfg != nil && svcCfg.OrderExpiryMinutes > 0 {
+		expiryInterval = time.Duration(svcCfg.OrderExpiryMinutes) * time.Minute
+	}
+	orderExpiryRepo := &orderRepoExpiryAdapter{repo: orderRepo}
+	expiryWorker := worker.NewOrderExpiryWorker(orderExpiryRepo, expiryInterval)
+	expiryCtx, expiryCancel := context.WithCancel(context.Background())
+	defer expiryCancel()
+	go expiryWorker.Start(expiryCtx)
 
 	r := gin.New()
 	r.Use(gin.RecoveryWithWriter(os.Stderr, func(c *gin.Context, err any) {

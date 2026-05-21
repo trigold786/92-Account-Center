@@ -315,7 +315,11 @@ func (s *authService) LoginWithBiometric(ctx context.Context, req *model.Biometr
 			hash := crypto.SM3Hash([]byte(req.BiometricToken))
 			if hash == cred.BiometricTokenHash && cred.IsActive {
 				var user model.User
-				user.ID, _ = strconv.ParseInt(cred.UserID, 10, 64)
+				var err error
+				user.ID, err = strconv.ParseInt(cred.UserID, 10, 64)
+				if err != nil {
+					return nil, fmt.Errorf("invalid credential user ID: %w", err)
+				}
 				user.AccountID = cred.UserID
 				tokenResp, err := s.jwtMgr.GenerateTokenPairWithDevice(user.ID, user.AccountID, req.DeviceFingerprint)
 				if err != nil {

@@ -28,7 +28,11 @@ declare module 'vue' {
     ElTabPane: typeof import('element-plus/es')['ElTabPane']
     ElTabs: typeof import('element-plus/es')['ElTabs']
     ElTag: typeof import('element-plus/es')['ElTag']
+    EmptyStateCard: typeof import('./src/components/EmptyStateCard.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    SkeletonScreen: typeof import('./src/components/SkeletonScreen.vue')['default']
+    SkipLink: typeof import('./src/components/a11y/SkipLink.vue')['default']
+    VisuallyHidden: typeof import('./src/components/a11y/VisuallyHidden.vue')['default']
   }
 }

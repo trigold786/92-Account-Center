@@ -31,9 +31,7 @@ import (
 	"github.com/trigold786/92-Account-Center/pkg/logging"
 )
 
-var logger *slog.Logger
-
-func init() {}
+var logger = slog.Default()
 
 var (
 	requestCount    uint64
@@ -126,7 +124,6 @@ func main() {
 	blacklistSvc := service.NewBlacklistService(blacklistRepo, rdb, svcCfg)
 	blacklistHandler := handler.NewBlacklistHandler(blacklistSvc)
 	windowLimiter := service.NewSlidingWindowLimiter(rdb, svcCfg)
-	_ = windowLimiter
 
 	r := gin.New()
 	r.Use(gin.RecoveryWithWriter(os.Stderr, func(c *gin.Context, err any) {

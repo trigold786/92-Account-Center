@@ -188,12 +188,19 @@ func (s *ABTestService) GetResults(ctx context.Context, experimentID string) (*m
 }
 
 func (s *ABTestService) calculateConfidence(count, conversions int) float64 {
-	if count == 0 {
+	if count == 0 || conversions == 0 {
 		return 0
 	}
 	p := float64(conversions) / float64(count)
 	n := float64(count)
+	if p <= 0 || p >= 1 {
+		return 0
+	}
 	se := math.Sqrt(p * (1 - p) / n)
 	z := 1.96
-	return math.Min(1.0, se*z*10)
+	marginOfError := z * se
+	if marginOfError >= p {
+		return 0
+	}
+	return math.Min(1.0, 1.0-marginOfError/p)
 }

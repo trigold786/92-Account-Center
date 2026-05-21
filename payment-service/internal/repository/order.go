@@ -17,6 +17,9 @@ type OrderRepository interface {
 	List(ctx context.Context, query *model.OrderQueryRequest) ([]model.Order, int, error)
 	UpdateStatus(ctx context.Context, id int64, status model.OrderStatus, paymentMethod, paymentTxnID string) error
 	UpdateRefund(ctx context.Context, id int64, reason string) error
+	FindExpired(ctx context.Context, before time.Time) ([]model.Order, error)
+	GetPendingOrdersOlderThan(ctx context.Context, since time.Duration) ([]*model.Order, error)
+	UpdateOrderStatus(ctx context.Context, orderNo string, fromStatus, toStatus string) error
 }
 
 type orderRepository struct {
@@ -206,6 +209,64 @@ func (r *orderRepository) scanRow(rows *sql.Rows, order *model.Order) error {
 		&order.PaidAt, &order.CancelledAt, &order.RefundedAt, &order.RefundReason,
 		&order.ExpiresAt, &order.Metadata, &order.CreatedAt, &order.UpdatedAt,
 	)
+}
+
+func (r *orderRepository) FindExpired(ctx context.Context, before time.Time) ([]model.Order, error) {
+	query := `SELECT id, order_no, user_id, product_type, product_name, amount, currency, status,
+		payment_method, payment_transaction_id, paid_at, cancelled_at, refunded_at, refund_reason,
+		expires_at, metadata, created_at, updated_at
+		FROM orders WHERE status = $1 AND expires_at IS NOT NULL AND expires_at < $2`
+	rows, err := r.db.QueryContext(ctx, query, string(model.OrderStatusPending), before)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var orders []model.Order
+	for rows.Next() {
+		var order model.Order
+		if err := r.scanRow(rows, &order); err != nil {
+			return nil, err
+		}
+		orders = append(orders, order)
+	}
+	return orders, rows.Err()
+}
+
+func (r *orderRepository) GetPendingOrdersOlderThan(ctx context.Context, since time.Duration) ([]*model.Order, error) {
+	cutoff := time.Now().Add(-since)
+	query := `SELECT id, order_no, user_id, product_type, product_name, amount, currency, status,
+		payment_method, payment_transaction_id, paid_at, cancelled_at, refunded_at, refund_reason,
+		expires_at, metadata, created_at, updated_at
+		FROM orders WHERE status = $1 AND created_at < $2`
+	rows, err := r.db.QueryContext(ctx, query, string(model.OrderStatusPending), cutoff)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var orders []*model.Order
+	for rows.Next() {
+		order := &model.Order{}
+		if err := r.scanRow(rows, order); err != nil {
+			return nil, err
+		}
+		orders = append(orders, order)
+	}
+	return orders, rows.Err()
+}
+
+func (r *orderRepository) UpdateOrderStatus(ctx context.Context, orderNo string, fromStatus, toStatus string) error {
+	query := `UPDATE orders SET status = $1, updated_at = NOW() WHERE order_no = $2 AND status = $3`
+	result, err := r.db.ExecContext(ctx, query, toStatus, orderNo, fromStatus)
+	if err != nil {
+		return err
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("order not found or status mismatch")
+	}
+	return nil
 }
 
 func generateOrderNo() string {

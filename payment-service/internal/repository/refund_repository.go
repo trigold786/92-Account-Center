@@ -45,6 +45,21 @@ func (r *RefundRepository) UpdateStatus(ctx context.Context, id int64, status st
 	return err
 }
 
+func (r *RefundRepository) FindByOrderID(ctx context.Context, orderID int64) (*model.Refund, error) {
+	row := r.db.QueryRowContext(ctx,
+		`SELECT id, order_id, user_id, amount, reason, status, COALESCE(approver_id,0), COALESCE(review_note,''), created_at, updated_at
+		 FROM refunds WHERE order_id=$1 LIMIT 1`, orderID)
+	ref := &model.Refund{}
+	err := row.Scan(&ref.ID, &ref.OrderID, &ref.UserID, &ref.Amount, &ref.Reason, &ref.Status, &ref.ApproverID, &ref.ReviewNote, &ref.CreatedAt, &ref.UpdatedAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return ref, nil
+}
+
 func (r *RefundRepository) ListByUserID(ctx context.Context, userID int64) ([]*model.Refund, error) {
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT id, order_id, user_id, amount, reason, status, COALESCE(approver_id,0), created_at, updated_at

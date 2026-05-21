@@ -9,7 +9,9 @@ import (
 )
 
 type OrderRepository interface {
+	GetByID(ctx context.Context, id int64) (*model.Order, error)
 	GetPendingOrdersOlderThan(ctx context.Context, since time.Duration) ([]*model.Order, error)
+	UpdateStatus(ctx context.Context, id int64, status string) error
 	UpdateOrderStatus(ctx context.Context, orderNo string, fromStatus, toStatus string) error
 }
 

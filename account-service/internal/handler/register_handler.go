@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -53,7 +54,9 @@ func (h *RegisterHandler) Register(c *gin.Context) {
 
 	if req.ReferralCode != "" && h.referralBinder != nil {
 		go func() {
-			_ = h.referralBinder.BindReferral(context.Background(), req.ReferralCode, fmt.Sprintf("%d", user.ID))
+			if err := h.referralBinder.BindReferral(context.Background(), req.ReferralCode, fmt.Sprintf("%d", user.ID)); err != nil {
+				slog.Warn("failed to bind referral", "referral_code", req.ReferralCode, "user_id", user.ID, "error", err)
+			}
 		}()
 	}
 

@@ -32,9 +32,7 @@ var (
 	durationCount   uint64
 )
 
-var logger *slog.Logger
-
-func init() {}
+var logger = slog.Default()
 
 func main() {
 	logger = logging.NewLogger("data-product-service")
@@ -72,8 +70,7 @@ func main() {
 		}
 	}
 
-	readReplica := repository.NewReadReplicaRepo(db, replicaDB)
-	_ = readReplica
+	_ = repository.NewReadReplicaRepo(db, replicaDB)
 
 	var healthCheckers []healthpkg.Checker
 	if db != nil {

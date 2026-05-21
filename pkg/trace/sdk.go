@@ -7,6 +7,7 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -16,12 +17,12 @@ import (
 
 func InitProvider(serviceName, env, otlpEndpoint string) (func(), error) {
 	if otlpEndpoint == "" {
-		return initNoopProvider(serviceName, env)
+		return initStdoutProvider(serviceName, env)
 	}
 	return initOTLPProvider(serviceName, env, otlpEndpoint)
 }
 
-func initNoopProvider(serviceName, env string) (func(), error) {
+func initStdoutProvider(serviceName, env string) (func(), error) {
 	exp, err := stdouttrace.New(stdouttrace.WithPrettyPrint())
 	if err != nil {
 		return nil, err
@@ -46,7 +47,11 @@ func initNoopProvider(serviceName, env string) (func(), error) {
 }
 
 func initOTLPProvider(serviceName, env, endpoint string) (func(), error) {
-	exp, err := stdouttrace.New(stdouttrace.WithPrettyPrint())
+	ctx := context.Background()
+	exp, err := otlptracegrpc.New(ctx,
+		otlptracegrpc.WithEndpoint(endpoint),
+		otlptracegrpc.WithInsecure(),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -61,9 +66,9 @@ func initOTLPProvider(serviceName, env, endpoint string) (func(), error) {
 		propagation.Baggage{},
 	))
 	return func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		if err := tp.Shutdown(ctx); err != nil {
+		if err := tp.Shutdown(shutdownCtx); err != nil {
 			log.Printf("Error shutting down tracer: %v", err)
 		}
 	}, nil

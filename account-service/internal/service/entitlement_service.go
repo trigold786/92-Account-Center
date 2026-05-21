@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/trigold786/92-Account-Center/account-service/internal/cache"
 	"github.com/trigold786/92-Account-Center/account-service/internal/model"
@@ -63,7 +64,9 @@ func (s *entitlementService) ConsumeQuota(ctx context.Context, userID int64, fea
 		}
 		entitlements, _ := s.repo.GetByUserID(ctx, userID)
 		if len(entitlements) > 0 {
-			_ = s.cache.WarmCache(ctx, entitlements)
+			if err := s.cache.WarmCache(ctx, entitlements); err != nil {
+				slog.Warn("failed to warm entitlement cache", "user_id", userID, "error", err)
+			}
 		}
 		return &model.ConsumeResponse{Success: true, Remaining: e.TotalQuota - newUsed}, nil
 	}
@@ -73,7 +76,9 @@ func (s *entitlementService) ConsumeQuota(ctx context.Context, userID int64, fea
 
 	e, err := s.repo.GetByUserAndFeature(ctx, userID, featureCode)
 	if err == nil && e != nil {
-		_ = s.repo.UpdateQuota(ctx, e.ID, e.UsedQuota+amount)
+		if err := s.repo.UpdateQuota(ctx, e.ID, e.UsedQuota+amount); err != nil {
+			slog.Warn("failed to update quota in repo after cache consume", "user_id", userID, "feature", featureCode, "error", err)
+		}
 	}
 
 	quota, _ := s.cache.GetQuota(ctx, userID, featureCode)
@@ -112,7 +117,9 @@ func (s *entitlementService) GrantEntitlements(ctx context.Context, userID int64
 				return err
 			}
 		}
-		_ = s.cache.GrantQuota(ctx, userID, featureCode, total)
+		if err := s.cache.GrantQuota(ctx, userID, featureCode, total); err != nil {
+			slog.Warn("failed to grant quota in cache", "user_id", userID, "feature", featureCode, "error", err)
+		}
 	}
 
 	return nil

@@ -44,11 +44,23 @@ page {
   --spacing-xl: 64rpx;
   --spacing-2xl: 96rpx;
 
-  --card-radius: 24rpx;
   --radius-sm: 8rpx;
   --radius-md: 16rpx;
   --radius-lg: 24rpx;
   --radius-xl: 32rpx;
+  --radius-2xl: 48rpx;
+  --radius-full: 19998rpx;
 
+  --shadow-sm: 0 2rpx 4rpx rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8rpx 16rpx rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 16rpx 48rpx rgba(0, 0, 0, 0.5);
   --shadow-card: 0 4rpx 16rpx rgba(0, 0, 0, 0.3);
+
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 350ms;
+
+  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
 }

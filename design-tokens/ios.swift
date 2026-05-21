@@ -54,4 +54,19 @@ extension CGFloat {
     static let radiusLG: CGFloat = 12
     static let radiusXL: CGFloat = 16
     static let radius2XL: CGFloat = 24
+    static let radiusFull: CGFloat = 9999
+}
+
+enum DesignTokens {
+    enum Shadows {
+        static let shadowSM = Shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
+        static let shadowMD = Shadow(color: .black.opacity(0.4), radius: 4, x: 0, y: 4)
+        static let shadowLG = Shadow(color: .black.opacity(0.5), radius: 8, x: 0, y: 8)
+    }
+
+    enum Motion {
+        static let durationFast: Double = 0.15
+        static let durationNormal: Double = 0.25
+        static let durationSlow: Double = 0.35
+    }
 }

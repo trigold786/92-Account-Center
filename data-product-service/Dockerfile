@@ -1,11 +1,11 @@
-FROM golang:1.21-alpine AS builder
+FROM golang:1.26-alpine AS builder
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o /data-product-service ./cmd/main.go
 
-FROM alpine:3.19
+FROM alpine:3.23
 RUN apk --no-cache add ca-certificates tzdata wget
 COPY --from=builder /data-product-service /usr/local/bin/data-product-service
 EXPOSE 30314

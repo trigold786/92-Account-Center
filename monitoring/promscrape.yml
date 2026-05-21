@@ -12,3 +12,4 @@ scrape_configs:
           - 'credit-service:30312'
           - 'compliance-service:30313'
           - 'data-product-service:30314'
+          - 'payment-service:30316'

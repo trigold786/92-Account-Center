@@ -54,7 +54,7 @@ func (s *RiskService) AssessRisk(ctx context.Context, req model.AssessRiskReques
 		})
 	}
 
-	deviceAnomaly, similarity, _ := s.DetectDeviceAnomaly(ctx, req.UserID, req.DeviceFingerprint)
+	deviceAnomaly, _, _ := s.DetectDeviceAnomaly(ctx, req.UserID, req.DeviceFingerprint)
 	if deviceAnomaly {
 		factors = append(factors, model.RiskFactor{
 			Type:   "device_change",
@@ -64,9 +64,7 @@ func (s *RiskService) AssessRisk(ctx context.Context, req model.AssessRiskReques
 		})
 	}
 
-	_ = similarity
-
-	velocityAnomaly, count, _ := s.DetectVelocityAnomaly(ctx, req.UserID)
+	velocityAnomaly, _, _ := s.DetectVelocityAnomaly(ctx, req.UserID)
 	if velocityAnomaly {
 		factors = append(factors, model.RiskFactor{
 			Type:   "velocity_exceeded",
@@ -75,8 +73,6 @@ func (s *RiskService) AssessRisk(ctx context.Context, req model.AssessRiskReques
 			Detail: "Abnormal login frequency detected",
 		})
 	}
-
-	_ = count
 
 	riskScore := s.CalculateRiskScore(factors)
 

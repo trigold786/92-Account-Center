@@ -1,0 +1,39 @@
+global:
+  environment: development
+  imageRegistry: ghcr.io/your-org/account-center
+  imagePullSecrets: []
+  storageClass: ""
+
+services:
+  api-gateway:
+    replicas: 1
+    image:
+      tag: latest
+  account-service:
+    replicas: 1
+  auth-service:
+    replicas: 1
+  notification-service:
+    replicas: 1
+  credit-service:
+    replicas: 1
+  compliance-service:
+    replicas: 1
+  data-product-service:
+    replicas: 1
+  config-service:
+    replicas: 1
+  payment-service:
+    replicas: 1
+
+postgresql:
+  enabled: false
+
+redis:
+  enabled: false
+
+ingress:
+  enabled: false
+
+monitoring:
+  enabled: false
