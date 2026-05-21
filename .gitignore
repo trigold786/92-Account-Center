@@ -45,3 +45,9 @@ weapp/miniprogram_npm/
 # Temp files
 *.log
 nul
+
+# Playwright
+test-results/
+playwright-report/
+web-ui/test-results/
+web-ui/playwright-report/
