@@ -462,13 +462,12 @@ services:
     restart: always
 
   web-ui:
-    image: nginx:alpine
+    build:
+      context: ./web-ui
+      dockerfile: Dockerfile
     container_name: web-ui
     ports:
       - "30317:80"
-    volumes:
-      - ./web-ui/dist:/usr/share/nginx/html:ro
-      - ./web-ui/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     networks:
       - app_network
       - 01-neurocashengine_nce-network
