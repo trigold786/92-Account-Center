@@ -23,6 +23,8 @@ export function register(params: { phone: string; password: string; code: string
     code: params.code,
     account_id: `user_${Date.now()}`,
     agree_to_terms: true,
+  }).then(async (res) => {
+    return res
   })
 }
 

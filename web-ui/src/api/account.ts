@@ -4,16 +4,31 @@ export function getTier(userId: number) {
   return client.get(`/account/${userId}/tier`)
 }
 
-export function changePassword(data: { current_password: string; new_password: string; code: string }) {
-  return client.post('/account/password/change', data)
-}
-
 export function sendPasswordCode(credential: string) {
-  return client.post('/account/password/send-verification-code', { credential })
+  const contactType = credential.includes('@') ? 'email' : 'phone'
+  return client.post('/account/password/send-verification-code', {
+    contact_type: contactType,
+    contact_value: credential,
+  })
 }
 
-export function requestDeletion() {
-  return client.post('/account/deletion/request')
+export function changePassword(data: {
+  current_password: string
+  new_password: string
+  verification_code: string
+  verification_type: string
+}) {
+  return client.post('/account/password/change', {
+    current_password: data.current_password,
+    new_password: data.new_password,
+    confirm_password: data.new_password,
+    verification_code: data.verification_code,
+    verification_type: data.verification_type,
+  })
+}
+
+export function requestDeletion(data: { verification_code: string; verification_type: string }) {
+  return client.post('/account/deletion/request', data)
 }
 
 export function cancelDeletion() {

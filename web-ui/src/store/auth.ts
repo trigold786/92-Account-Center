@@ -12,18 +12,19 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function doLogin(credential: string, password: string) {
     const res = await login(credential, password)
-    if (res.data.code === 0 && res.data.data) {
-      token.value = res.data.data.access_token
-      refreshToken.value = res.data.data.refresh_token
-      userId.value = res.data.data.user_id
-      accountId.value = res.data.data.account_id
+    const d = res.data.data ?? res.data
+    if (d.access_token) {
+      token.value = d.access_token
+      refreshToken.value = d.refresh_token
+      userId.value = d.user_id
+      accountId.value = d.account_id
       localStorage.setItem('access_token', token.value)
       localStorage.setItem('refresh_token', refreshToken.value)
       localStorage.setItem('user_id', String(userId.value))
       localStorage.setItem('account_id', accountId.value)
       return true
     }
-    throw new Error(res.data.message || '登录失败')
+    throw new Error(d.message || d.error || '登录失败')
   }
 
   async function doLogout() {

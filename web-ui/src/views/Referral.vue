@@ -20,7 +20,7 @@ const link = ref('')
 onMounted(async () => {
   const uid = auth.userId; if (!uid) return
   try { const r = await getReferralSummary(uid); summary.value = r.data.data } catch {}
-  try { const r = await generateReferralLink(); link.value = r.data.data?.referral_link || '' } catch {}
+  try { const r = await generateReferralLink(String(uid)); link.value = r.data.data?.referral_link || '' } catch {}
 })
 
 function copyLink() { navigator.clipboard.writeText(link.value); ElMessage.success('已复制') }

@@ -8,8 +8,8 @@ export function registerDevice(data: { device_name: string; device_type: string;
   return client.post('/device/register', data)
 }
 
-export function trustDevice(deviceId: string) {
-  return client.post('/device/trust', { device_id: deviceId })
+export function trustDevice(fingerprintId: string) {
+  return client.post('/device/trust', { fingerprint_id: fingerprintId })
 }
 
 export function removeDevice(deviceId: string) {

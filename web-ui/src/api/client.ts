@@ -16,10 +16,11 @@ client.interceptors.response.use(
       if (refreshToken) {
         try {
           const res = await axios.post('/api/v1/auth/refresh', { refresh_token: refreshToken })
-          if (res.data.code === 0 && res.data.data) {
-            localStorage.setItem('access_token', res.data.data.access_token)
-            localStorage.setItem('refresh_token', res.data.data.refresh_token)
-            error.config.headers.Authorization = `Bearer ${res.data.data.access_token}`
+          const d = res.data.data ?? res.data
+          if (d.access_token) {
+            localStorage.setItem('access_token', d.access_token)
+            localStorage.setItem('refresh_token', d.refresh_token)
+            error.config.headers.Authorization = `Bearer ${d.access_token}`
             return axios(error.config)
           }
         } catch {}

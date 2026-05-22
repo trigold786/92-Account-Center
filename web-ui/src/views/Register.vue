@@ -22,7 +22,7 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
-import { register, sendSMSCode } from '@/api/auth'
+import { register, sendSMSCode, verifySMSCode } from '@/api/auth'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()
@@ -51,6 +51,7 @@ async function doRegister() {
   if (!agree.value) { ElMessage.warning('请同意服务条款'); return }
   loading.value = true
   try {
+    await verifySMSCode(form.phone, form.code)
     await register({ phone: form.phone, password: form.password, code: form.code })
     await auth.doLogin(form.phone, form.password)
     ElMessage.success('注册成功')

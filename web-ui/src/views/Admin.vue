@@ -85,8 +85,13 @@ const blType = ref('ip'); const blValue = ref(''); const blReason = ref('')
 onMounted(async () => {
   try { const r = await getDashboardOverview(); overview.value = r.data.data } catch {}
   try { const r = await getSMSProviderStatus(); smsStatus.value = r.data.data } catch {}
-  try { const r = await getAuditLogs({ page_size: 20 }); auditLogs.value = r.data.data || [] } catch {}
-  try { const r = await listBlacklist({ page_size: 50 }); blacklist.value = r.data.data || [] } catch {}
+  try {
+    const now = new Date()
+    const weekAgo = new Date(now.getTime() - 7 * 86400000)
+    const r = await getAuditLogs({ start_time: weekAgo.toISOString(), end_time: now.toISOString(), limit: 20 })
+    auditLogs.value = r.data.data?.logs || r.data.data || []
+  } catch {}
+  try { const r = await listBlacklist({ limit: 50 }); blacklist.value = r.data.data || [] } catch {}
 })
 
 async function loadRisk() {

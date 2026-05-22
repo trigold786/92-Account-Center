@@ -4,24 +4,28 @@ export function getRiskHistory(userId: number) {
   return client.get(`/risk/history/${userId}`)
 }
 
-export function getAuditLogs(params: { page?: number; page_size?: number }) {
+export function getAuditLogs(params: { start_time: string; end_time: string; limit?: number; offset?: number }) {
   return client.get('/audit/logs', { params })
 }
 
-export function verifyAuditLog(logId: number) {
+export function verifyAuditLog(logId: string) {
   return client.get(`/audit/logs/${logId}/verify`)
 }
 
 export function cleanupAuditLogs(beforeDays: number) {
-  return client.post('/audit/logs/cleanup', { before_days: beforeDays })
+  return client.post('/audit/logs/cleanup', { retention_days: beforeDays })
 }
 
-export function listBlacklist(params: { type?: string; page?: number; page_size?: number }) {
+export function listBlacklist(params: { type?: string; limit?: number; offset?: number }) {
   return client.get('/blacklist/', { params })
 }
 
 export function addBlacklistEntry(data: { type: string; value: string; reason: string }) {
-  return client.post('/blacklist/', data)
+  return client.post('/blacklist/', {
+    entry_type: data.type.toUpperCase(),
+    entry_value: data.value,
+    reason: data.reason,
+  })
 }
 
 export function removeBlacklistEntry(type: string, value: string) {

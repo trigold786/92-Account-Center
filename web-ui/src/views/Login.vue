@@ -30,7 +30,7 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
-import { sendSMSCode } from '@/api/auth'
+import { sendSMSCode, loginWithCode } from '@/api/auth'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()
@@ -56,9 +56,22 @@ async function doLoginWithCode() {
   if (!form.credential || !form.code) { ElMessage.warning('请填写完整'); return }
   loading.value = true
   try {
-    await auth.doLogin(form.credential, form.password)
-    ElMessage.success('登录成功')
-    router.push('/')
+    const res = await loginWithCode(form.credential, form.code)
+    const d = res.data.data ?? res.data
+    if (d.access_token) {
+      auth.token = d.access_token
+      auth.refreshToken = d.refresh_token
+      auth.userId = d.user_id
+      auth.accountId = d.account_id
+      localStorage.setItem('access_token', d.access_token)
+      localStorage.setItem('refresh_token', d.refresh_token)
+      localStorage.setItem('user_id', String(d.user_id))
+      localStorage.setItem('account_id', d.account_id)
+      ElMessage.success('登录成功')
+      router.push('/')
+    } else {
+      ElMessage.error(d.message || d.error || '登录失败')
+    }
   } catch (e: any) { ElMessage.error(e.message || '登录失败') }
   loading.value = false
 }
