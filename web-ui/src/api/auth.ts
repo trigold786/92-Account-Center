@@ -17,13 +17,19 @@ export function logout() {
 }
 
 export function register(params: { phone: string; password: string; code: string }) {
-  return client.post('/account/register', params)
+  return client.post('/account/register', {
+    phone_number: params.phone,
+    password: params.password,
+    code: params.code,
+    account_id: `user_${Date.now()}`,
+    agree_to_terms: true,
+  })
 }
 
-export function sendSMSCode(phone: string, scene: string = 'login') {
-  return client.post('/sms/send', { phone, scene })
+export function sendSMSCode(phone: string) {
+  return client.post('/sms/send', { phone_number: phone })
 }
 
 export function verifySMSCode(phone: string, code: string) {
-  return client.post('/sms/verify', { phone, code })
+  return client.post('/sms/verify', { phone_number: phone, code })
 }

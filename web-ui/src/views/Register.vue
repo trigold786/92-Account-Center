@@ -37,7 +37,7 @@ async function sendCode() {
   if (!form.phone) { ElMessage.warning('请输入手机号'); return }
   codeSending.value = true
   try {
-    await sendSMSCode(form.phone, 'register')
+    await sendSMSCode(form.phone)
     ElMessage.success('验证码已发送')
     let sec = 60; codeBtnText.value = `${sec}s`
     const timer = setInterval(() => { sec--; codeBtnText.value = `${sec}s`; if (sec <= 0) { clearInterval(timer); codeBtnText.value = '重新获取'; codeSending.value = false } }, 1000)
