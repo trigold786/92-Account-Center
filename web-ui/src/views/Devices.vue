@@ -8,8 +8,8 @@
       <el-table-column label="可信" width="80"><template #default="{ row }"><el-tag :type="row.is_trusted ? 'success' : 'info'">{{ row.is_trusted ? '是' : '否' }}</el-tag></template></el-table-column>
       <el-table-column label="操作" width="120">
         <template #default="{ row }">
-          <el-button v-if="!row.is_trusted" size="small" @click="trustDevice(row.device_id)">信任</el-button>
-          <el-button size="small" type="danger" @click="removeDevice(row.device_id)">移除</el-button>
+          <el-button v-if="!row.is_trusted && hasPermission('device.trust')" size="small" @click="trustDevice(row.device_id)">信任</el-button>
+          <el-button size="small" type="danger" @click="removeDevice(row.device_id)" v-if="hasPermission('device.remove')">移除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -19,10 +19,13 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '@/store/auth'
+import { usePermissionStore } from '@/store/permission'
 import { getUserDevices, trustDevice, removeDevice } from '@/api/device'
 import { ElMessage } from 'element-plus'
 
 const auth = useAuthStore()
+const perm = usePermissionStore()
+const hasPermission = (p: string) => perm.hasPermission(p)
 const devices = ref<any[]>([])
 
 onMounted(async () => {

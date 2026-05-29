@@ -15,6 +15,7 @@ type GatewayConfig struct {
 	CreditServiceURL       string
 	ComplianceServiceURL   string
 	DataProductServiceURL  string
+	ConfigServiceURL       string
 	JWTSecret              string
 	Port                   string
 	RateLimitRPS           int
@@ -35,6 +36,7 @@ func Load(c *config.Client) (*GatewayConfig, error) {
 	cfg.CreditServiceURL = loadString(c, "CREDIT_SERVICE_URL", "CREDIT_SERVICE_URL", "http://localhost:30312")
 	cfg.ComplianceServiceURL = loadString(c, "COMPLIANCE_SERVICE_URL", "COMPLIANCE_SERVICE_URL", "http://localhost:30313")
 	cfg.DataProductServiceURL = loadString(c, "DATA_PRODUCT_SERVICE_URL", "DATA_PRODUCT_SERVICE_URL", "http://localhost:30314")
+	cfg.ConfigServiceURL = loadString(c, "CONFIG_SERVICE_URL", "CONFIG_SERVICE_URL", "http://localhost:30315")
 	cfg.JWTSecret = loadString(c, "JWT_SECRET", "JWT_SECRET", "default-secret")
 	cfg.Port = loadString(c, "GATEWAY_PORT", "PORT", "30300")
 	cfg.RateLimitRPS = loadInt(c, "GATEWAY_RATE_LIMIT_RPS", "RATE_LIMIT_RPS", 100)

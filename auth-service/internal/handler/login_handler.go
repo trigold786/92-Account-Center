@@ -20,14 +20,6 @@ type LoginRequest struct {
 	DeviceFingerprintID string `json:"device_fingerprint_id,omitempty"`
 }
 
-type LoginResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	ExpiresIn    int64  `json:"expires_in"`
-	UserID       int64  `json:"user_id"`
-	AccountID    string `json:"account_id"`
-}
-
 const rateLimitCleanupInterval = 5 * time.Minute
 const rateLimitEntryTTL = 2 * time.Minute
 
@@ -121,12 +113,13 @@ func (h *LoginHandler) Login(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, LoginResponse{
+	c.JSON(http.StatusOK, model.LoginResponse{
 		AccessToken:  resp.AccessToken,
 		RefreshToken: resp.RefreshToken,
 		ExpiresIn:    resp.ExpiresIn,
 		UserID:       resp.UserID,
 		AccountID:    resp.AccountID,
+		Roles:        resp.Roles,
 	})
 }
 
@@ -145,12 +138,13 @@ func (h *LoginHandler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, LoginResponse{
+	c.JSON(http.StatusOK, model.LoginResponse{
 		AccessToken:  resp.AccessToken,
 		RefreshToken: resp.RefreshToken,
 		ExpiresIn:    resp.ExpiresIn,
 		UserID:       resp.UserID,
 		AccountID:    resp.AccountID,
+		Roles:        resp.Roles,
 	})
 }
 
@@ -209,11 +203,12 @@ func (h *LoginHandler) LoginWithBiometric(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, LoginResponse{
+	c.JSON(http.StatusOK, model.LoginResponse{
 		AccessToken:  resp.AccessToken,
 		RefreshToken: resp.RefreshToken,
 		ExpiresIn:    resp.ExpiresIn,
 		UserID:       resp.UserID,
 		AccountID:    resp.AccountID,
+		Roles:        resp.Roles,
 	})
 }

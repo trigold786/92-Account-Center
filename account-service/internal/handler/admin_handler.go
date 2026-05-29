@@ -1,11 +1,11 @@
 package handler
 
 import (
+	"log/slog"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-
 	"github.com/trigold786/92-Account-Center/account-service/internal/model"
 	"github.com/trigold786/92-Account-Center/account-service/internal/service"
 )
@@ -27,6 +27,7 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 
 	resp, err := h.adminService.ListUsers(c.Request.Context(), &req)
 	if err != nil {
+		slog.Error("ListUsers failed", "error", err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}

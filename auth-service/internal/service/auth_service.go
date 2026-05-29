@@ -31,6 +31,11 @@ type UserRepository interface {
 	LinkSocialAccount(ctx context.Context, userID int64, provider, providerUID, email, avatar, accessToken, refreshToken string) error
 }
 
+type RoleRepository interface {
+	GetUserRoles(ctx context.Context, accountID string) ([]string, error)
+	GetUserRolesByUserID(ctx context.Context, userID int64) (string, []string, error)
+}
+
 type AuthService interface {
 	Login(ctx context.Context, req *model.LoginRequest) (*model.LoginResponse, error)
 	RefreshToken(ctx context.Context, refreshToken string) (*model.LoginResponse, error)
@@ -42,6 +47,7 @@ type AuthService interface {
 
 type authService struct {
 	userRepo                 UserRepository
+	roleRepo                 RoleRepository
 	jwtMgr                   *jwt.JWTManager
 	rdb                      *redis.Client
 	maxAttempts              int
@@ -50,9 +56,10 @@ type authService struct {
 	logger                   *slog.Logger
 }
 
-func NewAuthService(userRepo UserRepository, jwtMgr *jwt.JWTManager, rdb *redis.Client, cfg *svcconfig.AuthConfig) AuthService {
+func NewAuthService(userRepo UserRepository, roleRepo RoleRepository, jwtMgr *jwt.JWTManager, rdb *redis.Client, cfg *svcconfig.AuthConfig) AuthService {
 	return &authService{
 		userRepo:                 userRepo,
+		roleRepo:                 roleRepo,
 		jwtMgr:                   jwtMgr,
 		rdb:                      rdb,
 		maxAttempts:              cfg.LoginMaxAttempts,
@@ -169,11 +176,17 @@ func (s *authService) Login(ctx context.Context, req *model.LoginRequest) (*mode
 
 	s.resetFailedAttempts(req.Credential)
 
+	roles, err := s.roleRepo.GetUserRoles(ctx, user.AccountID)
+	if err != nil {
+		s.logger.Error("failed to get user roles", "account_id", user.AccountID, "error", err.Error())
+		roles = []string{}
+	}
+
 	var tokenResp *jwt.TokenResponse
 	if req.DeviceFingerprintID != "" {
-		tokenResp, err = s.jwtMgr.GenerateTokenPairWithDevice(user.ID, user.AccountID, req.DeviceFingerprintID)
+		tokenResp, err = s.jwtMgr.GenerateTokenPairWithDevice(user.ID, user.AccountID, req.DeviceFingerprintID, roles)
 	} else {
-		tokenResp, err = s.jwtMgr.GenerateTokenPairWithDevice(user.ID, user.AccountID, "")
+		tokenResp, err = s.jwtMgr.GenerateTokenPairWithDevice(user.ID, user.AccountID, "", roles)
 	}
 	if err != nil {
 		return nil, err
@@ -185,6 +198,7 @@ func (s *authService) Login(ctx context.Context, req *model.LoginRequest) (*mode
 		ExpiresIn:         tokenResp.ExpiresIn,
 		UserID:            user.ID,
 		AccountID:         user.AccountID,
+		Roles:             roles,
 		TokenID:           tokenResp.TokenID,
 		DeviceBindingInfo: tokenResp.DeviceBindingInfo,
 		IsTrusted:         true,
@@ -216,6 +230,7 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (*m
 		ExpiresIn:         tokenResp.ExpiresIn,
 		UserID:            claims.UserID,
 		AccountID:         claims.AccountID,
+		Roles:             claims.Roles,
 		TokenID:           tokenResp.TokenID,
 		DeviceBindingInfo: tokenResp.DeviceBindingInfo,
 		IsTrusted:         true,
@@ -321,7 +336,12 @@ func (s *authService) LoginWithBiometric(ctx context.Context, req *model.Biometr
 					return nil, fmt.Errorf("invalid credential user ID: %w", err)
 				}
 				user.AccountID = cred.UserID
-				tokenResp, err := s.jwtMgr.GenerateTokenPairWithDevice(user.ID, user.AccountID, req.DeviceFingerprint)
+				roles, err := s.roleRepo.GetUserRoles(ctx, user.AccountID)
+				if err != nil {
+					s.logger.Error("failed to get user roles", "account_id", user.AccountID, "error", err.Error())
+					roles = []string{}
+				}
+				tokenResp, err := s.jwtMgr.GenerateTokenPairWithDevice(user.ID, user.AccountID, req.DeviceFingerprint, roles)
 				if err != nil {
 					return nil, err
 				}
@@ -334,6 +354,7 @@ func (s *authService) LoginWithBiometric(ctx context.Context, req *model.Biometr
 					AccessToken:       tokenResp.AccessToken,
 					RefreshToken:      tokenResp.RefreshToken,
 					ExpiresIn:         tokenResp.ExpiresIn,
+					Roles:             roles,
 					TokenID:           tokenResp.TokenID,
 					DeviceBindingInfo: tokenResp.DeviceBindingInfo,
 					IsTrustedDevice:   true,

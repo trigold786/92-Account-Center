@@ -32,6 +32,11 @@ func (m *MockRoleRepository) CreateRole(ctx context.Context, r *model.Role) erro
 	return args.Error(0)
 }
 
+func (m *MockRoleRepository) DeleteRole(ctx context.Context, id int64) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
 func (m *MockRoleRepository) GetRolePermissions(ctx context.Context, roleID int64) ([]model.RolePermission, error) {
 	args := m.Called(ctx, roleID)
 	return args.Get(0).([]model.RolePermission), args.Error(1)

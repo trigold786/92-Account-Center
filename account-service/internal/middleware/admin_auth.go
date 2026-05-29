@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -65,17 +66,34 @@ func AdminAuthMiddleware(jwtSecret string) gin.HandlerFunc {
 			return
 		}
 
-		role, _ := claims["role"].(string)
+		roles := []string{}
+		if r, ok := claims["roles"].([]interface{}); ok {
+			for _, v := range r {
+				if s, ok := v.(string); ok {
+					roles = append(roles, s)
+				}
+			}
+		}
 
-		if role != "admin" {
+		hasAdmin := false
+		for _, r := range roles {
+			if r == "admin" || r == "system_owner" {
+				hasAdmin = true
+				break
+			}
+		}
+		if !hasAdmin {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "admin access required"})
 			return
 		}
 
 	userID, ok := claims["sub"].(string)
 	if !ok || userID == "" {
-		userID, ok = claims["user_id"].(string)
-		if !ok || userID == "" {
+		if uid, ok := claims["user_id"].(string); ok && uid != "" {
+			userID = uid
+		} else if uid, ok := claims["user_id"].(float64); ok {
+			userID = strconv.FormatInt(int64(uid), 10)
+		} else {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing user identity in token"})
 			return
 		}
@@ -83,7 +101,7 @@ func AdminAuthMiddleware(jwtSecret string) gin.HandlerFunc {
 	accountID, _ := claims["account_id"].(string)
 
 		c.Set("user_id", userID)
-		c.Set("admin_role", role)
+		c.Set("roles", roles)
 		c.Set("account_id", accountID)
 		c.Next()
 	}

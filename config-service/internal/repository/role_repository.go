@@ -11,6 +11,7 @@ type RoleRepository interface {
 	ListRoles(ctx context.Context) ([]model.Role, error)
 	GetRoleByID(ctx context.Context, id int64) (*model.Role, error)
 	CreateRole(ctx context.Context, r *model.Role) error
+	DeleteRole(ctx context.Context, id int64) error
 
 	GetRolePermissions(ctx context.Context, roleID int64) ([]model.RolePermission, error)
 	AddRolePermission(ctx context.Context, rp *model.RolePermission) error
@@ -111,6 +112,11 @@ func (r *roleRepository) GetUserRoles(ctx context.Context, userID string) ([]mod
 func (r *roleRepository) SetUserRole(ctx context.Context, ur *model.UserRole) error {
 	return r.db.QueryRowContext(ctx, "INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2) ON CONFLICT (user_id, role_id) DO NOTHING RETURNING id, created_at",
 		ur.UserID, ur.RoleID).Scan(&ur.ID, &ur.CreatedAt)
+}
+
+func (r *roleRepository) DeleteRole(ctx context.Context, id int64) error {
+	_, err := r.db.ExecContext(ctx, "DELETE FROM roles WHERE id = $1", id)
+	return err
 }
 
 func (r *roleRepository) RemoveUserRole(ctx context.Context, userID string, roleID int64) error {

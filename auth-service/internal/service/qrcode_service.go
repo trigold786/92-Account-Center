@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,16 +18,18 @@ import (
 type QRCodeService struct {
 	rdb       *redis.Client
 	jwtMgr    *jwt.JWTManager
+	roleRepo  RoleRepository
 	qrcodeTTL time.Duration
 }
 
-func NewQRCodeService(rdb *redis.Client, jwtMgr *jwt.JWTManager, qrcodeTTL time.Duration) *QRCodeService {
+func NewQRCodeService(rdb *redis.Client, jwtMgr *jwt.JWTManager, roleRepo RoleRepository, qrcodeTTL time.Duration) *QRCodeService {
 	if qrcodeTTL <= 0 {
 		qrcodeTTL = 5 * time.Minute
 	}
 	return &QRCodeService{
 		rdb:       rdb,
 		jwtMgr:    jwtMgr,
+		roleRepo:  roleRepo,
 		qrcodeTTL: qrcodeTTL,
 	}
 }
@@ -152,7 +155,14 @@ func (s *QRCodeService) Confirm(ctx context.Context, codeID string, userID int64
 		return nil, errors.New("user ID mismatch")
 	}
 
-	tokenResp, err := s.jwtMgr.GenerateTokenPairWithDevice(userID, fmt.Sprintf("%d", userID), "")
+	accountID, roles, err := s.roleRepo.GetUserRolesByUserID(ctx, userID)
+	if err != nil {
+		slog.Default().Error("failed to get user roles for qrcode", "user_id", userID, "error", err.Error())
+		accountID = fmt.Sprintf("%d", userID)
+		roles = []string{}
+	}
+
+	tokenResp, err := s.jwtMgr.GenerateTokenPairWithDevice(userID, accountID, "", roles)
 	if err != nil {
 		return nil, err
 	}

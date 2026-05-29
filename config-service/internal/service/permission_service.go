@@ -11,6 +11,7 @@ import (
 type PermissionService interface {
 	ListRoles(ctx context.Context) ([]model.Role, error)
 	CreateRole(ctx context.Context, role *model.Role, operator string) error
+	DeleteRole(ctx context.Context, id int64, operator string) error
 	GetRolePermissions(ctx context.Context, roleID int64) ([]model.RolePermission, error)
 	AddRolePermission(ctx context.Context, rp *model.RolePermission, operator string) error
 	RemoveRolePermission(ctx context.Context, id int64, operator string) error
@@ -18,6 +19,7 @@ type PermissionService interface {
 	SetUserRole(ctx context.Context, ur *model.UserRole, operator string) error
 	RemoveUserRole(ctx context.Context, userID string, roleID int64, operator string) error
 	CheckPermission(ctx context.Context, userID, permission string) (bool, error)
+	GetUserPermissions(ctx context.Context, userID string) ([]string, error)
 }
 
 type permissionService struct {
@@ -34,6 +36,14 @@ func NewPermissionService(roleRepo repository.RoleRepository, auditSvc AuditServ
 
 func (s *permissionService) ListRoles(ctx context.Context) ([]model.Role, error) {
 	return s.roleRepo.ListRoles(ctx)
+}
+
+func (s *permissionService) DeleteRole(ctx context.Context, id int64, operator string) error {
+	if err := s.roleRepo.DeleteRole(ctx, id); err != nil {
+		return err
+	}
+	s.auditSvc.Log(ctx, "DELETE_ROLE", fmt.Sprintf("roles:%d", id), operator, "success", "")
+	return nil
 }
 
 func (s *permissionService) CreateRole(ctx context.Context, role *model.Role, operator string) error {
@@ -103,4 +113,26 @@ func (s *permissionService) CheckPermission(ctx context.Context, userID, permiss
 		}
 	}
 	return false, nil
+}
+
+func (s *permissionService) GetUserPermissions(ctx context.Context, userID string) ([]string, error) {
+	userRoles, err := s.roleRepo.GetUserRoles(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	permSet := make(map[string]struct{})
+	for _, ur := range userRoles {
+		perms, err := s.roleRepo.GetRolePermissions(ctx, ur.RoleID)
+		if err != nil {
+			return nil, err
+		}
+		for _, p := range perms {
+			permSet[p.Permission] = struct{}{}
+		}
+	}
+	result := make([]string, 0, len(permSet))
+	for p := range permSet {
+		result = append(result, p)
+	}
+	return result, nil
 }

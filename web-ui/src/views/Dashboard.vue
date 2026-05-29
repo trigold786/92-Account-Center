@@ -20,23 +20,29 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useAuthStore } from '@/store/auth'
+import { usePermissionStore } from '@/store/permission'
 import { getRFMScore } from '@/api/data'
 import { getCreditAccount } from '@/api/credits'
 import { getSubscriptions } from '@/api/subscriptions'
 import { getTier } from '@/api/account'
 
 const auth = useAuthStore()
+const perm = usePermissionStore()
 const rfm = ref<any>(null)
 const credit = ref<any>(null)
 const subscription = ref<any>(null)
 const tier = ref('')
-const quickLinks = [
-  { path: '/account', name: '账户设置' }, { path: '/credits', name: '积分' },
-  { path: '/subscriptions', name: '订阅' }, { path: '/referral', name: '推荐' },
-  { path: '/devices', name: '设备管理' }, { path: '/admin', name: '管理后台' },
-]
+const quickLinks = computed(() => {
+  const links = [
+    { path: '/account', name: '账户设置' }, { path: '/credits', name: '积分' },
+    { path: '/subscriptions', name: '订阅' }, { path: '/referral', name: '推荐' },
+    { path: '/devices', name: '设备管理' },
+  ]
+  if (perm.hasAnyRole(['admin', 'system_owner', 'operator', 'finance', 'support'])) links.push({ path: '/admin', name: '管理后台' })
+  return links
+})
 
 onMounted(async () => {
   const uid = auth.userId

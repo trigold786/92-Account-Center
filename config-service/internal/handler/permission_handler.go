@@ -93,6 +93,77 @@ func (h *PermissionHandler) GetUserRoles(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "ok", "data": urs})
 }
 
+// RemoveRole DELETE /api/v1/config/roles/:id
+func (h *PermissionHandler) RemoveRole(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": "invalid id"})
+		return
+	}
+	operator := c.GetString("operator")
+	if err := h.permSvc.DeleteRole(c.Request.Context(), id, operator); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "ok"})
+}
+
+// RemoveRolePermission DELETE /api/v1/config/roles/:id/permissions/:permId
+func (h *PermissionHandler) RemoveRolePermission(c *gin.Context) {
+	permID, err := strconv.ParseInt(c.Param("permId"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": "invalid permission id"})
+		return
+	}
+	operator := c.GetString("operator")
+	if err := h.permSvc.RemoveRolePermission(c.Request.Context(), permID, operator); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "ok"})
+}
+
+// RemoveUserRole DELETE /api/v1/config/users/:userId/roles/:roleId
+func (h *PermissionHandler) RemoveUserRole(c *gin.Context) {
+	userID := c.Param("userId")
+	roleID, err := strconv.ParseInt(c.Param("roleId"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": "invalid role id"})
+		return
+	}
+	operator := c.GetString("operator")
+	if err := h.permSvc.RemoveUserRole(c.Request.Context(), userID, roleID, operator); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "ok"})
+}
+
+// GetUserPermissions GET /api/v1/config/users/:userId/permissions
+func (h *PermissionHandler) GetUserPermissions(c *gin.Context) {
+	userID := c.Param("userId")
+	if userID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": "invalid user id"})
+		return
+	}
+
+	operator := c.GetString("operator")
+	if operator != userID {
+		allowed, err := h.permSvc.CheckPermission(c.Request.Context(), operator, "permission.manage")
+		if err != nil || !allowed {
+			c.JSON(http.StatusForbidden, gin.H{"code": 5, "message": "permission denied"})
+			return
+		}
+	}
+
+	perms, err := h.permSvc.GetUserPermissions(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 2, "message": "internal error"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "ok", "data": perms})
+}
+
 // SetUserRole POST /api/v1/config/users/:userId/roles
 func (h *PermissionHandler) SetUserRole(c *gin.Context) {
 	userID := c.Param("userId")

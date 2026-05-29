@@ -1,0 +1,23 @@
+services:
+  registry-cache:
+    image: registry:2
+    container_name: registry-cache
+    ports:
+      - "5000:5000"
+    environment:
+      REGISTRY_PROXY_REMOTEURL: https://registry-1.docker.io
+      REGISTRY_STORAGE_CACHE_BLOBDESCRIPTOR: inmemory
+      REGISTRY_PROXY_USERAGENT: docker-cache/1.0
+    volumes:
+      - registry_cache:/var/lib/registry
+    networks:
+      - app_network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 128M
+    restart: always
+
+volumes:
+  registry_cache:

@@ -367,7 +367,7 @@ func (s *userService) GetProfile(ctx context.Context, userID int64) (*model.User
 		ID:          user.ID,
 		PhoneNumber: user.PhoneNumber,
 		AccountID:   user.AccountID,
-		Email:       user.Email,
+		Email:       *user.Email,
 		MFAEnabled:  user.MFAEnabled,
 		CreatedAt:   user.CreatedAt,
 		UpdatedAt:   user.UpdatedAt,

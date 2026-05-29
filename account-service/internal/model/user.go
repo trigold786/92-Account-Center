@@ -8,10 +8,10 @@ type User struct {
 	ID                  int64      `json:"id" db:"id"`
 	PhoneNumber         string     `json:"phone_number" db:"phone_number"`
 	AccountID           string     `json:"account_id" db:"account_id"`
-	Email               string     `json:"email,omitempty" db:"email"`
+	Email               *string    `json:"email,omitempty" db:"email"`
 	PasswordHash        string     `json:"-" db:"password_hash"`
 	MFAEnabled          bool       `json:"mfa_enabled" db:"mfa_enabled"`
-	MFASecret           string     `json:"-" db:"mfa_secret"`
+	MFASecret           *string    `json:"-" db:"mfa_secret"`
 	LastStrongAuthAt    *time.Time `json:"last_strong_auth_at,omitempty" db:"last_strong_auth_at"`
 	IdentityTier        int        `json:"identity_tier" db:"identity_tier"`
 	Status              string     `json:"status" db:"status"`

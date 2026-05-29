@@ -104,9 +104,24 @@ func main() {
 	r.Use(middleware.HMACVerifyMiddleware(svcCfg.JWTSecret))
 	r.Use(middleware.SanitizeInputMiddleware())
 
+	roleRoutes := []middleware.RouteRoleConfig{
+		{Prefix: "/api/v1/admin/", Roles: []string{"admin", "system_owner"}},
+		{Prefix: "/api/v1/audit/", Roles: []string{"admin", "operator", "system_owner"}},
+		{Prefix: "/api/v1/blacklist/", Roles: []string{"admin", "operator", "system_owner"}},
+		{Prefix: "/api/v1/kyb/", Roles: []string{"admin", "system_owner"}},
+		{Prefix: "/api/v1/config/users/", Roles: []string{}},  // any authenticated user can query own permissions
+		{Prefix: "/api/v1/config/", Roles: []string{"admin", "system_owner", "config_editor", "config_viewer"}},
+		{Prefix: "/api/v1/risk/", Roles: []string{"admin", "operator", "support"}},
+		{Prefix: "/api/v1/orders/", Roles: []string{"admin", "finance"}},
+		{Prefix: "/api/v1/invoices/", Roles: []string{"admin", "finance"}},
+		{Prefix: "/api/v1/refunds/", Roles: []string{"admin", "finance"}},
+	}
+	r.Use(middleware.RoleGuardMiddleware(roleRoutes))
+
 	r.Any("/api/v1/account/*path", proxyHandler(svcCfg.AccountServiceURL, svcCfg))
 	r.Any("/api/v1/entitlements/*path", proxyHandler(svcCfg.AccountServiceURL, svcCfg))
 	r.Any("/api/v1/subscriptions/*path", proxyHandler(svcCfg.AccountServiceURL, svcCfg))
+	r.Any("/api/v1/admin/*path", proxyHandler(svcCfg.AccountServiceURL, svcCfg))
 	r.Any("/api/v1/auth/*path", proxyHandler(svcCfg.AuthServiceURL, svcCfg))
 	r.Any("/api/v1/session/*path", proxyHandler(svcCfg.AuthServiceURL, svcCfg))
 	r.Any("/api/v1/device/*path", proxyHandler(svcCfg.AuthServiceURL, svcCfg))
@@ -119,6 +134,7 @@ func main() {
 	r.Any("/api/v1/risk/*path", proxyHandler(svcCfg.ComplianceServiceURL, svcCfg))
 	r.Any("/api/v1/audit/*path", proxyHandler(svcCfg.ComplianceServiceURL, svcCfg))
 	r.Any("/api/v1/kyb/*path", proxyHandler(svcCfg.ComplianceServiceURL, svcCfg))
+	r.Any("/api/v1/config/*path", proxyHandler(svcCfg.ConfigServiceURL, svcCfg))
 	r.Any("/api/v1/data/*path", proxyHandler(svcCfg.DataProductServiceURL, svcCfg))
 
 	v2Routes := []struct {
@@ -223,6 +239,20 @@ func proxyHandler(target string, cfg *svcconfig.GatewayConfig) gin.HandlerFunc {
 		c.Header("X-Request-ID", c.GetHeader("X-Request-ID"))
 		c.Header("X-Forwarded-For", c.ClientIP())
 
+		if operator, exists := c.Get("account_id"); exists {
+			if op, ok := operator.(string); ok && op != "" {
+				c.Request.Header.Set("X-Operator", op)
+			} else if userID, exists := c.Get("user_id"); exists {
+				if uid, ok := userID.(string); ok && uid != "" {
+					c.Request.Header.Set("X-Operator", uid)
+				}
+			}
+		} else if userID, exists := c.Get("user_id"); exists {
+			if uid, ok := userID.(string); ok && uid != "" {
+				c.Request.Header.Set("X-Operator", uid)
+			}
+		}
+
 		proxy.ServeHTTP(wrapWriter(c), c.Request)
 	}
 }
@@ -253,6 +283,12 @@ func v2ProxyHandler(target string, cfg *svcconfig.GatewayConfig) gin.HandlerFunc
 		c.Header("X-Request-ID", c.GetHeader("X-Request-ID"))
 		c.Header("X-Forwarded-For", c.ClientIP())
 		c.Header("X-API-Version", "2")
+
+		if operator, exists := c.Get("account_id"); exists {
+			if op, ok := operator.(string); ok && op != "" {
+				c.Request.Header.Set("X-Operator", op)
+			}
+		}
 
 		proxy.ServeHTTP(wrapWriter(c), c.Request)
 	}

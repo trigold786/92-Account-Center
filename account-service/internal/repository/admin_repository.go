@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/trigold786/92-Account-Center/account-service/internal/model"
@@ -71,6 +72,7 @@ func (r *adminRepository) ListUsers(ctx context.Context, page, pageSize int, sea
 	countQuery := "SELECT COUNT(*) FROM users" + whereClause
 	var total int
 	if err := r.db.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
+		slog.Error("admin count query failed", "query", countQuery, "args", args, "error", err.Error())
 		return nil, 0, err
 	}
 
@@ -90,6 +92,7 @@ func (r *adminRepository) ListUsers(ctx context.Context, page, pageSize int, sea
 
 	rows, err := r.db.QueryContext(ctx, listQuery, args...)
 	if err != nil {
+		slog.Error("admin list query failed", "query", listQuery, "args", args, "error", err.Error())
 		return nil, 0, err
 	}
 	defer rows.Close()
@@ -104,6 +107,7 @@ func (r *adminRepository) ListUsers(ctx context.Context, page, pageSize int, sea
 			&u.DeletionRequestedAt, &u.DeletionExpiresAt,
 			&u.DeletionCancelledAt, &u.DeletionDeletedAt,
 		); err != nil {
+			slog.Error("admin scan user failed", "error", err.Error())
 			return nil, 0, err
 		}
 		users = append(users, u)

@@ -17,10 +17,11 @@ type JWTManager struct {
 }
 
 type Claims struct {
-	UserID         int64  `json:"user_id"`
-	AccountID      string `json:"account_id"`
-	TokenID        string `json:"token_id"`
-	DeviceFingerprint string `json:"device_fingerprint,omitempty"`
+	UserID           int64    `json:"user_id"`
+	AccountID        string   `json:"account_id"`
+	TokenID          string   `json:"token_id"`
+	DeviceFingerprint string  `json:"device_fingerprint,omitempty"`
+	Roles            []string `json:"roles,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -47,14 +48,14 @@ func generateTokenID() string {
 	return base64.URLEncoding.EncodeToString(b)
 }
 
-func (m *JWTManager) GenerateTokenPair(userID int64, accountID string) (string, string, error) {
+func (m *JWTManager) GenerateTokenPair(userID int64, accountID string, roles []string) (string, string, error) {
 	tokenID := generateTokenID()
-	accessToken, err := m.generateToken(userID, accountID, tokenID, "", m.accessSecret, m.accessExpiry)
+	accessToken, err := m.generateToken(userID, accountID, tokenID, "", roles, m.accessSecret, m.accessExpiry)
 	if err != nil {
 		return "", "", err
 	}
 
-	refreshToken, err := m.generateToken(userID, accountID, tokenID, "", m.refreshSecret, m.refreshExpiry)
+	refreshToken, err := m.generateToken(userID, accountID, tokenID, "", roles, m.refreshSecret, m.refreshExpiry)
 	if err != nil {
 		return "", "", err
 	}
@@ -62,14 +63,14 @@ func (m *JWTManager) GenerateTokenPair(userID int64, accountID string) (string, 
 	return accessToken, refreshToken, nil
 }
 
-func (m *JWTManager) GenerateTokenPairWithDevice(userID int64, accountID, deviceFingerprint string) (*TokenResponse, error) {
+func (m *JWTManager) GenerateTokenPairWithDevice(userID int64, accountID, deviceFingerprint string, roles []string) (*TokenResponse, error) {
 	tokenID := generateTokenID()
-	accessToken, err := m.generateToken(userID, accountID, tokenID, deviceFingerprint, m.accessSecret, m.accessExpiry)
+	accessToken, err := m.generateToken(userID, accountID, tokenID, deviceFingerprint, roles, m.accessSecret, m.accessExpiry)
 	if err != nil {
 		return nil, err
 	}
 
-	refreshToken, err := m.generateToken(userID, accountID, tokenID, deviceFingerprint, m.refreshSecret, m.refreshExpiry)
+	refreshToken, err := m.generateToken(userID, accountID, tokenID, deviceFingerprint, roles, m.refreshSecret, m.refreshExpiry)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +119,7 @@ func (m *JWTManager) RefreshAccessToken(refreshToken string) (string, error) {
 		return "", errors.New("invalid refresh token")
 	}
 
-	return m.generateToken(claims.UserID, claims.AccountID, claims.TokenID, claims.DeviceFingerprint, m.accessSecret, m.accessExpiry)
+	return m.generateToken(claims.UserID, claims.AccountID, claims.TokenID, claims.DeviceFingerprint, claims.Roles, m.accessSecret, m.accessExpiry)
 }
 
 func (m *JWTManager) RefreshTokenPair(refreshToken string) (*TokenResponse, error) {
@@ -130,15 +131,16 @@ func (m *JWTManager) RefreshTokenPair(refreshToken string) (*TokenResponse, erro
 		return nil, errors.New("invalid refresh token")
 	}
 
-	return m.GenerateTokenPairWithDevice(claims.UserID, claims.AccountID, claims.DeviceFingerprint)
+	return m.GenerateTokenPairWithDevice(claims.UserID, claims.AccountID, claims.DeviceFingerprint, claims.Roles)
 }
 
-func (m *JWTManager) generateToken(userID int64, accountID, tokenID, deviceFingerprint, secret string, expiry time.Duration) (string, error) {
+func (m *JWTManager) generateToken(userID int64, accountID, tokenID, deviceFingerprint string, roles []string, secret string, expiry time.Duration) (string, error) {
 	claims := Claims{
 		UserID:         userID,
 		AccountID:      accountID,
 		TokenID:        tokenID,
 		DeviceFingerprint: deviceFingerprint,
+		Roles:          roles,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiry)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

@@ -35,3 +35,15 @@ export function removeBlacklistEntry(type: string, value: string) {
 export function getSMSProviderStatus() {
   return client.get('/sms/providers/status')
 }
+
+export function listUsers(params: { q?: string; page?: number; limit?: number }) {
+  return client.get('/admin/users', { params })
+}
+
+export function updateUserStatus(userId: number, action: string) {
+  return client.put(`/admin/users/${userId}/status`, { action })
+}
+
+export function updateUserTier(userId: number, tier: string) {
+  return client.put(`/admin/users/${userId}/tier`, { identity_tier: tier })
+}

@@ -8,7 +8,7 @@ import (
 func TestGenerateTokenPair(t *testing.T) {
 	mgr := NewJWTManager("access-secret", "refresh-secret", 15*time.Minute, 24*time.Hour)
 
-	accessToken, refreshToken, err := mgr.GenerateTokenPair(1, "account123")
+	accessToken, refreshToken, err := mgr.GenerateTokenPair(1, "account123", []string{})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -26,7 +26,7 @@ func TestGenerateTokenPair(t *testing.T) {
 func TestValidateToken_AccessToken(t *testing.T) {
 	mgr := NewJWTManager("access-secret", "refresh-secret", 15*time.Minute, 24*time.Hour)
 
-	accessToken, _, err := mgr.GenerateTokenPair(42, "acct42")
+	accessToken, _, err := mgr.GenerateTokenPair(42, "acct42", []string{})
 	if err != nil {
 		t.Fatalf("generate token pair failed: %v", err)
 	}
@@ -46,7 +46,7 @@ func TestValidateToken_AccessToken(t *testing.T) {
 func TestValidateToken_RefreshToken(t *testing.T) {
 	mgr := NewJWTManager("access-secret", "refresh-secret", 15*time.Minute, 24*time.Hour)
 
-	_, refreshToken, err := mgr.GenerateTokenPair(10, "acct10")
+	_, refreshToken, err := mgr.GenerateTokenPair(10, "acct10", []string{})
 	if err != nil {
 		t.Fatalf("generate token pair failed: %v", err)
 	}
@@ -73,7 +73,7 @@ func TestValidateToken_WrongSecret(t *testing.T) {
 	mgr1 := NewJWTManager("secret1", "secret1", 15*time.Minute, 24*time.Hour)
 	mgr2 := NewJWTManager("secret2", "secret2", 15*time.Minute, 24*time.Hour)
 
-	token, _, _ := mgr1.GenerateTokenPair(1, "acct1")
+	token, _, _ := mgr1.GenerateTokenPair(1, "acct1", []string{})
 
 	_, err := mgr2.ValidateToken(token)
 	if err == nil {
@@ -84,7 +84,7 @@ func TestValidateToken_WrongSecret(t *testing.T) {
 func TestRefreshAccessToken(t *testing.T) {
 	mgr := NewJWTManager("access-secret", "refresh-secret", 15*time.Minute, 24*time.Hour)
 
-	_, refreshToken, err := mgr.GenerateTokenPair(5, "acct5")
+	_, refreshToken, err := mgr.GenerateTokenPair(5, "acct5", []string{})
 	if err != nil {
 		t.Fatalf("generate token pair failed: %v", err)
 	}
@@ -118,7 +118,7 @@ func TestRefreshAccessToken_InvalidToken(t *testing.T) {
 func TestRefreshAccessToken_WithAccessTokenFails(t *testing.T) {
 	mgr := NewJWTManager("access-secret", "refresh-secret", 15*time.Minute, 24*time.Hour)
 
-	accessToken, _, _ := mgr.GenerateTokenPair(1, "acct1")
+	accessToken, _, _ := mgr.GenerateTokenPair(1, "acct1", []string{})
 
 	_, err := mgr.RefreshAccessToken(accessToken)
 	if err == nil {
@@ -129,7 +129,7 @@ func TestRefreshAccessToken_WithAccessTokenFails(t *testing.T) {
 func TestTokenExpiry(t *testing.T) {
 	mgr := NewJWTManager("access-secret", "refresh-secret", 15*time.Minute, 24*time.Hour)
 
-	accessToken, _, _ := mgr.GenerateTokenPair(1, "acct1")
+	accessToken, _, _ := mgr.GenerateTokenPair(1, "acct1", []string{})
 
 	claims, err := mgr.ValidateToken(accessToken)
 	if err != nil {
@@ -163,7 +163,7 @@ func TestMultipleTokenPairs(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		accessToken, _, err := mgr.GenerateTokenPair(tt.userID, tt.accountID)
+		accessToken, _, err := mgr.GenerateTokenPair(tt.userID, tt.accountID, []string{})
 		if err != nil {
 			t.Fatalf("generate token pair failed for user %d: %v", tt.userID, err)
 		}

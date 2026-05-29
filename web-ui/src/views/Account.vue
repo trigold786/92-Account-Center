@@ -6,7 +6,7 @@
       <p>等级: {{ tier }}</p>
     </el-card>
 
-    <el-card style="margin-top:16px"><template #header>修改密码</template>
+    <el-card style="margin-top:16px" v-if="hasPermission('account.password.change')"><template #header>修改密码</template>
       <el-form label-width="100px">
         <el-form-item label="验证方式">
           <el-select v-model="pwd.verificationType" placeholder="选择验证方式">
@@ -16,19 +16,19 @@
           </el-select>
         </el-form-item>
         <el-form-item v-if="pwd.verificationType !== 'password'" label="联系方式">
-          <el-input v-model="pwd.credential" :placeholder="pwd.verificationType === 'email_otp' ? '邮箱地址' : '手机号'" />
+          <el-input v-model="pwd.credential" :placeholder="pwd.verificationType === 'email_otp' ? '邮箱地址' : '手机号'" @keyup.enter="sendPwdCode" />
         </el-form-item>
         <el-form-item v-if="pwd.verificationType !== 'password'">
           <el-button @click="sendPwdCode" :disabled="pwdSending">{{ pwdBtnText }}</el-button>
         </el-form-item>
-        <el-form-item v-if="pwd.verificationType !== 'password'" label="验证码"><el-input v-model="pwd.verificationCode" /></el-form-item>
-        <el-form-item v-if="pwd.verificationType === 'password'" label="当前密码"><el-input v-model="pwd.currentPassword" type="password" /></el-form-item>
-        <el-form-item label="新密码"><el-input v-model="pwd.newPassword" type="password" /></el-form-item>
+        <el-form-item v-if="pwd.verificationType !== 'password'" label="验证码"><el-input v-model="pwd.verificationCode" @keyup.enter="changePwd" /></el-form-item>
+        <el-form-item v-if="pwd.verificationType === 'password'" label="当前密码"><el-input v-model="pwd.currentPassword" type="password" @keyup.enter="changePwd" /></el-form-item>
+        <el-form-item label="新密码"><el-input v-model="pwd.newPassword" type="password" @keyup.enter="changePwd" /></el-form-item>
         <el-form-item><el-button type="primary" @click="changePwd">确认修改</el-button></el-form-item>
       </el-form>
     </el-card>
 
-    <el-card style="margin-top:16px"><template #header>注销账户</template>
+    <el-card style="margin-top:16px" v-if="hasPermission('account.delete.apply')"><template #header>注销账户</template>
       <p style="color:var(--text-secondary);margin-bottom:12px">注销后将有30天冻结期，期间可撤销</p>
       <div v-if="!delStatus" style="margin-bottom:12px">
         <el-form label-width="100px">
@@ -50,11 +50,14 @@
 <script setup lang="ts">
 import { ref, onMounted, reactive } from 'vue'
 import { useAuthStore } from '@/store/auth'
+import { usePermissionStore } from '@/store/permission'
 import { getTier, changePassword, sendPasswordCode, requestDeletion, cancelDeletion, getDeletionStatus } from '@/api/account'
 import { sendSMSCode } from '@/api/auth'
 import { ElMessage } from 'element-plus'
 
 const auth = useAuthStore()
+const perm = usePermissionStore()
+const hasPermission = (p: string) => perm.hasPermission(p)
 const tier = ref('')
 const pwd = reactive({ credential: '', verificationCode: '', newPassword: '', currentPassword: '', verificationType: 'sms_code' })
 const pwdSending = ref(false); const pwdBtnText = ref('发送验证码')
@@ -76,10 +79,19 @@ async function sendPwdCode() {
     } else {
       await sendPasswordCode(pwd.credential)
     }
-    ElMessage.success('验证码已发送')
+    const isDev = import.meta.env.DEV
+    ElMessage.success(isDev ? '验证码已发送（开发模式验证码: 012345）' : '验证码已发送')
     let s = 60; pwdBtnText.value = `${s}s`
     const t = setInterval(() => { s--; pwdBtnText.value = `${s}s`; if (s <= 0) { clearInterval(t); pwdBtnText.value = '重新获取'; pwdSending.value = false } }, 1000)
-  } catch { pwdSending.value = false }
+  } catch (e: any) {
+    const msg = e?.response?.data?.error || e?.response?.data?.message || '发送失败'
+    if (msg.includes('rate limit') || msg.includes('频繁')) {
+      ElMessage.warning('发送过于频繁，请稍后再试')
+    } else {
+      ElMessage.error(msg)
+    }
+    pwdSending.value = false
+  }
 }
 
 async function changePwd() {

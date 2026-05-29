@@ -173,11 +173,17 @@ func main() {
 	{
 		permGroup.GET("/roles", permH.ListRoles)
 		permGroup.POST("/roles", permH.CreateRole)
+		permGroup.DELETE("/roles/:id", permH.RemoveRole)
 		permGroup.GET("/roles/:id/permissions", permH.GetRolePermissions)
 		permGroup.POST("/roles/:id/permissions", permH.AddRolePermission)
+		permGroup.DELETE("/roles/:id/permissions/:permId", permH.RemoveRolePermission)
 		permGroup.GET("/users/:userId/roles", permH.GetUserRoles)
 		permGroup.POST("/users/:userId/roles", permH.SetUserRole)
+		permGroup.DELETE("/users/:userId/roles/:roleId", permH.RemoveUserRole)
 	}
+
+	// User permissions endpoint (self-service, no specific permission required beyond auth)
+	r.GET("/api/v1/config/users/:userId/permissions", authMiddleware(""), permH.GetUserPermissions)
 
 	// Stats route
 	r.GET("/api/v1/config/stats", authMiddleware("config.read"), func(c *gin.Context) {

@@ -13,6 +13,7 @@ declare module 'vue' {
     ElCheckbox: typeof import('element-plus/es')['ElCheckbox']
     ElCol: typeof import('element-plus/es')['ElCol']
     ElContainer: typeof import('element-plus/es')['ElContainer']
+    ElDialog: typeof import('element-plus/es')['ElDialog']
     ElForm: typeof import('element-plus/es')['ElForm']
     ElFormItem: typeof import('element-plus/es')['ElFormItem']
     ElIcon: typeof import('element-plus/es')['ElIcon']
@@ -34,5 +35,8 @@ declare module 'vue' {
     SkeletonScreen: typeof import('./src/components/SkeletonScreen.vue')['default']
     SkipLink: typeof import('./src/components/a11y/SkipLink.vue')['default']
     VisuallyHidden: typeof import('./src/components/a11y/VisuallyHidden.vue')['default']
+  }
+  export interface ComponentCustomProperties {
+    vLoading: typeof import('element-plus/es')['ElLoadingDirective']
   }
 }

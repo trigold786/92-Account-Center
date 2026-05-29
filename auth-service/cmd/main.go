@@ -83,6 +83,7 @@ func main() {
 	jwtMgr := jwt.NewJWTManager(accessSecret, refreshSecret, authCfg.JwtAccessTokenExpire, authCfg.JwtRefreshTokenExpire)
 
 	userRepo := repository.NewUserRepository(db)
+	roleRepo := repository.NewRoleRepository(db)
 
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     getEnv("REDIS_ADDR", "localhost:6379"),
@@ -109,7 +110,7 @@ func main() {
 	}
 	compositeHealth := healthpkg.CompositeChecker{Checkers: healthCheckers}
 
-	authService := service.NewAuthService(userRepo, jwtMgr, rdb, authCfg)
+	authService := service.NewAuthService(userRepo, roleRepo, jwtMgr, rdb, authCfg)
 	loginHandler := handler.NewLoginHandler(authService, authCfg.LoginRateLimitPerIP)
 
 	sessionRepo := repository.NewSessionRepository(rdb, authCfg.SessionTimeout)
@@ -120,7 +121,7 @@ func main() {
 	deviceSvc := service.NewDeviceFingerprintService(deviceRepo, authCfg.DeviceTrustDays, 0.3)
 	deviceHandler := handler.NewDeviceHandler(deviceSvc)
 
-	qrcodeSvc := service.NewQRCodeService(rdb, jwtMgr, authCfg.QRCodeExpire)
+	qrcodeSvc := service.NewQRCodeService(rdb, jwtMgr, roleRepo, authCfg.QRCodeExpire)
 	qrcodeHandler := handler.NewQRCodeHandler(qrcodeSvc)
 
 	oauthRegistry := service.NewOAuthProviderRegistry()

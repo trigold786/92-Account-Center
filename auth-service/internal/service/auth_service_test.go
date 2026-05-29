@@ -60,6 +60,16 @@ func (m *mockUserRepo) LinkSocialAccount(ctx context.Context, userID int64, prov
 	return nil
 }
 
+type mockRoleRepo struct{}
+
+func (m *mockRoleRepo) GetUserRoles(ctx context.Context, accountID string) ([]string, error) {
+	return []string{}, nil
+}
+
+func (m *mockRoleRepo) GetUserRolesByUserID(ctx context.Context, userID int64) (string, []string, error) {
+	return "", []string{}, nil
+}
+
 func newTestAuthService(repo UserRepository) AuthService {
 	jwtMgr := jwt.NewJWTManager("test-access-secret", "test-refresh-secret", 15*time.Minute, 24*time.Hour)
 	cfg := &svcconfig.AuthConfig{
@@ -68,7 +78,7 @@ func newTestAuthService(repo UserRepository) AuthService {
 		LoginMaxAttempts:      5,
 		LoginLockoutDuration:  15 * time.Minute,
 	}
-	return NewAuthService(repo, jwtMgr, nil, cfg)
+	return NewAuthService(repo, &mockRoleRepo{}, jwtMgr, nil, cfg)
 }
 
 func makeTestUser() *model.User {
