@@ -5,6 +5,7 @@ import (
 	"sync"
 )
 
+// PaymentProvider defines the contract for payment gateway integrations.
 type PaymentProvider interface {
 	CreatePayment(ctx context.Context, req *CreatePaymentRequest) (*CreatePaymentResponse, error)
 	QueryPayment(ctx context.Context, orderNo string) (*PaymentStatus, error)

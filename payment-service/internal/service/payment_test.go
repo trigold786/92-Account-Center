@@ -45,6 +45,52 @@ func TestProviderRegistry_List(t *testing.T) {
 	assert.Contains(t, names, "alipay")
 }
 
+func TestWeChatProvider_ProductionModeRequiresRealCredentials(t *testing.T) {
+	cfg := WeChatPayConfig{
+		Mode:                "production",
+		AppID:               "wx_sandbox_app_id",
+		MchID:               "sandbox_mch_id",
+		APIKey:              "sandbox_api_key",
+		CertificateSerialNo: "",
+		PrivateKeyPath:      "",
+	}
+	err := cfg.ValidateProduction()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "production")
+
+	cfg = WeChatPayConfig{
+		Mode:                "production",
+		AppID:               "wx_real_app_id",
+		MchID:               "real_mch_id",
+		APIKey:              "real_api_key",
+		CertificateSerialNo: "real_cert_serial",
+		PrivateKeyPath:      "C:/secure/wechat_private_key.pem",
+	}
+	assert.NoError(t, cfg.ValidateProduction())
+}
+
+func TestAlipayProvider_ProductionModeRequiresRealCredentials(t *testing.T) {
+	cfg := AlipayConfig{
+		Mode:       "production",
+		AppID:      "alipay_sandbox_app_id",
+		PrivateKey: "sandbox_private_key",
+		PublicKey:  "sandbox_public_key",
+		NotifyURL:  "http://localhost:30316/api/v1/payment/callback/alipay",
+	}
+	err := cfg.ValidateProduction()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "production")
+
+	cfg = AlipayConfig{
+		Mode:       "production",
+		AppID:      "real_alipay_app_id",
+		PrivateKey: "real_private_key",
+		PublicKey:  "real_public_key",
+		NotifyURL:  "https://pay.example.com/api/v1/payment/callback/alipay",
+	}
+	assert.NoError(t, cfg.ValidateProduction())
+}
+
 func TestWeChatProvider_Name(t *testing.T) {
 	p := NewWeChatPayProvider(WeChatPayConfig{
 		AppID:  "wx_test",
@@ -153,23 +199,53 @@ func TestWeChatProvider_VerifyCallback(t *testing.T) {
 		"total_amount":   "100.00",
 		"time_paid":      "2025-01-01 12:00:00",
 	})
+	headers := signedWeChatHeaders(apiKey, body)
+	result, err := p.VerifyCallback(context.Background(), headers, body)
+	assert.NoError(t, err)
+	assert.Equal(t, "PAY001", result.OrderNo)
+	assert.Equal(t, "TXN001", result.TransactionID)
+	assert.Equal(t, "SUCCESS", result.Status)
+}
+
+func TestWeChatProvider_VerifyCallback_RejectsMissingSignature(t *testing.T) {
+	p := NewWeChatPayProvider(WeChatPayConfig{APIKey: "test_key"})
+	body, _ := json.Marshal(map[string]interface{}{
+		"out_trade_no": "PAY001",
+		"result_code":  "SUCCESS",
+	})
+	result, err := p.VerifyCallback(context.Background(), map[string]string{}, body)
+	assert.Nil(t, result)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "signature")
+	}
+}
+
+func TestWeChatProvider_VerifyCallback_RejectsInvalidSignature(t *testing.T) {
+	p := NewWeChatPayProvider(WeChatPayConfig{APIKey: "test_key"})
+	body, _ := json.Marshal(map[string]interface{}{
+		"out_trade_no": "PAY001",
+		"result_code":  "SUCCESS",
+	})
+	headers := signedWeChatHeaders("wrong_key", body)
+	result, err := p.VerifyCallback(context.Background(), headers, body)
+	assert.Nil(t, result)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "signature")
+	}
+}
+
+func signedWeChatHeaders(apiKey string, body []byte) map[string]string {
 	timestamp := "1234567890"
 	nonce := "abc123"
 	message := timestamp + "\n" + nonce + "\n" + string(body) + "\n"
 	mac := hmac.New(sha256.New, []byte(apiKey))
 	mac.Write([]byte(message))
 	sig := hex.EncodeToString(mac.Sum(nil))
-
-	headers := map[string]string{
+	return map[string]string{
 		"Wechatpay-Timestamp": timestamp,
 		"Wechatpay-Nonce":     nonce,
 		"Wechatpay-Signature": sig,
 	}
-	result, err := p.VerifyCallback(context.Background(), headers, body)
-	assert.NoError(t, err)
-	assert.Equal(t, "PAY001", result.OrderNo)
-	assert.Equal(t, "TXN001", result.TransactionID)
-	assert.Equal(t, "SUCCESS", result.Status)
 }
 
 func TestAlipayProvider_Name(t *testing.T) {
@@ -245,10 +321,44 @@ func TestAlipayProvider_VerifyCallback_Success(t *testing.T) {
 		"total_amount": "200.00",
 		"gmt_payment":  "2025-01-01 12:00:00",
 	})
-	result, err := p.VerifyCallback(context.Background(), map[string]string{}, body)
+	headers := signedAlipayHeaders("test_key", body)
+	result, err := p.VerifyCallback(context.Background(), headers, body)
 	assert.NoError(t, err)
 	assert.Equal(t, "PAY001", result.OrderNo)
 	assert.Equal(t, "SUCCESS", result.Status)
+}
+
+func TestAlipayProvider_VerifyCallback_RejectsMissingSignature(t *testing.T) {
+	p := NewAlipayProvider(AlipayConfig{PrivateKey: "test_key"})
+	body, _ := json.Marshal(map[string]interface{}{
+		"out_trade_no": "PAY001",
+		"trade_status": "TRADE_SUCCESS",
+	})
+	result, err := p.VerifyCallback(context.Background(), map[string]string{}, body)
+	assert.Nil(t, result)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "signature")
+	}
+}
+
+func TestAlipayProvider_VerifyCallback_RejectsInvalidSignature(t *testing.T) {
+	p := NewAlipayProvider(AlipayConfig{PrivateKey: "test_key"})
+	body, _ := json.Marshal(map[string]interface{}{
+		"out_trade_no": "PAY001",
+		"trade_status": "TRADE_SUCCESS",
+	})
+	headers := signedAlipayHeaders("wrong_key", body)
+	result, err := p.VerifyCallback(context.Background(), headers, body)
+	assert.Nil(t, result)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "signature")
+	}
+}
+
+func signedAlipayHeaders(secret string, body []byte) map[string]string {
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(body)
+	return map[string]string{"Alipay-Signature": hex.EncodeToString(mac.Sum(nil))}
 }
 
 func TestAlipayProvider_VerifyCallback_Fail(t *testing.T) {
@@ -257,9 +367,26 @@ func TestAlipayProvider_VerifyCallback_Fail(t *testing.T) {
 		"out_trade_no": "PAY001",
 		"trade_status": "TRADE_CLOSED",
 	})
-	result, err := p.VerifyCallback(context.Background(), map[string]string{}, body)
+	result, err := p.VerifyCallback(context.Background(), signedAlipayHeaders("test_key", body), body)
 	assert.NoError(t, err)
 	assert.Equal(t, "FAIL", result.Status)
+}
+
+type mockReconciliationReportRepo struct {
+	mock.Mock
+}
+
+func (m *mockReconciliationReportRepo) Save(ctx context.Context, report *ReconciliationReport) error {
+	args := m.Called(ctx, report)
+	return args.Error(0)
+}
+
+func (m *mockReconciliationReportRepo) GetByID(ctx context.Context, id string) (*ReconciliationReport, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*ReconciliationReport), args.Error(1)
 }
 
 type mockReconOrderRepo struct {
@@ -318,6 +445,27 @@ func (m *mockReconOrderRepo) GetPendingOrdersOlderThan(ctx context.Context, sinc
 func (m *mockReconOrderRepo) UpdateOrderStatus(ctx context.Context, orderNo string, fromStatus, toStatus string) error {
 	args := m.Called(ctx, orderNo, fromStatus, toStatus)
 	return args.Error(0)
+}
+
+func TestReconciliation_PersistsReport(t *testing.T) {
+	registry := provider.NewProviderRegistry()
+	registry.Register(&mockQueryProvider{status: &provider.PaymentStatus{Status: "SUCCESS", Amount: 100.00}})
+	repo := new(mockReconOrderRepo)
+	reportRepo := new(mockReconciliationReportRepo)
+	now := time.Now()
+	orders := []model.Order{{ID: 1, OrderNo: "PAY001", Amount: 100.00, Status: model.OrderStatusPaid, CreatedAt: now, UpdatedAt: now}}
+	repo.On("List", mock.Anything, mock.AnythingOfType("*model.OrderQueryRequest")).Return(orders, 1, nil)
+	reportRepo.On("Save", mock.Anything, mock.MatchedBy(func(r *ReconciliationReport) bool {
+		return r.ID == "RECON-mock-"+now.Format("2006-01-02") && r.TotalOrders == 1 && r.MatchedOrders == 1
+	})).Return(nil)
+
+	svc := NewReconciliationServiceWithRepository(registry, repo, reportRepo, nil).(*reconciliationService)
+	report, err := svc.ReconcileOrders(context.Background(), "mock", now.Format("2006-01-02"))
+
+	assert.NoError(t, err)
+	assert.Equal(t, 1, report.MatchedOrders)
+	repo.AssertExpectations(t)
+	reportRepo.AssertExpectations(t)
 }
 
 func TestReconciliation_MismatchDetection(t *testing.T) {

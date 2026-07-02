@@ -1,9 +1,12 @@
 package handler
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -13,10 +16,24 @@ import (
 	"github.com/trigold786/92-Account-Center/payment-service/internal/service"
 )
 
+type SubscriptionActivationRequest struct {
+	UserID        int64   `json:"user_id"`
+	OrderID       string  `json:"order_id"`
+	TierLevel     int     `json:"tier_level"`
+	Price         float64 `json:"price"`
+	PaymentMethod string  `json:"payment_method"`
+}
+
+type SubscriptionActivationNotifier interface {
+	NotifySubscriptionActivation(ctx context.Context, req SubscriptionActivationRequest) error
+}
+
 type CallbackHandler struct {
 	providerRegistry *provider.ProviderRegistry
 	orderRepo        repository.OrderRepository
 	orderSvc         service.OrderService
+	callbackRepo     repository.PaymentCallbackRepository
+	activationNotify SubscriptionActivationNotifier
 	logger           *slog.Logger
 }
 
@@ -26,10 +43,33 @@ func NewCallbackHandler(
 	orderSvc service.OrderService,
 	logger *slog.Logger,
 ) *CallbackHandler {
+	return NewCallbackHandlerWithCallbackRepository(providerRegistry, orderRepo, orderSvc, nil, logger)
+}
+
+func NewCallbackHandlerWithCallbackRepository(
+	providerRegistry *provider.ProviderRegistry,
+	orderRepo repository.OrderRepository,
+	orderSvc service.OrderService,
+	callbackRepo repository.PaymentCallbackRepository,
+	logger *slog.Logger,
+) *CallbackHandler {
+	return NewCallbackHandlerWithActivationNotifier(providerRegistry, orderRepo, orderSvc, callbackRepo, nil, logger)
+}
+
+func NewCallbackHandlerWithActivationNotifier(
+	providerRegistry *provider.ProviderRegistry,
+	orderRepo repository.OrderRepository,
+	orderSvc service.OrderService,
+	callbackRepo repository.PaymentCallbackRepository,
+	activationNotify SubscriptionActivationNotifier,
+	logger *slog.Logger,
+) *CallbackHandler {
 	return &CallbackHandler{
 		providerRegistry: providerRegistry,
 		orderRepo:        orderRepo,
 		orderSvc:         orderSvc,
+		callbackRepo:     callbackRepo,
+		activationNotify: activationNotify,
 		logger:           logger,
 	}
 }
@@ -63,6 +103,22 @@ func (h *CallbackHandler) HandleCallback(c *gin.Context) {
 		h.logger.Error("callback verification failed", "provider", providerName, "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "verification failed"})
 		return
+	}
+
+	if h.callbackRepo != nil {
+		callback := &model.PaymentCallback{
+			Provider:      providerName,
+			OrderNo:       result.OrderNo,
+			TransactionID: result.TransactionID,
+			Status:        result.Status,
+			Verified:      true,
+			RawPayload:    string(body),
+		}
+		if err := h.callbackRepo.Save(c.Request.Context(), callback); err != nil {
+			h.logger.Error("failed to persist payment callback", "provider", providerName, "order_no", result.OrderNo, "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "failed to persist callback"})
+			return
+		}
 	}
 
 	h.logger.Info("payment callback received",
@@ -99,10 +155,41 @@ func (h *CallbackHandler) HandleCallback(c *gin.Context) {
 		if _, err := h.orderSvc.UpdateStatus(c.Request.Context(), order.ID, req); err != nil {
 			h.logger.Error("failed to update order status from callback",
 				"order_no", result.OrderNo, "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "failed to update order"})
+			return
+		}
+		if err := h.notifySubscriptionActivation(c.Request.Context(), order, providerName); err != nil {
+			h.logger.Error("failed to notify subscription activation", "order_no", result.OrderNo, "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "failed to activate subscription"})
+			return
 		}
 	}
 
 	c.String(http.StatusOK, "success")
+}
+
+func (h *CallbackHandler) notifySubscriptionActivation(ctx context.Context, order *model.Order, paymentMethod string) error {
+	if h.activationNotify == nil || order.ProductType != "subscription" {
+		return nil
+	}
+	var metadata struct {
+		TierLevel int `json:"tier_level"`
+	}
+	if order.Metadata != "" {
+		if err := json.Unmarshal([]byte(order.Metadata), &metadata); err != nil {
+			return err
+		}
+	}
+	if metadata.TierLevel == 0 {
+		return fmt.Errorf("subscription order metadata missing tier_level")
+	}
+	return h.activationNotify.NotifySubscriptionActivation(ctx, SubscriptionActivationRequest{
+		UserID:        order.UserID,
+		OrderID:       strconv.FormatInt(order.ID, 10),
+		TierLevel:     metadata.TierLevel,
+		Price:         order.Amount,
+		PaymentMethod: paymentMethod,
+	})
 }
 
 type CreatePaymentHandler struct {
@@ -124,12 +211,12 @@ func NewCreatePaymentHandler(
 }
 
 type CreatePaymentAPIRequest struct {
-	OrderID   int64   `json:"order_id" binding:"required"`
-	TradeType string  `json:"trade_type" binding:"required"`
-	ReturnURL string  `json:"return_url,omitempty"`
-	OpenID    string  `json:"open_id,omitempty"`
-	NotifyURL string  `json:"notify_url,omitempty"`
-	ClientIP  string  `json:"client_ip,omitempty"`
+	OrderID   int64  `json:"order_id" binding:"required"`
+	TradeType string `json:"trade_type" binding:"required"`
+	ReturnURL string `json:"return_url,omitempty"`
+	OpenID    string `json:"open_id,omitempty"`
+	NotifyURL string `json:"notify_url,omitempty"`
+	ClientIP  string `json:"client_ip,omitempty"`
 }
 
 func (h *CreatePaymentHandler) CreatePayment(c *gin.Context) {

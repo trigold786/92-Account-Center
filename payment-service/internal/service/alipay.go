@@ -2,6 +2,9 @@ package service
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -12,11 +15,30 @@ import (
 )
 
 type AlipayConfig struct {
+	Mode       string
 	AppID      string
 	PrivateKey string
 	PublicKey  string
 	NotifyURL  string
 	IsSandbox  bool
+}
+
+func (c AlipayConfig) ValidateProduction() error {
+	if c.Mode != "production" {
+		return nil
+	}
+	fields := map[string]string{
+		"ALIPAY_APP_ID":      c.AppID,
+		"ALIPAY_PRIVATE_KEY": c.PrivateKey,
+		"ALIPAY_PUBLIC_KEY":  c.PublicKey,
+		"ALIPAY_NOTIFY_URL":  c.NotifyURL,
+	}
+	for name, value := range fields {
+		if insecurePaymentValue(value) {
+			return fmt.Errorf("production alipay payment config requires real %s", name)
+		}
+	}
+	return nil
 }
 
 type AlipayProvider struct {
@@ -142,6 +164,10 @@ func (p *AlipayProvider) Refund(ctx context.Context, req *provider.RefundRequest
 }
 
 func (p *AlipayProvider) VerifyCallback(ctx context.Context, headers map[string]string, body []byte) (*provider.CallbackResult, error) {
+	if err := p.verifyCallbackSignature(headers, body); err != nil {
+		return nil, err
+	}
+
 	var payload map[string]interface{}
 	if err := json.Unmarshal(body, &payload); err != nil {
 		return nil, fmt.Errorf("invalid callback body: %w", err)
@@ -176,4 +202,18 @@ func (p *AlipayProvider) VerifyCallback(ctx context.Context, headers map[string]
 	}
 
 	return result, nil
+}
+
+func (p *AlipayProvider) verifyCallbackSignature(headers map[string]string, body []byte) error {
+	signature := firstHeader(headers, "Alipay-Signature", "alipay-signature")
+	if signature == "" {
+		return fmt.Errorf("missing alipay callback signature")
+	}
+	mac := hmac.New(sha256.New, []byte(p.cfg.PrivateKey))
+	mac.Write(body)
+	expected := hex.EncodeToString(mac.Sum(nil))
+	if !hmac.Equal([]byte(expected), []byte(signature)) {
+		return fmt.Errorf("invalid alipay callback signature")
+	}
+	return nil
 }

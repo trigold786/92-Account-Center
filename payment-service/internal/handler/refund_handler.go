@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -25,10 +26,20 @@ func (h *RefundHandler) RequestRefund(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	userID, _ := c.Get("user_id")
-	refund, err := h.svc.RequestRefund(c.Request.Context(), req.OrderID, userID.(int64), req.Reason)
+	userID, ok := c.Get("user_id")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	uid, ok := userID.(int64)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid user"})
+		return
+	}
+	refund, err := h.svc.RequestRefund(c.Request.Context(), req.OrderID, uid, req.Reason)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		slog.Error("request refund failed", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 	c.JSON(http.StatusCreated, refund)
@@ -36,9 +47,19 @@ func (h *RefundHandler) RequestRefund(c *gin.Context) {
 
 func (h *RefundHandler) ApproveRefund(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
-	adminID, _ := c.Get("user_id")
-	if err := h.svc.ApproveRefund(c.Request.Context(), id, adminID.(int64)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	adminID, ok := c.Get("user_id")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	aid, ok := adminID.(int64)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid user"})
+		return
+	}
+	if err := h.svc.ApproveRefund(c.Request.Context(), id, aid); err != nil {
+		slog.Error("approve refund failed", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "approved"})
@@ -50,9 +71,19 @@ func (h *RefundHandler) RejectRefund(c *gin.Context) {
 		Note string `json:"note"`
 	}
 	c.ShouldBindJSON(&req)
-	adminID, _ := c.Get("user_id")
-	if err := h.svc.RejectRefund(c.Request.Context(), id, adminID.(int64), req.Note); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	adminID, ok := c.Get("user_id")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	aid, ok := adminID.(int64)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid user"})
+		return
+	}
+	if err := h.svc.RejectRefund(c.Request.Context(), id, aid, req.Note); err != nil {
+		slog.Error("reject refund failed", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "rejected"})

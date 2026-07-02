@@ -17,6 +17,11 @@ type ReconciliationService interface {
 	GetReconciliationReport(ctx context.Context, reportID string) (*ReconciliationReport, error)
 }
 
+type ReconciliationReportRepository interface {
+	Save(ctx context.Context, report *ReconciliationReport) error
+	GetByID(ctx context.Context, id string) (*ReconciliationReport, error)
+}
+
 type ReconciliationReport struct {
 	ID             string          `json:"id"`
 	ProviderName   string          `json:"provider_name"`
@@ -40,6 +45,7 @@ type reconciliationService struct {
 	providerRegistry *provider.ProviderRegistry
 	orderRepo        repository.OrderRepository
 	logger           *slog.Logger
+	reportRepo       ReconciliationReportRepository
 	mu               sync.RWMutex
 	reports          map[string]*ReconciliationReport
 }
@@ -49,10 +55,20 @@ func NewReconciliationService(
 	orderRepo repository.OrderRepository,
 	logger *slog.Logger,
 ) ReconciliationService {
+	return NewReconciliationServiceWithRepository(providerRegistry, orderRepo, nil, logger)
+}
+
+func NewReconciliationServiceWithRepository(
+	providerRegistry *provider.ProviderRegistry,
+	orderRepo repository.OrderRepository,
+	reportRepo ReconciliationReportRepository,
+	logger *slog.Logger,
+) ReconciliationService {
 	return &reconciliationService{
 		providerRegistry: providerRegistry,
 		orderRepo:        orderRepo,
 		logger:           logger,
+		reportRepo:       reportRepo,
 		reports:          make(map[string]*ReconciliationReport),
 	}
 }
@@ -73,11 +89,11 @@ func (s *reconciliationService) ReconcileOrders(ctx context.Context, providerNam
 
 	paidStatus := model.OrderStatusPaid
 	query := &model.OrderQueryRequest{
-		Status:   &paidStatus,
+		Status:    &paidStatus,
 		StartTime: &startTime,
 		EndTime:   &endTime,
-		Page:     1,
-		PageSize: 1000,
+		Page:      1,
+		PageSize:  1000,
 	}
 
 	orders, total, err := s.orderRepo.List(ctx, query)
@@ -131,19 +147,29 @@ func (s *reconciliationService) ReconcileOrders(ctx context.Context, providerNam
 	s.mu.Lock()
 	s.reports[report.ID] = report
 	s.mu.Unlock()
+	if s.reportRepo != nil {
+		if err := s.reportRepo.Save(ctx, report); err != nil {
+			return nil, fmt.Errorf("failed to persist reconciliation report: %w", err)
+		}
+	}
 
 	return report, nil
 }
 
 func (s *reconciliationService) GetReconciliationReport(ctx context.Context, reportID string) (*ReconciliationReport, error) {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
-
 	report, ok := s.reports[reportID]
-	if !ok {
-		return nil, fmt.Errorf("report not found: %s", reportID)
+	s.mu.RUnlock()
+	if ok {
+		return report, nil
 	}
-	return report, nil
+	if s.reportRepo != nil {
+		report, err := s.reportRepo.GetByID(ctx, reportID)
+		if err == nil && report != nil {
+			return report, nil
+		}
+	}
+	return nil, fmt.Errorf("report not found: %s", reportID)
 }
 
 func mapLocalStatus(status model.OrderStatus) string {

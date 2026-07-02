@@ -163,6 +163,9 @@ func (r *orderRepository) UpdateStatus(ctx context.Context, id int64, status mod
 	case model.OrderStatusCancelled:
 		query = `UPDATE orders SET status = $1, cancelled_at = NOW(), updated_at = NOW() WHERE id = $2`
 		args = []interface{}{string(status), id}
+	case model.OrderStatusRefunded:
+		query = `UPDATE orders SET status = $1, refunded_at = NOW(), updated_at = NOW() WHERE id = $2`
+		args = []interface{}{string(status), id}
 	default:
 		query = `UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2`
 		args = []interface{}{string(status), id}

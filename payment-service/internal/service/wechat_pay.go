@@ -2,9 +2,13 @@ package service
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/wechatpay-apiv3/wechatpay-go/core"
@@ -17,11 +21,39 @@ import (
 )
 
 type WeChatPayConfig struct {
-	AppID                   string
-	MchID                   string
-	APIKey                  string
-	CertificateSerialNo     string
-	PrivateKeyPath          string
+	Mode                string
+	AppID               string
+	MchID               string
+	APIKey              string
+	CertificateSerialNo string
+	PrivateKeyPath      string
+}
+
+func (c WeChatPayConfig) ValidateProduction() error {
+	if c.Mode != "production" {
+		return nil
+	}
+	fields := map[string]string{
+		"WECHAT_APP_ID":           c.AppID,
+		"WECHAT_MCH_ID":           c.MchID,
+		"WECHAT_API_KEY":          c.APIKey,
+		"WECHAT_CERT_SERIAL_NO":   c.CertificateSerialNo,
+		"WECHAT_PRIVATE_KEY_PATH": c.PrivateKeyPath,
+	}
+	for name, value := range fields {
+		if insecurePaymentValue(value) {
+			return fmt.Errorf("production wechat payment config requires real %s", name)
+		}
+	}
+	return nil
+}
+
+func insecurePaymentValue(value string) bool {
+	v := strings.ToLower(strings.TrimSpace(value))
+	if v == "" {
+		return true
+	}
+	return strings.Contains(v, "sandbox") || strings.Contains(v, "test") || strings.Contains(v, "default") || strings.Contains(v, "placeholder")
 }
 
 type WeChatPayProvider struct {
@@ -97,11 +129,10 @@ func (p *WeChatPayProvider) CreatePayment(ctx context.Context, req *provider.Cre
 		return nil, fmt.Errorf("wechat pay prepay: %w", err)
 	}
 
-	result := &provider.CreatePaymentResponse{
+	return &provider.CreatePaymentResponse{
 		PaymentURL:    *resp.CodeUrl,
 		TransactionID: req.OrderNo,
-	}
-	return result, nil
+	}, nil
 }
 
 func (p *WeChatPayProvider) sandboxCreatePayment(req *provider.CreatePaymentRequest) (*provider.CreatePaymentResponse, error) {
@@ -182,15 +213,16 @@ func (p *WeChatPayProvider) Refund(ctx context.Context, req *provider.RefundRequ
 }
 
 func (p *WeChatPayProvider) VerifyCallback(ctx context.Context, headers map[string]string, body []byte) (*provider.CallbackResult, error) {
+	if err := p.verifyCallbackSignature(headers, body); err != nil {
+		return nil, err
+	}
+
 	var payload map[string]interface{}
 	if err := json.Unmarshal(body, &payload); err != nil {
 		return nil, fmt.Errorf("invalid callback body: %w", err)
 	}
 
-	result := &provider.CallbackResult{
-		RawData: string(body),
-	}
-
+	result := &provider.CallbackResult{RawData: string(body)}
 	if orderNo, ok := payload["out_trade_no"].(string); ok {
 		result.OrderNo = orderNo
 	}
@@ -212,4 +244,30 @@ func (p *WeChatPayProvider) VerifyCallback(ctx context.Context, headers map[stri
 	}
 
 	return result, nil
+}
+
+func (p *WeChatPayProvider) verifyCallbackSignature(headers map[string]string, body []byte) error {
+	timestamp := firstHeader(headers, "Wechatpay-Timestamp", "wechatpay-timestamp")
+	nonce := firstHeader(headers, "Wechatpay-Nonce", "wechatpay-nonce")
+	signature := firstHeader(headers, "Wechatpay-Signature", "wechatpay-signature")
+	if timestamp == "" || nonce == "" || signature == "" {
+		return fmt.Errorf("missing wechat callback signature headers")
+	}
+	message := timestamp + "\n" + nonce + "\n" + string(body) + "\n"
+	mac := hmac.New(sha256.New, []byte(p.cfg.APIKey))
+	mac.Write([]byte(message))
+	expected := hex.EncodeToString(mac.Sum(nil))
+	if !hmac.Equal([]byte(expected), []byte(signature)) {
+		return fmt.Errorf("invalid wechat callback signature")
+	}
+	return nil
+}
+
+func firstHeader(headers map[string]string, names ...string) string {
+	for _, name := range names {
+		if value := headers[name]; value != "" {
+			return value
+		}
+	}
+	return ""
 }
