@@ -11,10 +11,12 @@ use (
 	./notification-service
 	./payment-service
 	./pkg/async
+	./pkg/jwtutil
 	./pkg/circuitbreaker
 	./pkg/config
 	./pkg/database
 	./pkg/discovery
+	./pkg/env
 	./pkg/health
 	./pkg/logging
 	./pkg/saga
