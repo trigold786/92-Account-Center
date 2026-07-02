@@ -38,7 +38,8 @@ function generateChallenge(): CaptchaChallenge {
         case 1: { const a = rand(1,20), b = rand(1,20); return { type:'math', question:`${a} + ${b} = ?`, answer:String(a+b) } }
         case 2: { const a = rand(5,30), b = rand(1,a); return { type:'math', question:`${a} - ${b} = ?`, answer:String(a-b) } }
         case 3: { const a = rand(2,9), b = rand(2,9); return { type:'math', question:`${a} × ${b} = ?`, answer:String(a*b) } }
-        case 4: { const a = rand(2,20), b = rand(2,9), r = Math.floor(a/b), rm = a % b; return { type:'math', question:`${a} ÷ ${b} = ?（取整）`, answer:String(r) } }
+        case 4: { const a = rand(2,20), b = rand(2,9), r = Math.floor(a/b); return { type:'math', question:`${a} ÷ ${b} = ?（取整）`, answer:String(r) } }
+        default: { const a = rand(1,20), b = rand(1,20); return { type:'math', question:`${a} + ${b} = ?`, answer:String(a+b) } }
       }
     }
 
@@ -128,6 +129,10 @@ function generateChallenge(): CaptchaChallenge {
       }
       const options = shuffle(Array.from(optSet).map(l => ({ id: l, label: l })))
       return { type:'letter', question:`请按字母顺序点击：${targets.join(' → ')}`, answer, options }
+    }
+    default: {
+      const a = rand(1,20), b = rand(1,20)
+      return { type:'math', question:`${a} + ${b} = ?`, answer:String(a+b) }
     }
   }
 }

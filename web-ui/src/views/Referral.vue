@@ -1,9 +1,9 @@
 <template>
   <el-row :gutter="16">
-    <el-col :span="12"><el-card><template #header>我的邀请码</template><h2 style="color:#00D4FF;font-size:32px">{{ summary?.referral_code || '--' }}</h2></el-card></el-col>
-    <el-col :span="12"><el-card><template #header>返佣收益</template><h2 style="color:#2ED573;font-size:32px">{{ summary?.total_earnings || 0 }}</h2></el-card></el-col>
-    <el-col :span="12" style="margin-top:16px"><el-card><template #header>邀请好友</template><p>{{ summary?.total_referrals || 0 }} 人</p></el-card></el-col>
-    <el-col :span="12" style="margin-top:16px"><el-card><template #header>邀请链接</template><el-input v-model="link" readonly><template #append><el-button @click="copyLink" v-if="hasPermission('referral.copy')">复制</el-button></template></el-input></el-card></el-col>
+    <el-col :xs="24" :sm="12"><el-card><template #header>我的邀请码</template><h2 style="color:#00D4FF;font-size:32px">{{ summary?.referral_code || '--' }}</h2></el-card></el-col>
+    <el-col :xs="24" :sm="12"><el-card><template #header>返佣收益</template><h2 style="color:#2ED573;font-size:32px">{{ summary?.total_earnings || 0 }}</h2></el-card></el-col>
+    <el-col :xs="24" :sm="12" style="margin-top:16px"><el-card><template #header>邀请好友</template><p>{{ summary?.total_referrals || 0 }} 人</p></el-card></el-col>
+    <el-col :xs="24" :sm="12" style="margin-top:16px"><el-card><template #header>邀请链接</template><el-input v-model="link" readonly><template #append><el-button @click="copyLink" v-if="hasPermission('referral.copy')">复制</el-button></template></el-input></el-card></el-col>
   </el-row>
 </template>
 

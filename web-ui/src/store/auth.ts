@@ -40,7 +40,8 @@ export const useAuthStore = defineStore('auth', () => {
     userId.value = 0
     accountId.value = ''
     roles.value = []
-    localStorage.clear()
+    const keys = ['access_token', 'refresh_token', 'user_id', 'account_id', 'roles']
+    keys.forEach(k => localStorage.removeItem(k))
   }
 
   return { token, refreshToken, userId, accountId, roles, isLoggedIn, doLogin, doLogout }

@@ -111,7 +111,7 @@ async function changePwd() {
 }
 
 async function requestDel() {
-  if (delStatus) {
+  if (delStatus.value) {
     try { const r = await getDeletionStatus(); ElMessage.info(`注销状态: ${JSON.stringify(r.data)}`) } catch (e: any) { ElMessage.error(e.message) }
     return
   }

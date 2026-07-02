@@ -6,17 +6,19 @@ const availableLocales = [
   { value: 'en-US', label: 'English' },
 ]
 
-const currentLocale = ref(i18n.global.locale.value)
+type SupportedLocale = 'zh-CN' | 'en-US'
+const currentLocale = ref<SupportedLocale>((i18n.global.locale.value as SupportedLocale) || 'zh-CN')
 
 function getCurrentLocale() {
   return currentLocale.value
 }
 
 function setLocale(locale: string) {
-  currentLocale.value = locale
-  i18n.global.locale.value = locale as any
-  localStorage.setItem('locale', locale)
-  document.documentElement.setAttribute('lang', locale)
+  const next = (locale === 'en-US' ? 'en-US' : 'zh-CN') as SupportedLocale
+  currentLocale.value = next
+  i18n.global.locale.value = next
+  localStorage.setItem('locale', next)
+  document.documentElement.setAttribute('lang', next)
 }
 
 export function useLocale() {

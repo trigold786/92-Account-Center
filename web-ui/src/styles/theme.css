@@ -5,7 +5,7 @@
   --brand-primary: #6C63FF;
   --brand-secondary: #00D4FF;
   --text-primary: #E6EDF3;
-  --text-secondary: #8B949E;
+  --text-secondary: #9BA4B0;
   --border-color: #30363D;
   --color-success: #2ED573;
   --color-warning: #FFA502;
@@ -20,3 +20,28 @@ body {
 }
 .el-card { background: var(--bg-card) !important; border: 1px solid var(--border-color) !important; color: var(--text-primary) !important; }
 .el-input__inner { background: var(--bg-secondary) !important; color: var(--text-primary) !important; border-color: var(--border-color) !important; }
+
+*:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (prefers-contrast: high) {
+  :root {
+    --bg-primary: #000000;
+    --bg-secondary: #1a1a1a;
+    --bg-card: #222222;
+    --text-primary: #ffffff;
+    --text-secondary: #cccccc;
+    --border-color: #ffffff;
+  }
+}

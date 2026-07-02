@@ -9,6 +9,7 @@
               <el-button type="primary" @click="showCreateDialog = true" v-if="hasPermission('admin.roles.create')">新建角色</el-button>
             </div>
           </template>
+          <div style="overflow-x: auto; width: 100%">
           <el-table :data="roles" stripe>
             <el-table-column prop="id" label="ID" width="60" />
             <el-table-column prop="name" label="名称" width="150" />
@@ -23,6 +24,7 @@
               </template>
             </el-table-column>
           </el-table>
+          </div>
         </el-card>
       </el-tab-pane>
 
@@ -81,7 +83,7 @@
       </el-tab-pane>
     </el-tabs>
 
-    <el-dialog v-model="showCreateDialog" :title="editingRole ? '编辑角色' : '新建角色'" width="400px">
+    <el-dialog v-model="showCreateDialog" :title="editingRole ? '编辑角色' : '新建角色'" width="min(400px, 90vw)">
       <el-form label-width="80px">
         <el-form-item label="名称">
           <el-input v-model="roleForm.name" placeholder="角色标识" />
@@ -107,11 +109,12 @@ const perm = usePermissionStore()
 const hasPermission = (p: string) => perm.hasPermission(p)
 import {
   listRoles, createRole, deleteRole as apiDeleteRole, getRolePermissions, addRolePermission, removeRolePermission,
-  getUserRoles, setUserRole, removeUserRole,
+  getUserRoles, setUserRole, removeUserRole as apiRemoveUserRole,
 } from '@/api/roles'
+import type { Role, Permission } from '@/types/api'
 
 const section = ref('roles')
-const roles = ref<any[]>([])
+const roles = ref<Role[]>([])
 const permCounts = reactive<Record<number, number>>({})
 
 onMounted(async () => {
@@ -133,10 +136,10 @@ async function loadRoles() {
 
 // role CRUD
 const showCreateDialog = ref(false)
-const editingRole = ref<any>(null)
+const editingRole = ref<Role | null>(null)
 const roleForm = reactive({ name: '', description: '' })
 
-function editRole(role: any) {
+function editRole(role: Role) {
   editingRole.value = role
   roleForm.name = role.name
   roleForm.description = role.description
@@ -167,11 +170,11 @@ async function deleteRole(role: any) {
 // permission config
 const selectedRoleId = ref<number | null>(null)
 const selectedPerms = ref<string[]>([])
-const allRolePerms = ref<any[]>([])
+const allRolePerms = ref<Permission[]>([])
 
 const permissionGroups: Record<string, string[]> = {
-  '导航菜单': ['nav.dashboard', 'nav.account', 'nav.credits', 'nav.subscriptions', 'nav.referral', 'nav.devices', 'nav.admin'],
-  '页面访问': ['page.dashboard', 'page.account', 'page.credits', 'page.subscriptions', 'page.referral', 'page.devices', 'page.admin'],
+  '导航菜单': ['nav.dashboard', 'nav.account', 'nav.credits', 'nav.subscriptions', 'nav.referral', 'nav.devices', 'nav.finance', 'nav.admin'],
+  '页面访问': ['page.dashboard', 'page.account', 'page.credits', 'page.subscriptions', 'page.referral', 'page.devices', 'page.finance', 'page.admin'],
   '账户-修改密码': ['account.password.change'],
   '账户-注销': ['account.delete.apply', 'account.delete.cancel'],
   '推荐-复制链接': ['referral.copy'],
@@ -201,17 +204,17 @@ async function loadRolePerms() {
   try {
     const r = await getRolePermissions(selectedRoleId.value)
     allRolePerms.value = r.data.data || []
-    selectedPerms.value = allRolePerms.value.map((p: any) => p.permission)
+    selectedPerms.value = allRolePerms.value.map((p: Permission) => p.permission)
   } catch { ElMessage.error('加载权限失败') }
 }
 
 async function savePermissions() {
   if (!selectedRoleId.value) return
-  const current = new Set(allRolePerms.value.map((p: any) => p.permission))
+  const current = new Set(allRolePerms.value.map((p: Permission) => p.permission))
   const desired = new Set(selectedPerms.value)
 
   const toAdd = selectedPerms.value.filter(p => !current.has(p))
-  const toRemove = allRolePerms.value.filter((p: any) => !desired.has(p.permission))
+  const toRemove = allRolePerms.value.filter((p: Permission) => !desired.has(p.permission))
 
   try {
     for (const p of toAdd) {
@@ -227,8 +230,9 @@ async function savePermissions() {
 }
 
 // user role assignment
+interface UserRole { role_id: number }
 const targetUserId = ref('')
-const userRoleList = ref<any[] | null>(null)
+const userRoleList = ref<UserRole[] | null>(null)
 const addRoleId = ref<number | null>(null)
 
 async function loadUserRoles() {
@@ -256,7 +260,7 @@ async function assignUserRole() {
 async function removeUserRole(roleId: number) {
   if (!targetUserId.value) return
   try {
-    await removeUserRole(targetUserId.value, roleId)
+    await apiRemoveUserRole(targetUserId.value, roleId)
     ElMessage.success('角色已移除')
     await loadUserRoles()
   } catch (e: any) { ElMessage.error(e.message) }

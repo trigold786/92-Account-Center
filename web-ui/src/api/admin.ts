@@ -16,7 +16,7 @@ export function cleanupAuditLogs(beforeDays: number) {
   return client.post('/audit/logs/cleanup', { retention_days: beforeDays })
 }
 
-export function listBlacklist(params: { type?: string; limit?: number; offset?: number }) {
+export function listBlacklist(params: { type?: string; limit?: number; offset?: number; page_size?: number }) {
   return client.get('/blacklist/', { params })
 }
 
@@ -36,14 +36,22 @@ export function getSMSProviderStatus() {
   return client.get('/sms/providers/status')
 }
 
-export function listUsers(params: { q?: string; page?: number; limit?: number }) {
+export function listUsers(params: { search?: string; status?: string; tier?: number; page?: number; page_size?: number }) {
   return client.get('/admin/users', { params })
 }
 
-export function updateUserStatus(userId: number, action: string) {
-  return client.put(`/admin/users/${userId}/status`, { action })
+export function updateUserStatus(userId: number, status: string, reason: string) {
+  return client.put(`/admin/users/${userId}/status`, { status, reason })
 }
 
-export function updateUserTier(userId: number, tier: string) {
-  return client.put(`/admin/users/${userId}/tier`, { identity_tier: tier })
+export function updateUserTier(userId: number, tier: number, reason: string) {
+  return client.put(`/admin/users/${userId}/tier`, { tier, reason })
+}
+
+export function getPendingKYC() {
+  return client.get('/admin/kyc/pending')
+}
+
+export function reviewKYC(enterpriseId: string, action: 'approve' | 'reject') {
+  return client.put(`/admin/kyc/${enterpriseId}/review`, { action })
 }

@@ -20,9 +20,9 @@ export function register(params: { phone: string; password: string; code: string
   return client.post('/account/register', {
     phone_number: params.phone,
     password: params.password,
-    code: params.code,
+    sms_code: params.code,
     account_id: `user_${Date.now()}`,
-    agree_to_terms: true,
+    agree_terms: true,
   }).then(async (res) => {
     return res
   })
@@ -34,4 +34,13 @@ export function sendSMSCode(phone: string) {
 
 export function verifySMSCode(phone: string, code: string) {
   return client.post('/sms/verify', { phone_number: phone, code })
+}
+
+export function oauthAuthorize(provider: string) {
+  return client.get('/auth/oauth/authorize', { params: { provider } })
+}
+
+export function oauthCallback(provider: string, code: string, state: string) {
+  const params = new URLSearchParams({ provider, code, state })
+  return client.post('/auth/oauth/callback?' + params.toString())
 }

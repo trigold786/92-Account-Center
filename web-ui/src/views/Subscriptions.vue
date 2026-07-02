@@ -23,11 +23,16 @@ import { ref, onMounted, computed } from 'vue'
 import { useAuthStore } from '@/store/auth'
 import { getSubscriptions } from '@/api/subscriptions'
 import { getTier } from '@/api/account'
+import type { Subscription } from '@/types/api'
 
 const auth = useAuthStore()
-const subscription = ref<any>(null)
+interface SubscriptionData { plan_name: string; status: string; current_period_start: string; current_period_end: string }
+const subscription = ref<SubscriptionData | null>(null)
 const tier = ref('')
-const statusType = computed(() => ({ active: 'success', expired: 'danger', cancelled: 'info', trialing: 'warning' } as any)[subscription.value?.status] || 'info')
+const statusType = computed(() => {
+  const statusMap: Record<string, string> = { active: 'success', expired: 'danger', cancelled: 'info', trialing: 'warning' }
+  return statusMap[subscription.value?.status ?? ''] || 'info'
+})
 
 onMounted(async () => {
   const uid = auth.userId; if (!uid) return
