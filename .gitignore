@@ -16,6 +16,8 @@ Thumbs.db
 # Go
 *.exe
 *.exe~
+main.exe
+cmd.exe
 *.test
 *.out
 coverage.out
@@ -51,3 +53,7 @@ test-results/
 playwright-report/
 web-ui/test-results/
 web-ui/playwright-report/
+
+# Local isolated worktrees
+.worktrees/
+worktrees/

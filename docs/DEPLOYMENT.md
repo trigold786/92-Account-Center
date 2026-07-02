@@ -8,7 +8,6 @@
 | Docker Compose | 2.0+ | 容器编排 |
 | PostgreSQL | 15+ | 主数据库 |
 | Redis | 7+ | 缓存/会话 |
-| Kafka | 3.0+ | 消息队列 (可选) |
 
 ## 快速部署
 
@@ -46,7 +45,7 @@ docker-compose logs -f
 
 ```bash
 # 健康检查
-curl http://localhost:8080/health
+curl http://localhost:30300/health
 
 # 查看所有服务状态
 docker-compose ps
@@ -56,19 +55,19 @@ docker-compose ps
 
 | 服务 | 端口 | 内部网络 |
 |------|------|----------|
-| API Gateway | 8080 | 外部访问 |
-| Account Service | 8081 | 内部 |
-| Auth Service | 8082 | 内部 |
-| SMS Service | 8083 | 内部 |
-| Device Service | 8089 | 内部 |
-| KYB Service | 8084 | 内部 |
-| Audit Service | 8085 | 内部 |
-| Risk Service | 8086 | 内部 |
-| Session Service | 8087 | 内部 |
-| Email Service | 8088 | 内部 |
+| API Gateway | 30300 | 外部访问 |
+| Account Service | 30301 | 内部 |
+| Auth Service | 30302 | 内部 |
+| Notification Service | 30311 | 内部 |
+| Credit Service | 30312 | 内部 |
+| Compliance Service | 30313 | 内部 |
+| Data Product Service | 30314 | 内部 |
+| Config Service | 30315 | 内部 |
+| Payment Service | 30316 | 内部 |
+| Web UI | 30317 | 外部访问 |
+| Config Management UI | 30318 | 外部访问 |
 | PostgreSQL | 5432 | 仅内部 |
 | Redis | 6379 | 仅内部 |
-| Kafka | 9092 | 仅内部 |
 
 ## 配置说明
 
@@ -87,23 +86,49 @@ DB_PASSWORD=postgres
 DB_NAME=account_center
 
 # Redis
-REDIS_HOST=redis
-REDIS_PORT=6379
-
-# Kafka (可选)
-KAFKA_BROKERS=kafka:9092
-KAFKA_AUDIT_TOPIC=audit-logs
+REDIS_ADDR=localhost:6379
+REDIS_PASSWORD=
 
 # JWT 密钥 (生产环境必须修改)
 JWT_ACCESS_SECRET=your-access-secret-key
 JWT_REFRESH_SECRET=your-refresh-secret-key
+JWT_SECRET=your-jwt-secret-key
+
+# 服务 URL
+CONFIG_SERVICE_URL=http://config-service:30315
+AUTH_SERVICE_URL=http://auth-service:30302
+ACCOUNT_SERVICE_URL=http://account-service:30301
+CREDIT_SERVICE_URL=http://credit-service:30312
+COMPLIANCE_SERVICE_URL=http://compliance-service:30313
+NOTIFICATION_SERVICE_URL=http://notification-service:30311
+DATA_PRODUCT_SERVICE_URL=http://data-product-service:30314
+PAYMENT_SERVICE_URL=http://payment-service:30316
 
 # 短信服务商 (根据需要配置)
-ALIYUN_APP_ID=xxx
-ALIYUN_APP_SECRET=xxx
+ALIYUN_ACCESS_KEY_ID=xxx
+ALIYUN_ACCESS_KEY_SECRET=xxx
 ALIYUN_SIGN_NAME=AccountCenter
 TENCENT_APP_ID=xxx
 TENCENT_APP_SECRET=xxx
+
+# 邮件服务商 (根据需要配置)
+EMAIL_PROVIDER=smtp
+SMTP_HOST=smtp.163.com
+SMTP_PORT=465
+SMTP_USERNAME=xxx
+SMTP_PASSWORD=xxx
+
+# 支付服务 (根据需要配置)
+PAYMENT_MODE=sandbox
+WECHAT_APP_ID=xxx
+WECHAT_MCH_ID=xxx
+WECHAT_API_KEY=xxx
+ALIPAY_APP_ID=xxx
+ALIPAY_PRIVATE_KEY=xxx
+ALIPAY_PUBLIC_KEY=xxx
+
+# Grafana
+GF_SECURITY_ADMIN_PASSWORD=admin
 ```
 
 ## 扩展部署
@@ -215,7 +240,7 @@ helm install account-center ./helm/account-center
 docker-compose logs <service-name>
 
 # 检查端口占用
-netstat -tlnp | grep 8080
+netstat -tlnp | grep 30300
 ```
 
 ### 数据库连接失败

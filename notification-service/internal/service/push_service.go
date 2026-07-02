@@ -193,14 +193,12 @@ func (s *PushService) GetUserDeviceTokens(ctx context.Context, userID string) ([
 
 func (s *PushService) sendViaProvider(ctx context.Context, providerName, deviceToken, title, body string, data map[string]interface{}) error {
 	if s.registry == nil {
-		log.Printf("[%s] registry not configured, skipping send", providerName)
-		return nil
+		return fmt.Errorf("push provider registry not initialized")
 	}
 
 	p, ok := s.registry.Get(providerName)
 	if !ok {
-		log.Printf("[%s] provider not registered, skipping send", providerName)
-		return nil
+		return fmt.Errorf("no push provider registered for platform %s", providerName)
 	}
 
 	pushData := make(map[string]string)

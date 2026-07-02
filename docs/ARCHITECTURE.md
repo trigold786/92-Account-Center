@@ -8,14 +8,14 @@
                          │            (Port 30300)                 │
                          └──────────────┬──────────────────────────┘
                                          │
-         ┌────────┬────────┬──────┴──────┬────────┬────────┬────────┬────────┐
-         ▼        ▼        ▼            ▼        ▼        ▼        ▼        ▼
-    ┌────────┐┌────────┐┌────────┐┌────────┐┌────────┐┌────────┐┌────────┐┌────────┐
-    │Account ││ Auth   ││SMS/Email││ KYB   ││ Audit  ││ Risk   ││Session ││ Device │
-    │:30301  ││:30302  ││:30303  ││:30304  ││:30305  ││:30306  ││:30307  ││:30309  │
-    └───┬────┘└───┬────┘└───┬────┘└───┬────┘└───┬────┘└───┬────┘└───┬────┘└───┬────┘
-        │         │         │         │         │         │         │         │
-        └─────────┴─────────┴─────────┴─────────┴─────────┴─────────┴─────────┘
+         ┌────────┬────────┬──────┴──────┬────────┬────────┬────────┐
+         ▼        ▼        ▼            ▼        ▼        ▼        ▼
+    ┌────────┐┌────────┐┌────────┐┌────────┐┌────────┐┌────────┐┌────────┐
+    │Account ││ Auth   ││Notify  ││Credit  ││Compli- ││Data    ││Payment │
+    │:30301  ││:30302  ││:30311  ││:30312  ││:30313  ││:30314  ││:30316  │
+    └───┬────┘└───┬────┘└───┬────┘└───┬────┘└───┬────┘└───┬────┘└───┬────┘
+        │         │         │         │         │         │         │
+        └─────────┴─────────┴─────────┴─────────┴─────────┴─────────┘
                                         │
                          ┌──────────────┴──────────────┐
                          │       PostgreSQL :5432       │
@@ -70,6 +70,9 @@ POST /api/v1/account/register/phone
 - JWT 令牌生成
 - 刷新令牌
 - Magic Link 登录
+- OAuth 登录 (微信/Apple/Google/支付宝)
+- 企业 OAuth (企业微信/钉钉)
+- 二维码扫码登录
 
 ```
 登录流程:
@@ -78,62 +81,72 @@ POST /api/v1/auth/login/send-sms-code
 POST /api/v1/auth/login/send-email-otp
 ```
 
-### 4. SMS/Email Service (30303)
+### 4. Notification Service (30311)
 
-多云短信服务：
-- 阿里云 SMS
-- 腾讯云 SMS
-- 天翼云 SMS
+统一通知服务，整合原 SMS/Email/Push 功能：
+- 短信通知 (阿里云/腾讯云/天翼云)
+- 邮件通知 (SMTP/SendGrid/SES)
+- 推送通知 (APNs/FCM/HMS)
+- 微信模板消息
 - 熔断器保护 (阈值 5, 重置 30s)
 - 频率限制 (60秒、10次/天)
 
-### 5. Device Service (30309)
+### 5. Credit Service (30312)
 
-设备指纹服务：
-- 设备指纹注册
-- 可信设备标记 (默认3天)
-- 设备验证与风险评估
-- 用户设备列表
+积分/信用服务：
+- 积分余额管理
+- 积分交易记录
+- 积分兑换
 
-### 6. KYB Service (30304)
+### 6. Compliance Service (30313)
 
-企业认证服务：
-- 企业信息提交 (SM4 加密存储)
-- 小额打款验证 (0.01-0.1元)
-- 人脸核身
-- 认证状态跟踪
+合规服务，整合原 SMS/KYB/Audit/Risk/Session/Email/Device 功能：
+- KYB 企业认证 (SM4 加密存储、小额打款验证、人脸核身)
+- 审计日志 (SM3 哈希、180 天自动清理)
+- 风险检测 (地理位置异常、设备指纹变化、登录频率)
+- 会话管理 (Redis 存储、20 分钟滑动窗口、最大 5 会话)
+- 设备指纹管理 (可信设备标记、风险评估)
+- 短信/邮件/推送通知
 
-### 7. Audit Service (30305)
+### 7. Data Product Service (30314)
 
-审计日志服务：
-- 操作审计记录 (SM3 哈希)
-- Kafka 消费 (异步收集)
-- 日志完整性验证
-- 180 天自动清理
+数据产品服务：
+- RFM 用户分析
+- 数据看板
+- 漏斗分析
+- 事件追踪
+- 运营指标 (注册趋势、转化漏斗、MRR、K-Factor)
+- A/B 测试
 
-### 8. Email Service (30308)
+### 8. Config Service (30315)
 
-邮件服务：
-- OTP 验证码 (6位, 5分钟)
-- Magic Link (JWT, 15分钟)
-- 频率限制 (3次/小时)
-- SendGrid/SES/SMTP
+配置管理服务：
+- 动态配置存储
+- 配置版本管理
+- 配置下发
 
-### 9. Risk Service (30306)
+### 9. Payment Service (30316)
 
-风险检测服务：
-- 地理位置异常检测 (>1000km/h)
-- 设备指纹变化检测
-- 登录频率检测 (>10次/小时)
-- 风险评分 (0-100)
+支付服务：
+- 微信支付 (sandbox/production)
+- 支付宝支付 (sandbox/production)
+- 订单管理
+- 退款处理
+- 发票管理
+- 对账报告
+- 订单过期自动处理
 
-### 10. Session Service (30307)
+### 10. Web UI (30317)
 
-会话管理服务：
-- Redis 存储
-- 20 分钟滑动窗口
-- 最大 5 会话限制
-- 强制下线支持
+前端 Web 界面：
+- 用户管理界面
+- 数据可视化
+
+### 11. Config Management UI (30318)
+
+配置管理前端界面：
+- 配置查看/编辑
+- 配置版本历史
 
 ## 数据流
 
@@ -141,10 +154,10 @@ POST /api/v1/auth/login/send-email-otp
 
 ```
 1. Client → Account Service: POST /register/send-sms-code
-2. Account Service → SMS Service: 发送验证码
+2. Account Service → Notification Service: 发送验证码
 3. Client → Account Service: POST /register/phone (含验证码)
 4. Account Service → DB: 创建用户
-5. Account Service → Audit Service: 记录审计日志
+5. Account Service → Compliance Service: 记录审计日志
 6. 返回: user_id, access_token, refresh_token
 ```
 
@@ -153,11 +166,11 @@ POST /api/v1/auth/login/send-email-otp
 ```
 1. Client → Auth Service: POST /login (credential + password + fingerprint)
 2. Auth Service → DB: 验证凭证
-3. Auth Service → Risk Service: 风险评估
-4. Auth Service → Device Service: 检查可信设备
+3. Auth Service → Compliance Service: 风险评估
+4. Auth Service → Compliance Service: 检查可信设备
 5. Auth Service → JWT Manager: 生成令牌
-6. Auth Service → Session Service: 创建会话
-7. Auth Service → Audit Service: 记录审计日志
+6. Auth Service → Compliance Service: 创建会话
+7. Auth Service → Compliance Service: 记录审计日志
 8. 返回: access_token, refresh_token, is_trusted_device
 ```
 
@@ -255,14 +268,14 @@ docker-compose up -d --scale account-service=3
 ### 服务发现
 
 通过 Docker Compose 网络，服务间通过服务名通信：
-- `account-service:8081`
+- `account-service:30301`
 - `postgres:5432`
 - `redis:6379`
 
 ### 熔断器配置
 
 ```yaml
-sms-service:
+notification-service:
   circuit_breaker:
     threshold: 5          # 失败5次后打开
     reset_timeout: 30s    # 30秒后半开

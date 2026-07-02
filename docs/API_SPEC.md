@@ -30,7 +30,7 @@
 
 ---
 
-## Account Service (端口 8081)
+## Account Service (端口 30301)
 
 ### 1. 发送注册验证码
 
@@ -171,7 +171,7 @@ POST /account/delete/cancel
 
 ---
 
-## Auth Service (端口 8082)
+## Auth Service (端口 30302)
 
 ### 1. 登录
 
@@ -237,7 +237,7 @@ POST /auth/login/send-email-otp
 
 ---
 
-## SMS Service (端口 8083)
+## Notification Service (端口 30311)
 
 ### 1. 发送短信
 
@@ -280,93 +280,11 @@ GET /sms/providers/status
 
 ---
 
-## Device Service (端口 8089)
+## Compliance Service (端口 30313)
 
-### 1. 注册设备
+### 1. KYB 企业认证
 
-```
-POST /device/register
-```
-
-**请求:**
-```json
-{
-  "fingerprint_id": "fp_abc123xyz",
-  "user_agent": "Mozilla/5.0...",
-  "ip_address": "192.168.1.100",
-  "country": "China",
-  "city": "Beijing",
-  "latitude": 39.9042,
-  "longitude": 116.4074
-}
-```
-
----
-
-### 2. 验证设备
-
-```
-POST /device/verify
-```
-
-**请求:**
-```json
-{
-  "fingerprint_id": "fp_abc123xyz",
-  "user_id": "550e8400-e29b-41d4-a716-446655440000"
-}
-```
-
-**响应:**
-```json
-{
-  "code": 200,
-  "data": {
-    "is_trusted": false,
-    "risk_score": 45,
-    "risk_factors": ["location_change", "new_device"]
-  }
-}
-```
-
----
-
-### 3. 标记可信设备
-
-```
-POST /device/trust
-```
-
-**请求:**
-```json
-{
-  "fingerprint_id": "fp_abc123xyz",
-  "user_id": "550e8400-e29b-41d4-a716-446655440000",
-  "trust_days": 7
-}
-```
-
----
-
-### 4. 获取用户设备列表
-
-```
-GET /device/user/{user_id}
-```
-
----
-
-### 5. 删除设备
-
-```
-DELETE /device/{device_id}
-```
-
----
-
-## KYB Service (端口 8084)
-
-### 1. 提交企业信息
+#### 提交企业信息
 
 ```
 POST /kyb/enterprise/submit
@@ -386,9 +304,7 @@ POST /kyb/enterprise/submit
 
 **说明:** `legal_person_id_number` 和 `bank_account_number` 将被 SM4 加密存储。
 
----
-
-### 2. 发起小额打款验证
+#### 发起小额打款验证
 
 ```
 POST /kyb/enterprise/micro-payment/init
@@ -409,9 +325,7 @@ POST /kyb/enterprise/micro-payment/init
 
 **说明:** 请向显示的银行账户转账指定金额以完成验证。
 
----
-
-### 3. 验证小额打款
+#### 验证小额打款
 
 ```
 POST /kyb/enterprise/micro-payment/verify
@@ -425,9 +339,7 @@ POST /kyb/enterprise/micro-payment/verify
 }
 ```
 
----
-
-### 4. 提交人脸核身
+#### 提交人脸核身
 
 ```
 POST /kyb/enterprise/face/verify
@@ -441,9 +353,7 @@ POST /kyb/enterprise/face/verify
 }
 ```
 
----
-
-### 5. 获取企业认证状态
+#### 获取企业认证状态
 
 ```
 GET /kyb/enterprise/status/{enterprise_id}
@@ -467,9 +377,9 @@ GET /kyb/enterprise/status/{enterprise_id}
 
 ---
 
-## Audit Service (端口 8085)
+### 2. 审计日志
 
-### 1. 记录审计日志
+#### 记录审计日志
 
 ```
 POST /audit/logs
@@ -487,9 +397,7 @@ POST /audit/logs
 }
 ```
 
----
-
-### 2. 批量记录审计日志
+#### 批量记录审计日志
 
 ```
 POST /audit/logs/batch
@@ -505,25 +413,19 @@ POST /audit/logs/batch
 }
 ```
 
----
-
-### 3. 获取用户审计日志
+#### 获取用户审计日志
 
 ```
 GET /audit/logs/user/{user_id}?limit=100&offset=0
 ```
 
----
-
-### 4. 按时间范围查询
+#### 按时间范围查询
 
 ```
 GET /audit/logs?start=2024-01-01T00:00:00Z&end=2024-01-31T23:59:59Z&limit=50
 ```
 
----
-
-### 5. 验证日志完整性
+#### 验证日志完整性
 
 ```
 GET /audit/logs/{log_id}/verify
@@ -542,9 +444,7 @@ GET /audit/logs/{log_id}/verify
 }
 ```
 
----
-
-### 6. 清理旧日志 (管理员)
+#### 清理旧日志 (管理员)
 
 ```
 POST /audit/logs/cleanup
@@ -559,87 +459,9 @@ POST /audit/logs/cleanup
 
 ---
 
-## Email Service (端口 8088)
+### 3. 风险评估
 
-### 1. 发送 OTP
-
-```
-POST /email/otp/send
-```
-
-**请求:**
-```json
-{
-  "email": "user@example.com"
-}
-```
-
-**响应:**
-```json
-{
-  "code": 200,
-  "data": {
-    "expires_in": 300
-  }
-}
-```
-
----
-
-### 2. 验证 OTP
-
-```
-POST /email/otp/verify
-```
-
-**请求:**
-```json
-{
-  "email": "user@example.com",
-  "code": "123456"
-}
-```
-
----
-
-### 3. 发送 Magic Link
-
-```
-POST /email/magic-link/send
-```
-
-**请求:**
-```json
-{
-  "email": "user@example.com",
-  "target_url": "https://app.example.com/auth/callback"
-}
-```
-
-**响应:**
-```json
-{
-  "code": 200,
-  "data": {
-    "magic_link": "https://app.example.com/auth/callback?token=eyJhbG...",
-    "expires_in": 900
-  }
-}
-```
-
----
-
-### 4. 验证 Magic Link
-
-```
-GET /email/magic-link/verify?token=eyJhbG...
-```
-
----
-
-## Risk Service (端口 8086)
-
-### 1. 风险评估
+#### 风险评估
 
 ```
 POST /risk/assess
@@ -683,17 +505,13 @@ POST /risk/assess
 - `verify`: 需要验证
 - `deny`: 拒绝
 
----
-
-### 2. 获取用户风险历史
+#### 获取用户风险历史
 
 ```
 GET /risk/history/{user_id}?start=2024-01-01&end=2024-01-31
 ```
 
----
-
-### 3. 获取风险事件详情
+#### 获取风险事件详情
 
 ```
 GET /risk/event/{event_id}
@@ -701,9 +519,9 @@ GET /risk/event/{event_id}
 
 ---
 
-## Session Service (端口 8087)
+### 4. 会话管理
 
-### 1. 创建会话
+#### 创建会话
 
 ```
 POST /session/create
@@ -718,9 +536,7 @@ POST /session/create
 }
 ```
 
----
-
-### 2. 验证会话
+#### 验证会话
 
 ```
 POST /session/validate
@@ -733,17 +549,13 @@ POST /session/validate
 }
 ```
 
----
-
-### 3. 获取用户会话列表
+#### 获取用户会话列表
 
 ```
 GET /session/user/{user_id}
 ```
 
----
-
-### 4. 使单个会话失效
+#### 使单个会话失效
 
 ```
 POST /session/invalidate
@@ -756,9 +568,7 @@ POST /session/invalidate
 }
 ```
 
----
-
-### 5. 使所有会话失效
+#### 使所有会话失效
 
 ```
 POST /session/invalidate-all
@@ -771,9 +581,7 @@ POST /session/invalidate-all
 }
 ```
 
----
-
-### 6. 刷新会话
+#### 刷新会话
 
 ```
 POST /session/refresh
@@ -784,6 +592,188 @@ POST /session/refresh
 {
   "session_id": "xxx"
 }
+```
+
+---
+
+### 5. 设备管理
+
+#### 注册设备
+
+```
+POST /device/register
+```
+
+**请求:**
+```json
+{
+  "fingerprint_id": "fp_abc123xyz",
+  "user_agent": "Mozilla/5.0...",
+  "ip_address": "192.168.1.100",
+  "country": "China",
+  "city": "Beijing",
+  "latitude": 39.9042,
+  "longitude": 116.4074
+}
+```
+
+#### 验证设备
+
+```
+POST /device/verify
+```
+
+**请求:**
+```json
+{
+  "fingerprint_id": "fp_abc123xyz",
+  "user_id": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+**响应:**
+```json
+{
+  "code": 200,
+  "data": {
+    "is_trusted": false,
+    "risk_score": 45,
+    "risk_factors": ["location_change", "new_device"]
+  }
+}
+```
+
+#### 标记可信设备
+
+```
+POST /device/trust
+```
+
+**请求:**
+```json
+{
+  "fingerprint_id": "fp_abc123xyz",
+  "user_id": "550e8400-e29b-41d4-a716-446655440000",
+  "trust_days": 7
+}
+```
+
+#### 获取用户设备列表
+
+```
+GET /device/user/{user_id}
+```
+
+#### 删除设备
+
+```
+DELETE /device/{device_id}
+```
+
+---
+
+## Data Product Service (端口 30314)
+
+### 1. RFM 分析
+
+```
+GET /data/rfm/:user_id
+POST /data/rfm/batch
+```
+
+### 2. 数据看板
+
+```
+GET /data/dashboard/overview
+GET /data/funnel/subscription
+```
+
+### 3. 事件追踪
+
+```
+POST /events
+POST /events/batch
+```
+
+### 4. 运营指标
+
+```
+GET /ops/registration-trends
+GET /ops/conversion-funnel
+GET /ops/mrr
+GET /ops/k-factor
+GET /ops/rfm-distribution
+```
+
+### 5. 实时流
+
+```
+POST /stream/events
+GET /stream/online
+GET /stream/funnel
+```
+
+### 6. 广告追踪
+
+```
+POST /ad/events
+GET /ad/metrics
+```
+
+### 7. A/B 测试
+
+```
+POST /experiments
+GET /experiments/:id/assign
+POST /experiments/:id/events
+GET /experiments/:id/results
+```
+
+---
+
+## Payment Service (端口 30316)
+
+### 1. 订单管理
+
+```
+POST /orders
+GET /orders/:id
+GET /orders
+PUT /orders/:id/status
+GET /orders/export/csv
+```
+
+### 2. 发票管理
+
+```
+POST /invoices
+GET /invoices
+GET /invoices/:id
+POST /invoices/svc
+```
+
+### 3. 支付流程
+
+```
+GET /payment-flow/result/:order_no
+POST /payment-flow/retry/:order_no
+```
+
+### 4. 退款管理
+
+```
+POST /refunds
+PUT /refunds/:id/approve
+PUT /refunds/:id/reject
+```
+
+### 5. 支付回调
+
+```
+POST /payment/callback/:provider
+POST /payment/create
+POST /payment/reconcile
+GET /payment/reconcile/:report_id
 ```
 
 ---

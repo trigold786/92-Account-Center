@@ -2,6 +2,8 @@ package auth
 
 import (
 	"testing"
+
+	"github.com/trigold786/92-Account-Center/auth-service/pkg/crypto"
 )
 
 func TestHashPasswordArgon2id_VerifySuccess(t *testing.T) {
@@ -99,5 +101,23 @@ func TestNeedsRehash(t *testing.T) {
 	}
 	if !NeedsRehash("salt$sm3hash") {
 		t.Error("SM3 hash should need rehash")
+	}
+}
+
+func TestVerifyPassword_RealSM3Compatibility(t *testing.T) {
+	salt := "testsalt123"
+	password := "MyPassword123!"
+	sm3Hash := salt + "$" + crypto.SM3Hash([]byte(salt+password))
+
+	if !VerifyPassword(password, sm3Hash) {
+		t.Fatal("expected SM3 hash to verify successfully")
+	}
+
+	if VerifyPassword("wrongpassword", sm3Hash) {
+		t.Fatal("expected wrong password to fail verification")
+	}
+
+	if IdentifyHashAlgorithm(sm3Hash) != HashSM3 {
+		t.Fatal("expected SM3 algorithm identification")
 	}
 }

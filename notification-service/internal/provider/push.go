@@ -2,9 +2,11 @@ package provider
 
 import (
 	"context"
+	"strings"
 	"sync"
 )
 
+// PushProvider defines the contract for sending push notifications.
 type PushProvider interface {
 	Send(ctx context.Context, req *PushRequest) (*PushResponse, error)
 	ValidateToken(ctx context.Context, token string) error
@@ -59,4 +61,12 @@ func (r *PushProviderRegistry) List() []string {
 		names = append(names, name)
 	}
 	return names
+}
+
+func insecurePushValue(value string) bool {
+	v := strings.ToLower(strings.TrimSpace(value))
+	if v == "" {
+		return true
+	}
+	return strings.Contains(v, "sandbox") || strings.Contains(v, "test") || strings.Contains(v, "default") || strings.Contains(v, "placeholder")
 }

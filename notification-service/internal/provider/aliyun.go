@@ -95,7 +95,7 @@ func (p *aliyunProvider) SendCode(ctx context.Context, phoneNumber string) (stri
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 
 	var result struct {
 		Code    string `json:"Code"`

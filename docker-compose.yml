@@ -114,6 +114,7 @@ services:
       COMPLIANCE_SERVICE_URL: "http://compliance-service:30313"
       DATA_PRODUCT_SERVICE_URL: "http://data-product-service:30314"
       CONFIG_SERVICE_URL: "http://config-service:30315"
+      PAYMENT_SERVICE_URL: "http://payment-service:30316"
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET required}
       PORT: "30300"
     networks:
@@ -130,6 +131,8 @@ services:
       compliance-service:
         condition: service_started
       data-product-service:
+        condition: service_started
+      payment-service:
         condition: service_started
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:30300/health"]
@@ -149,6 +152,9 @@ services:
       context: ./account-service
       dockerfile: Dockerfile
     container_name: account-service
+    read_only: true
+    tmpfs:
+      - /tmp
     ports:
       - "30301:30301"
     environment:
@@ -161,6 +167,7 @@ services:
       REDIS_ADDR: "redis:6379"
       CREDIT_SERVICE_URL: "http://credit-service:30312"
       CONFIG_SERVICE_URL: "http://config-service:30315"
+      PAYMENT_SERVICE_URL: "http://payment-service:30316"
       JWT_SECRET: ${JWT_SECRET}
       PORT: "30301"
     networks:
@@ -188,6 +195,9 @@ services:
       context: ./auth-service
       dockerfile: Dockerfile
     container_name: auth-service
+    read_only: true
+    tmpfs:
+      - /tmp
     ports:
       - "30302:30302"
     environment:
@@ -226,6 +236,9 @@ services:
       context: ./notification-service
       dockerfile: Dockerfile
     container_name: notification-service
+    read_only: true
+    tmpfs:
+      - /tmp
     ports:
       - "30311:30311"
     environment:
@@ -359,6 +372,58 @@ services:
         limits:
           cpus: '0.25'
           memory: 256M
+    restart: always
+
+  payment-service:
+    build:
+      context: ./payment-service
+      dockerfile: Dockerfile
+    container_name: payment-service
+    read_only: true
+    tmpfs:
+      - /tmp
+    ports:
+      - "30316:30316"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: postgres
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-account_center}
+      CONFIG_SERVICE_URL: "http://config-service:30315"
+      CREDIT_SERVICE_URL: "http://credit-service:30312"
+      ACCOUNT_SERVICE_URL: "http://account-service:30301"
+      PAYMENT_MODE: ${PAYMENT_MODE:-sandbox}
+      WECHAT_APP_ID: ${WECHAT_APP_ID:-wx_sandbox_app_id}
+      WECHAT_MCH_ID: ${WECHAT_MCH_ID:-sandbox_mch_id}
+      WECHAT_API_KEY: ${WECHAT_API_KEY:-sandbox_api_key}
+      WECHAT_CERT_SERIAL_NO: ${WECHAT_CERT_SERIAL_NO:-""}
+      WECHAT_PRIVATE_KEY_PATH: ${WECHAT_PRIVATE_KEY_PATH:-""}
+      ALIPAY_APP_ID: ${ALIPAY_APP_ID:-alipay_sandbox_app_id}
+      ALIPAY_PRIVATE_KEY: ${ALIPAY_PRIVATE_KEY:-sandbox_private_key}
+      ALIPAY_PUBLIC_KEY: ${ALIPAY_PUBLIC_KEY:-sandbox_public_key}
+      ALIPAY_NOTIFY_URL: ${ALIPAY_NOTIFY_URL:-http://localhost:30316/api/v1/payment/callback/alipay}
+      PORT: "30316"
+    networks:
+      - app_network
+    depends_on:
+      postgres:
+        condition: service_started
+      config-service:
+        condition: service_started
+      credit-service:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:30316/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
     restart: always
 
   victoriametrics:

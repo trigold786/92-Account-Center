@@ -1,6 +1,8 @@
 package proxy
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 )
@@ -32,4 +34,41 @@ func TestNewTransportCustom(t *testing.T) {
 	if tr.IdleConnTimeout != 45*time.Second {
 		t.Errorf("expected IdleConnTimeout 45s, got %v", tr.IdleConnTimeout)
 	}
+}
+
+func TestNewTransport_ResponseHeaderTimeoutFires(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(2 * time.Second)
+		w.WriteHeader(200)
+	}))
+	defer srv.Close()
+
+	tr := NewTransport(1, 30)
+	client := &http.Client{Transport: tr}
+	_, err := client.Get(srv.URL)
+	if err == nil {
+		t.Fatal("expected timeout error from slow upstream, got nil")
+	}
+}
+
+func TestNewTransport_ConnectionReuse(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+	}))
+	defer srv.Close()
+
+	tr := NewTransport(30, 90)
+	client := &http.Client{Transport: tr}
+
+	resp1, err := client.Get(srv.URL)
+	if err != nil {
+		t.Fatalf("first request failed: %v", err)
+	}
+	resp1.Body.Close()
+
+	resp2, err := client.Get(srv.URL)
+	if err != nil {
+		t.Fatalf("second request failed: %v", err)
+	}
+	resp2.Body.Close()
 }

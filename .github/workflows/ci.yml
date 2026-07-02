@@ -24,9 +24,24 @@ env:
   NODE_VERSION: "20"
 
 jobs:
+  artifact-guard:
+    name: Artifact Guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for tracked binary artifacts
+        run: |
+          if git ls-files | grep -iE '\.(exe|dll|so|dylib|bin)$|^main\.exe$|^cmd\.exe$|^\.worktrees/|^worktrees/'; then
+            echo "ERROR: Tracked binary/artifact files detected:"
+            git ls-files | grep -iE '\.(exe|dll|so|dylib|bin)$|^main\.exe$|^cmd\.exe$|^\.worktrees/|^worktrees/'
+            exit 1
+          fi
+          echo "No tracked artifacts found."
+
   lint:
     name: Lint Go Services
     runs-on: ubuntu-latest
+    needs: [artifact-guard]
     steps:
       - uses: actions/checkout@v4
 
@@ -51,6 +66,7 @@ jobs:
   test:
     name: Test Go Services
     runs-on: ubuntu-latest
+    needs: [artifact-guard]
     services:
       postgres:
         image: postgres:18-alpine
@@ -107,6 +123,14 @@ jobs:
             echo "==> Testing $svc"
             cd "$svc"
             go test -v -race -coverprofile=coverage.out ./...
+            cov=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+            echo "$svc coverage: ${cov}%"
+            if [ -n "$cov" ]; then
+              threshold=$(echo "$cov < 30.0" | bc -l)
+              if [ "$threshold" -eq 1 ]; then
+                echo "WARNING: $svc coverage ${cov}% is below 30% threshold"
+              fi
+            fi
             cd ..
           done
 
