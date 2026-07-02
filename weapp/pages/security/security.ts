@@ -21,7 +21,7 @@ Page({
     this.setData({ loading: true })
     const uid = getUserId()
     const [devRes, riskRes] = await Promise.all([
-      api.get<DeviceInfo[]>(`/device/users/${uid}/devices`),
+      api.get<DeviceInfo[]>(`/device/user/${uid}`),
       api.get<RiskEvent[]>(`/risk/history/${uid}`),
     ])
     this.setData({ devices: devRes.data || [], riskEvents: (riskRes.data || []).slice(0, 10), loading: false })
@@ -36,7 +36,7 @@ Page({
     if (newPassword !== confirmPassword) { this.setData({ passMsg: '两次密码不一致', passSuccess: false }); return }
     wx.showLoading({ title: '处理中...' })
     try {
-      const res = await api.post('/account/password/send-code', { credential: '' })
+      const res = await api.post('/account/password/send-verification-code', { credential: '' })
       if (res.code === 0) {
         this.setData({ passMsg: '密码修改请求已提交', passSuccess: true, currentPassword: '', newPassword: '', confirmPassword: '' })
       } else {

@@ -14,10 +14,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.accountcenter.R
 import com.accountcenter.model.Subscription
 import com.accountcenter.model.TierInfo
 import com.accountcenter.ui.components.AppCard
@@ -36,15 +38,15 @@ fun SubscriptionScreen(
     Box(modifier = Modifier.fillMaxSize().background(BgPrimary)) {
         Column(modifier = Modifier.fillMaxSize()) {
             CenterAlignedTopAppBar(
-                title = { Text("订阅管理", color = TextPrimary) },
+                title = { Text(stringResource(R.string.subscription_title), color = TextPrimary) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "返回", tint = TextPrimary)
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back), tint = TextPrimary)
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.refresh() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "刷新", tint = TextPrimary)
+                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh), tint = TextPrimary)
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -70,7 +72,7 @@ fun SubscriptionScreen(
                     val activeSubs = subscriptions.filter { it.status == "active" }
                     if (activeSubs.isNotEmpty()) {
                         item {
-                            Text("当前订阅", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                            Text(stringResource(R.string.subscription_current), style = MaterialTheme.typography.labelSmall, color = TextSecondary)
                         }
                         activeSubs.forEach { sub ->
                             item {
@@ -85,7 +87,7 @@ fun SubscriptionScreen(
                                 shape = RoundedCornerShape(16.dp)
                             ) {
                                 Text(
-                                    "暂无活跃订阅",
+                                    stringResource(R.string.subscription_no_active),
                                     modifier = Modifier.padding(24.dp),
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = TextSecondary
@@ -96,7 +98,7 @@ fun SubscriptionScreen(
 
                     item {
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("订阅历史", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                        Text(stringResource(R.string.subscription_history), style = MaterialTheme.typography.labelSmall, color = TextSecondary)
                     }
                     subscriptions.filter { it.status != "active" }.forEach { sub ->
                         item {
@@ -112,11 +114,11 @@ fun SubscriptionScreen(
 @Composable
 private fun TierBadge(level: Int) {
     val (name, tierColor) = when (level) {
-        0 -> "免费版" to TierFree
-        1 -> "基础版" to TierBasic
-        2 -> "高级版" to TierPremium
-        3 -> "企业版" to TierEnterprise
-        else -> "未知" to TierFree
+        0 -> stringResource(R.string.tier_free) to TierFree
+        1 -> stringResource(R.string.tier_basic) to TierBasic
+        2 -> stringResource(R.string.tier_premium) to TierPremium
+        3 -> stringResource(R.string.tier_enterprise) to TierEnterprise
+        else -> stringResource(R.string.tier_free) to TierFree
     }
     AppCard(
         modifier = Modifier.fillMaxWidth()
@@ -125,7 +127,7 @@ private fun TierBadge(level: Int) {
             Box(modifier = Modifier.size(12.dp).clip(RoundedCornerShape(6.dp)).background(tierColor))
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                "当前等级",
+                stringResource(R.string.subscription_tier),
                 style = MaterialTheme.typography.bodySmall,
                 color = TextSecondary
             )
@@ -169,20 +171,20 @@ private fun ActiveSubscriptionCard(subscription: Subscription) {
             )
             Column(modifier = Modifier.padding(16.dp).weight(1f)) {
                 Row {
-                    Text("状态：", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                    Text("${stringResource(R.string.subscription_status)}：", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                     Text(subscription.status, style = MaterialTheme.typography.bodySmall, color = Success)
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 Row {
-                    Text("开始时间：", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                    Text("${stringResource(R.string.subscription_start_time)}：", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                     Text(subscription.startTime, style = MaterialTheme.typography.bodySmall, color = TextPrimary)
                 }
                 Row {
-                    Text("结束时间：", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                    Text("${stringResource(R.string.subscription_end_time)}：", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                     Text(subscription.endTime, style = MaterialTheme.typography.bodySmall, color = TextPrimary)
                 }
                 Row {
-                    Text("价格：", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                    Text("${stringResource(R.string.subscription_price)}：", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                     Text("¥${subscription.price}", style = MaterialTheme.typography.bodySmall, color = TextPrimary, fontWeight = FontWeight.Bold)
                 }
             }
@@ -199,7 +201,7 @@ private fun SubscriptionHistoryCard(subscription: Subscription) {
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("状态：${subscription.status}", style = MaterialTheme.typography.bodySmall, color = TextPrimary)
+                Text("${stringResource(R.string.subscription_status)}：${subscription.status}", style = MaterialTheme.typography.bodySmall, color = TextPrimary)
                 Text("¥${subscription.price}", style = MaterialTheme.typography.bodySmall, color = TextPrimary, fontWeight = FontWeight.Bold)
             }
             Spacer(modifier = Modifier.height(4.dp))

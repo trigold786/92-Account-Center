@@ -15,8 +15,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.accountcenter.R
 import com.accountcenter.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -41,10 +43,10 @@ fun AboutScreen(onNavigateBack: () -> Unit) {
     Box(modifier = Modifier.fillMaxSize().background(BgPrimary)) {
         Column(modifier = Modifier.fillMaxSize()) {
             CenterAlignedTopAppBar(
-                title = { Text("关于", color = TextPrimary) },
+                title = { Text(stringResource(R.string.about_title), color = TextPrimary) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "返回", tint = TextPrimary)
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back), tint = TextPrimary)
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -65,7 +67,7 @@ fun AboutScreen(onNavigateBack: () -> Unit) {
                     tint = BrandPrimary
                 )
                 Spacer(modifier = Modifier.height(12.dp))
-                Text("账户中心", style = MaterialTheme.typography.headlineLarge, color = TextPrimary)
+                Text(stringResource(R.string.about_account_center), style = MaterialTheme.typography.headlineLarge, color = TextPrimary)
                 Text("Version $versionName Build $versionCode", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                 Spacer(modifier = Modifier.height(32.dp))
 
@@ -75,9 +77,9 @@ fun AboutScreen(onNavigateBack: () -> Unit) {
                     shape = RoundedCornerShape(16.dp)
                 ) {
                     Column {
-                        InfoRow("应用版本", versionName)
+                        InfoRow(stringResource(R.string.about_app_version), versionName)
                         HorizontalDivider(color = Divider)
-                        InfoRow("构建号", versionCode.toString())
+                        InfoRow(stringResource(R.string.about_build), versionCode.toString())
                     }
                 }
                 Spacer(modifier = Modifier.height(12.dp))
@@ -88,9 +90,9 @@ fun AboutScreen(onNavigateBack: () -> Unit) {
                     shape = RoundedCornerShape(16.dp)
                 ) {
                     Column {
-                        LegalRow("服务条款")
+                        LegalRow(stringResource(R.string.about_terms))
                         HorizontalDivider(color = Divider)
-                        LegalRow("隐私政策")
+                        LegalRow(stringResource(R.string.about_privacy))
                     }
                 }
 

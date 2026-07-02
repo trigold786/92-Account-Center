@@ -22,6 +22,11 @@ class LoginViewModel: ObservableObject {
         self.authManager = authManager
     }
     
+    deinit {
+        countdownTimer?.invalidate()
+        countdownTimer = nil
+    }
+    
     func login() async {
         guard !isLoading else { return }
         isLoading = true

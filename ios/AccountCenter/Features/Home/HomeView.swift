@@ -20,10 +20,10 @@ struct HomeView: View {
                                 .foregroundColor(.white)
                         }
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(viewModel.currentUser?.accountId ?? "用户")
+                            Text(viewModel.currentUser?.accountId ?? NSLocalizedString("user_placeholder", comment: ""))
                                 .font(.custom("SpaceGrotesk-Bold", size: 18))
                                 .foregroundColor(.textPrimary)
-                            Text("未绑定手机号")
+                            Text(NSLocalizedString("phone_unbound", comment: ""))
                                 .font(.custom("Inter-Regular", size: 13))
                                 .foregroundColor(.textSecondary)
                             HStack(spacing: 4) {
@@ -64,19 +64,19 @@ struct HomeView: View {
 
                     // Features
                     VStack(alignment: .leading, spacing: 0) {
-                        Text("功能")
+                        Text(NSLocalizedString("features_section", comment: ""))
                             .sectionTitle()
                             .padding(.horizontal, 4)
                             .padding(.bottom, 8)
 
                         VStack(spacing: 0) {
-                            FeatureRow(icon: "cart", label: "订阅管理", destination: SubscriptionView())
+                            FeatureRow(icon: "cart", label: NSLocalizedString("feature_subscription", comment: ""), destination: SubscriptionView())
                             Divider().background(Color.divider).padding(.leading, 44)
-                            FeatureRow(icon: "creditcard", label: "积分中心", destination: CreditsView())
+                            FeatureRow(icon: "creditcard", label: NSLocalizedString("feature_credits", comment: ""), destination: CreditsView())
                             Divider().background(Color.divider).padding(.leading, 44)
-                            FeatureRow(icon: "lock", label: "安全设置", destination: SecurityView())
+                            FeatureRow(icon: "lock", label: NSLocalizedString("feature_security", comment: ""), destination: SecurityView())
                             Divider().background(Color.divider).padding(.leading, 44)
-                            FeatureRow(icon: "info.circle", label: "关于", destination: AboutView())
+                            FeatureRow(icon: "info.circle", label: NSLocalizedString("feature_about", comment: ""), destination: AboutView())
                         }
                         .background(Color.bgCard)
                         .cornerRadius(16)
@@ -84,7 +84,7 @@ struct HomeView: View {
 
                     // Logout
                     Button(action: { Task { await viewModel.logout() } }) {
-                        Text("退出登录")
+                        Text(NSLocalizedString("logout", comment: ""))
                             .font(.custom("Inter-Regular", size: 15))
                             .foregroundColor(.danger)
                             .frame(maxWidth: .infinity)
@@ -97,10 +97,11 @@ struct HomeView: View {
                 .padding(16)
             }
         }
-        .navigationTitle("用户中心")
+        .navigationTitle(NSLocalizedString("home_title", comment: ""))
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Color.bgPrimary.opacity(0.9), for: .navigationBar)
         .task { await viewModel.loadRFM() }
+        .preventScreenshot()
     }
 }
 

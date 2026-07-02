@@ -44,26 +44,26 @@ struct SubscriptionView: View {
 
                     // Active subscription
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("当前订阅")
+                        Text(NSLocalizedString("subscription_current", comment: ""))
                             .sectionTitle()
 
                         if let sub = viewModel.activeSubscription {
                             VStack(alignment: .leading, spacing: 12) {
                                 HStack(spacing: 6) {
                                     Circle().fill(Color.success).frame(width: 8, height: 8)
-                                    Text("状态").font(.custom("Inter-Regular", size: 14)).foregroundColor(.textSecondary)
+                                    Text(NSLocalizedString("subscription_status", comment: "")).font(.custom("Inter-Regular", size: 14)).foregroundColor(.textSecondary)
                                     Spacer()
-                                    Text("生效中").font(.custom("Inter-Semibold", size: 14)).foregroundColor(.success)
+                                    Text(NSLocalizedString("subscription_active", comment: "")).font(.custom("Inter-Semibold", size: 14)).foregroundColor(.success)
                                 }
                                 Divider().background(Color.divider)
-                                labeledRow("开始时间", sub.startTime)
+                                labeledRow(NSLocalizedString("subscription_start_time", comment: ""), sub.startTime)
                                 Divider().background(Color.divider)
-                                labeledRow("结束时间", sub.endTime)
+                                labeledRow(NSLocalizedString("subscription_end_time", comment: ""), sub.endTime)
                                 Divider().background(Color.divider)
-                                labeledRow("金额", "\u{00A5}\(String(format: "%.2f", sub.price))")
+                                labeledRow(NSLocalizedString("subscription_price", comment: ""), "\u{00A5}\(String(format: "%.2f", sub.price))")
                                 if let method = sub.paymentMethod {
                                     Divider().background(Color.divider)
-                                    labeledRow("支付方式", method)
+                                    labeledRow(NSLocalizedString("subscription_payment_method", comment: ""), method)
                                 }
                             }
                             .cardStyle()
@@ -77,7 +77,7 @@ struct SubscriptionView: View {
                                     .clipShape(RoundedRectangle(cornerRadius: 16))
                             )
                         } else {
-                            Text("暂无活跃订阅")
+                            Text(NSLocalizedString("subscription_no_active", comment: ""))
                                 .font(.custom("Inter-Regular", size: 14))
                                 .foregroundColor(.textSecondary)
                                 .cardStyle()
@@ -87,7 +87,7 @@ struct SubscriptionView: View {
 
                     // History
                     VStack(alignment: .leading, spacing: 0) {
-                        Text("订阅历史")
+                        Text(NSLocalizedString("subscription_history", comment: ""))
                             .sectionTitle()
                             .padding(.bottom, 8)
 
@@ -118,7 +118,7 @@ struct SubscriptionView: View {
                 .padding(16)
             }
         }
-        .navigationTitle("订阅管理")
+        .navigationTitle(NSLocalizedString("subscription_title", comment: ""))
         .toolbarBackground(Color.bgPrimary.opacity(0.9), for: .navigationBar)
         .refreshable { await viewModel.load() }
         .task { await viewModel.load() }

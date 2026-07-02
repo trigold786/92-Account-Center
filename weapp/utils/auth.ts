@@ -43,7 +43,12 @@ export async function sendSMSCode(phone: string): Promise<void> {
 }
 
 export async function register(params: { phone: string; password: string; code: string }): Promise<void> {
-  const res = await api.post('/account/register', params)
+  const res = await api.post('/account/register', {
+    phone_number: params.phone,
+    account_id: params.phone,
+    password: params.password,
+    agree_to_terms: true,
+  })
   if (res.code !== 0) throw new Error(res.message || '注册失败')
 }
 

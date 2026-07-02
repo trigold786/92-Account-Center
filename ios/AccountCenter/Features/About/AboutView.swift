@@ -12,7 +12,7 @@ struct AboutView: View {
                     Image(systemName: "person.circle.fill")
                         .font(.system(size: 56))
                         .foregroundStyle(Color.brandGradient)
-                    Text("账户中心")
+                    Text(NSLocalizedString("about_account_center", comment: ""))
                         .font(.custom("SpaceGrotesk-Bold", size: 22))
                         .foregroundColor(.textPrimary)
                     HStack(spacing: 4) {
@@ -34,17 +34,17 @@ struct AboutView: View {
                 .padding(.bottom, 48)
 
                 VStack(spacing: 0) {
-                    aboutRow("版本号", Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0")
+                    aboutRow(NSLocalizedString("about_version", comment: ""), Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0")
                     Divider().background(Color.divider).padding(.leading, 16)
-                    aboutRow("构建号", Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1")
+                    aboutRow(NSLocalizedString("about_build", comment: ""), Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1")
                 }
                 .background(Color.bgCard).cornerRadius(16)
                 .padding(.horizontal, 16)
 
                 VStack(spacing: 0) {
-                    legalRow("服务条款")
+                    legalRow(NSLocalizedString("about_terms", comment: ""))
                     Divider().background(Color.divider).padding(.leading, 16)
-                    legalRow("隐私政策")
+                    legalRow(NSLocalizedString("about_privacy", comment: ""))
                 }
                 .background(Color.bgCard).cornerRadius(16)
                 .padding(.horizontal, 16)
@@ -58,7 +58,7 @@ struct AboutView: View {
                     .padding(.bottom, 24)
             }
         }
-        .navigationTitle("关于")
+        .navigationTitle(NSLocalizedString("about_title", comment: ""))
         .toolbarBackground(Color.bgPrimary.opacity(0.9), for: .navigationBar)
     }
 

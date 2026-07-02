@@ -17,10 +17,10 @@ struct SecurityView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 0) {
-                        Text("风险事件").sectionTitle().padding(.bottom, 8)
+                        Text(NSLocalizedString("risk_events", comment: "")).sectionTitle().padding(.bottom, 8)
 
                         if viewModel.riskEvents.isEmpty {
-                            Text("暂无风险事件")
+                            Text(NSLocalizedString("no_data", comment: ""))
                                 .font(.custom("Inter-Regular", size: 14)).foregroundColor(.textSecondary)
                                 .padding(24).frame(maxWidth: .infinity).background(Color.bgCard).cornerRadius(16)
                         } else {
@@ -51,10 +51,10 @@ struct SecurityView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 0) {
-                        Text("登录设备").sectionTitle().padding(.bottom, 8)
+                        Text(NSLocalizedString("login_devices", comment: "")).sectionTitle().padding(.bottom, 8)
 
                         if viewModel.devices.isEmpty {
-                            Text("暂无设备记录")
+                            Text(NSLocalizedString("no_data", comment: ""))
                                 .font(.custom("Inter-Regular", size: 14)).foregroundColor(.textSecondary)
                                 .padding(24).frame(maxWidth: .infinity).background(Color.bgCard).cornerRadius(16)
                         } else {
@@ -67,12 +67,12 @@ struct SecurityView: View {
                                             Text(device.deviceName ?? device.platform)
                                                 .font(.custom("Inter-Regular", size: 14)).foregroundColor(.textPrimary)
                                             if let lastActive = device.lastActiveAt {
-                                                Text("最近活跃: \(lastActive)")
+                                                Text("\(NSLocalizedString("last_active", comment: "")): \(lastActive)")
                                                     .font(.custom("Inter-Regular", size: 11)).foregroundColor(.textSecondary)
                                             }
                                         }
                                         Spacer()
-                                        Text(device.isActive ? "活跃中" : "离线")
+                                        Text(device.isActive ? NSLocalizedString("device_active", comment: "") : NSLocalizedString("device_offline", comment: ""))
                                             .font(.custom("Inter-Semibold", size: 11))
                                             .foregroundColor(device.isActive ? .success : .textSecondary)
                                     }
@@ -90,16 +90,16 @@ struct SecurityView: View {
             }
 
             VStack(alignment: .leading, spacing: 0) {
-                Text("修改密码").sectionTitle().padding(.bottom, 8)
+                Text(NSLocalizedString("change_password", comment: "")).sectionTitle().padding(.bottom, 8)
 
                 VStack(spacing: 12) {
-                    SecureField("当前密码", text: $viewModel.currentPassword)
+                    SecureField(NSLocalizedString("current_password", comment: ""), text: $viewModel.currentPassword)
                         .textFieldStyle(.roundedBorder)
-                    SecureField("新密码", text: $viewModel.newPassword)
+                    SecureField(NSLocalizedString("new_password", comment: ""), text: $viewModel.newPassword)
                         .textFieldStyle(.roundedBorder)
-                    SecureField("确认新密码", text: $viewModel.confirmPassword)
+                    SecureField(NSLocalizedString("confirm_password", comment: ""), text: $viewModel.confirmPassword)
                         .textFieldStyle(.roundedBorder)
-                    Button("修改密码") {
+                    Button(NSLocalizedString("change_password", comment: "")) {
                         viewModel.changePassword()
                     }
                     .buttonStyle(.borderedProminent)
@@ -115,9 +115,10 @@ struct SecurityView: View {
                 .cornerRadius(16)
             }
         }
-        .navigationTitle("安全设置")
+        .navigationTitle(NSLocalizedString("feature_security", comment: ""))
         .toolbarBackground(Color.bgPrimary.opacity(0.9), for: .navigationBar)
         .refreshable { await viewModel.load() }
         .task { await viewModel.load() }
+        .preventScreenshot()
     }
 }

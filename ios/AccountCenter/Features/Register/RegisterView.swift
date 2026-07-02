@@ -13,28 +13,28 @@ struct RegisterView: View {
                     Spacer().frame(height: 24)
 
                     VStack(spacing: 8) {
-                        Text("创建账户")
+                        Text(NSLocalizedString("register_create_account", comment: ""))
                             .font(.custom("SpaceGrotesk-Bold", size: 28))
                             .foregroundColor(.textPrimary)
-                        Text("注册新账户以使用完整功能")
+                        Text(NSLocalizedString("register_subtitle", comment: ""))
                             .font(.custom("Inter-Regular", size: 14))
                             .foregroundColor(.textSecondary)
                     }
                     .padding(.bottom, 32)
 
-                    TextField("手机号", text: $viewModel.phoneNumber)
+                    TextField(NSLocalizedString("register_phone_label", comment: ""), text: $viewModel.phoneNumber)
                         .keyboardType(.numberPad)
                         .textContentType(.telephoneNumber)
                         .font(.custom("Inter-Regular", size: 15))
                         .glowingInput()
 
                     HStack(spacing: 8) {
-                        TextField("验证码", text: $viewModel.verificationCode)
+                        TextField(NSLocalizedString("register_code_label", comment: ""), text: $viewModel.verificationCode)
                             .keyboardType(.numberPad)
                             .font(.custom("Inter-Regular", size: 15))
                             .glowingInput()
 
-                        Button(viewModel.countdownSeconds > 0 ? "\(viewModel.countdownSeconds)s" : "发送验证码") {
+                        Button(viewModel.countdownSeconds > 0 ? "\(viewModel.countdownSeconds)s" : NSLocalizedString("register_send_code", comment: "")) {
                             Task { await viewModel.sendVerificationCode() }
                         }
                         .font(.custom("Inter-Regular", size: 13))
@@ -42,27 +42,27 @@ struct RegisterView: View {
                         .disabled(viewModel.countdownSeconds > 0 || viewModel.phoneNumber.isEmpty)
                     }
 
-                    TextField("账户ID", text: $viewModel.accountId)
+                    TextField(NSLocalizedString("register_account_id", comment: ""), text: $viewModel.accountId)
                         .textContentType(.username)
                         .font(.custom("Inter-Regular", size: 15))
                         .glowingInput()
 
-                    SecureField("密码", text: $viewModel.password)
+                    SecureField(NSLocalizedString("register_password_label", comment: ""), text: $viewModel.password)
                         .textContentType(.newPassword)
                         .font(.custom("Inter-Regular", size: 15))
                         .glowingInput()
 
-                    SecureField("确认密码", text: $viewModel.confirmPassword)
+                    SecureField(NSLocalizedString("register_confirm_password", comment: ""), text: $viewModel.confirmPassword)
                         .textContentType(.newPassword)
                         .font(.custom("Inter-Regular", size: 15))
                         .glowingInput()
 
-                    TextField("推荐码（可选）", text: $viewModel.referralCode)
+                    TextField(NSLocalizedString("register_referral_code", comment: ""), text: $viewModel.referralCode)
                         .font(.custom("Inter-Regular", size: 15))
                         .glowingInput()
 
                     Toggle(isOn: $viewModel.agreeToTerms) {
-                        Text("我已阅读并同意服务条款和隐私政策")
+                        Text(NSLocalizedString("register_agree_terms", comment: ""))
                             .font(.custom("Inter-Regular", size: 12))
                             .foregroundColor(.textSecondary)
                     }
@@ -78,7 +78,7 @@ struct RegisterView: View {
                         if viewModel.isLoading {
                             ProgressView()
                         } else {
-                            Text("注册")
+                            Text(NSLocalizedString("register_login", comment: ""))
                                 .font(.custom("Inter-Semibold", size: 16))
                         }
                     }
@@ -86,11 +86,11 @@ struct RegisterView: View {
                     .disabled(viewModel.isLoading)
 
                     HStack(spacing: 4) {
-                        Text("已有账号？")
+                        Text(NSLocalizedString("register_has_account", comment: ""))
                             .font(.custom("Inter-Regular", size: 13))
                             .foregroundColor(.textSecondary)
                         Button(action: { dismiss() }) {
-                            Text("立即登录")
+                            Text(NSLocalizedString("register_login_now", comment: ""))
                                 .font(.custom("Inter-Semibold", size: 13))
                                 .foregroundColor(.brandSecondary)
                         }

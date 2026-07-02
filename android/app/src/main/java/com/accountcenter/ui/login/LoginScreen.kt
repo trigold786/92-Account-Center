@@ -1,5 +1,7 @@
 package com.accountcenter.ui.login
 
+import android.view.WindowManager
+import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
@@ -9,10 +11,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.accountcenter.R
 import com.accountcenter.ui.components.GradientButton
 import com.accountcenter.ui.theme.*
 
@@ -23,6 +27,14 @@ fun LoginScreen(
     onNavigateToRegister: () -> Unit,
     onLoginSuccess: () -> Unit
 ) {
+    val activity = LocalActivity.current
+    DisposableEffect(activity) {
+        activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        onDispose {
+            activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
+    }
+
     val uiState by viewModel.uiState.collectAsState()
 
     Box(
@@ -41,12 +53,12 @@ fun LoginScreen(
             )
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                "账户中心",
+                stringResource(R.string.login_title),
                 style = MaterialTheme.typography.headlineLarge,
                 color = TextPrimary
             )
             Text(
-                "登录您的账户",
+                stringResource(R.string.login_subtitle),
                 style = MaterialTheme.typography.bodyMedium,
                 color = TextSecondary
             )
@@ -55,7 +67,7 @@ fun LoginScreen(
             OutlinedTextField(
                 value = uiState.phoneNumber,
                 onValueChange = viewModel::onPhoneNumberChange,
-                label = { Text("手机号") },
+                label = { Text(stringResource(R.string.login_phone_label)) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                 modifier = Modifier.fillMaxWidth(),
@@ -75,14 +87,14 @@ fun LoginScreen(
                     onClick = { viewModel.onLoginModeChange(LoginMode.PASSWORD) },
                     shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
                 ) {
-                    Text("密码登录", color = TextPrimary)
+                    Text(stringResource(R.string.login_password_mode), color = TextPrimary)
                 }
                 SegmentedButton(
                     selected = uiState.loginMode == LoginMode.VERIFICATION_CODE,
                     onClick = { viewModel.onLoginModeChange(LoginMode.VERIFICATION_CODE) },
                     shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
                 ) {
-                    Text("验证码登录", color = TextPrimary)
+                    Text(stringResource(R.string.login_code_mode), color = TextPrimary)
                 }
             }
 
@@ -92,7 +104,7 @@ fun LoginScreen(
                 OutlinedTextField(
                     value = uiState.password,
                     onValueChange = viewModel::onPasswordChange,
-                    label = { Text("密码") },
+                    label = { Text(stringResource(R.string.login_password_placeholder)) },
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     modifier = Modifier.fillMaxWidth(),
@@ -109,7 +121,7 @@ fun LoginScreen(
                     OutlinedTextField(
                         value = uiState.verificationCode,
                         onValueChange = viewModel::onVerificationCodeChange,
-                        label = { Text("验证码") },
+                        label = { Text(stringResource(R.string.register_code_placeholder)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f),
@@ -121,7 +133,7 @@ fun LoginScreen(
                             cursorColor = BrandSecondary
                         )
                     )
-                    val btnText = if (uiState.countdownSeconds > 0) "${uiState.countdownSeconds}s" else "发送验证码"
+                    val btnText = if (uiState.countdownSeconds > 0) "${uiState.countdownSeconds}s" else stringResource(R.string.send_code)
                     OutlinedButton(
                         onClick = viewModel::sendVerificationCode,
                         enabled = !uiState.isLoading && uiState.countdownSeconds == 0 && uiState.phoneNumber.isNotEmpty()
@@ -137,16 +149,16 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             GradientButton(
-                text = "登录",
+                text = stringResource(R.string.login_button),
                 onClick = { viewModel.login(onLoginSuccess) },
                 enabled = !uiState.isLoading
             )
 
             Spacer(modifier = Modifier.height(24.dp))
             Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
-                Text("还没有账号？", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                Text(stringResource(R.string.login_no_account), style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                 TextButton(onClick = onNavigateToRegister) {
-                    Text("立即注册", color = BrandSecondary)
+                    Text(stringResource(R.string.login_register), color = BrandSecondary)
                 }
             }
         }

@@ -22,6 +22,9 @@ class TokenAuthenticator @Inject constructor(
         if (response.request.url.encodedPath.contains("/auth/refresh")) return null
         if (route == null) return null
 
+        // Prevent infinite retry loops - if we already retried, fail immediately
+        if (response.count() > 1) return null
+
         synchronized(lock) {
             val refreshToken = runBlocking { tokenManager.getRefreshToken() } ?: return null
 

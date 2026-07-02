@@ -11,10 +11,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.accountcenter.R
 import com.accountcenter.ui.components.GradientButton
 import com.accountcenter.ui.theme.*
 
@@ -42,14 +44,14 @@ fun RegisterScreen(
                     tint = BrandPrimary
                 )
                 Spacer(modifier = Modifier.height(12.dp))
-                Text("创建账户", style = MaterialTheme.typography.headlineLarge, color = TextPrimary)
-                Text("注册新账户以使用完整功能", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                Text(stringResource(R.string.register_create_account), style = MaterialTheme.typography.headlineLarge, color = TextPrimary)
+                Text(stringResource(R.string.register_subtitle), style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
             }
 
             OutlinedTextField(
                 value = uiState.phoneNumber,
                 onValueChange = viewModel::onPhoneNumberChange,
-                label = { Text("手机号") },
+                label = { Text(stringResource(R.string.register_phone_label)) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                 modifier = Modifier.fillMaxWidth(),
@@ -61,13 +63,13 @@ fun RegisterScreen(
                 OutlinedTextField(
                     value = uiState.verificationCode,
                     onValueChange = viewModel::onVerificationCodeChange,
-                    label = { Text("验证码") },
+                    label = { Text(stringResource(R.string.register_code_label)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.weight(1f),
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = BrandSecondary, unfocusedBorderColor = Divider, focusedLabelColor = BrandSecondary, unfocusedLabelColor = TextSecondary, cursorColor = BrandSecondary)
                 )
-                val btnText = if (uiState.countdownSeconds > 0) "${uiState.countdownSeconds}s" else "发送验证码"
+                val btnText = if (uiState.countdownSeconds > 0) "${uiState.countdownSeconds}s" else stringResource(R.string.register_send_code)
                 OutlinedButton(
                     onClick = viewModel::sendVerificationCode,
                     enabled = !uiState.isLoading && uiState.countdownSeconds == 0 && uiState.phoneNumber.isNotEmpty()
@@ -78,7 +80,7 @@ fun RegisterScreen(
             OutlinedTextField(
                 value = uiState.accountId,
                 onValueChange = viewModel::onAccountIdChange,
-                label = { Text("账户ID") },
+                label = { Text(stringResource(R.string.register_account_id)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = BrandSecondary, unfocusedBorderColor = Divider, focusedLabelColor = BrandSecondary, unfocusedLabelColor = TextSecondary, cursorColor = BrandSecondary)
@@ -88,7 +90,7 @@ fun RegisterScreen(
             OutlinedTextField(
                 value = uiState.password,
                 onValueChange = viewModel::onPasswordChange,
-                label = { Text("密码") },
+                label = { Text(stringResource(R.string.register_password_label)) },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
@@ -99,7 +101,7 @@ fun RegisterScreen(
             OutlinedTextField(
                 value = uiState.confirmPassword,
                 onValueChange = viewModel::onConfirmPasswordChange,
-                label = { Text("确认密码") },
+                label = { Text(stringResource(R.string.register_confirm_password)) },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
@@ -110,7 +112,7 @@ fun RegisterScreen(
             OutlinedTextField(
                 value = uiState.referralCode,
                 onValueChange = viewModel::onReferralCodeChange,
-                label = { Text("推荐码（可选）") },
+                label = { Text(stringResource(R.string.register_referral_code)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = BrandSecondary, unfocusedBorderColor = Divider, focusedLabelColor = BrandSecondary, unfocusedLabelColor = TextSecondary, cursorColor = BrandSecondary)
@@ -123,7 +125,7 @@ fun RegisterScreen(
                     onCheckedChange = viewModel::onAgreeToTermsChange,
                     colors = CheckboxDefaults.colors(checkedColor = BrandPrimary)
                 )
-                Text("我已阅读并同意服务条款和隐私政策", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                Text(stringResource(R.string.register_agree_terms), style = MaterialTheme.typography.bodySmall, color = TextSecondary)
             }
 
             uiState.errorMessage?.let {
@@ -132,16 +134,16 @@ fun RegisterScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             GradientButton(
-                text = "注册",
+                text = stringResource(R.string.register_button),
                 onClick = { viewModel.register(onRegisterSuccess) },
                 enabled = !uiState.isLoading
             )
 
             Spacer(modifier = Modifier.height(16.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                Text("已有账号？", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                Text(stringResource(R.string.register_has_account), style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                 TextButton(onClick = onNavigateBack) {
-                    Text("立即登录", color = BrandSecondary)
+                    Text(stringResource(R.string.register_login_now), color = BrandSecondary)
                 }
             }
             Spacer(modifier = Modifier.height(24.dp))

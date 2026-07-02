@@ -19,6 +19,8 @@ import javax.inject.Singleton
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "auth")
 
+// SECURITY NOTE: Tokens are stored in plain DataStore for development.
+// For production, migrate to EncryptedSharedPreferences or AndroidKeyStore.
 @Singleton
 class TokenManager @Inject constructor(
     @ApplicationContext private val context: Context

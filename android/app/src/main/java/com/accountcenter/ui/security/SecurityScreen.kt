@@ -1,5 +1,7 @@
 package com.accountcenter.ui.security
 
+import android.view.WindowManager
+import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,15 +13,18 @@ import androidx.compose.material.icons.filled.Computer
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.accountcenter.R
 import com.accountcenter.model.PushDevice
 import com.accountcenter.model.RiskEvent
 import com.accountcenter.ui.theme.*
@@ -30,6 +35,14 @@ fun SecurityScreen(
     viewModel: SecurityViewModel = hiltViewModel(),
     onNavigateBack: () -> Unit
 ) {
+    val activity = LocalActivity.current
+    DisposableEffect(activity) {
+        activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        onDispose {
+            activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
+    }
+
     val riskEvents by viewModel.riskEvents.collectAsStateWithLifecycle()
     val devices by viewModel.devices.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
@@ -37,10 +50,10 @@ fun SecurityScreen(
     Box(modifier = Modifier.fillMaxSize().background(BgPrimary)) {
         Column(modifier = Modifier.fillMaxSize()) {
             CenterAlignedTopAppBar(
-                title = { Text("安全设置", color = TextPrimary) },
+                title = { Text(stringResource(R.string.feature_security), color = TextPrimary) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "返回", tint = TextPrimary)
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back), tint = TextPrimary)
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -58,7 +71,7 @@ fun SecurityScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     item {
-                        Text("风险事件", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                        Text(stringResource(R.string.risk_events), style = MaterialTheme.typography.labelSmall, color = TextSecondary)
                     }
                     riskEvents.forEach { event ->
                         item {
@@ -68,7 +81,7 @@ fun SecurityScreen(
 
                     item {
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("登录设备", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                        Text(stringResource(R.string.login_devices), style = MaterialTheme.typography.labelSmall, color = TextSecondary)
                     }
                     devices.forEach { device ->
                         item {
@@ -143,10 +156,10 @@ private fun DeviceCard(device: PushDevice) {
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(device.deviceName ?: device.platform, style = MaterialTheme.typography.bodyMedium, color = TextPrimary)
-                Text("最近活跃", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                Text(stringResource(R.string.last_active), style = MaterialTheme.typography.bodySmall, color = TextSecondary)
             }
             Text(
-                if (device.isActive) "活跃中" else "离线",
+                if (device.isActive) stringResource(R.string.device_active) else stringResource(R.string.device_offline),
                 style = MaterialTheme.typography.bodySmall,
                 color = if (device.isActive) Success else TextSecondary,
                 fontWeight = FontWeight.Medium

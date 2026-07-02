@@ -23,6 +23,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.res.stringResource
+import com.accountcenter.R
 import com.accountcenter.model.ReferralSummary
 import com.accountcenter.model.Transaction
 import com.accountcenter.ui.components.AppCard
@@ -54,15 +56,15 @@ fun CreditsScreen(
     Box(modifier = Modifier.fillMaxSize().background(BgPrimary)) {
         Column(modifier = Modifier.fillMaxSize()) {
             CenterAlignedTopAppBar(
-                title = { Text("积分中心", color = TextPrimary) },
+                title = { Text(stringResource(R.string.credits_title), color = TextPrimary) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "返回", tint = TextPrimary)
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back), tint = TextPrimary)
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.refresh() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "刷新", tint = TextPrimary)
+                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh), tint = TextPrimary)
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -93,7 +95,7 @@ fun CreditsScreen(
 
                     item {
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("交易记录", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                        Text(stringResource(R.string.credits_transaction_history), style = MaterialTheme.typography.labelSmall, color = TextSecondary)
                     }
 
                     transactions.forEach { tx ->
@@ -105,7 +107,7 @@ fun CreditsScreen(
                     if (hasMore) {
                         item {
                             TextButton(onClick = { viewModel.loadMore() }, modifier = Modifier.fillMaxWidth()) {
-                                Text("加载更多...", color = BrandSecondary)
+                                Text(stringResource(R.string.credits_load_more), color = BrandSecondary)
                             }
                         }
                     }
@@ -124,7 +126,7 @@ private fun BalanceCard(balance: Double) {
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("当前积分", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+            Text(stringResource(R.string.credits_current), style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "%.2f".format(balance),
@@ -141,11 +143,11 @@ private fun ReferralCard(summary: ReferralSummary, onShare: () -> Unit) {
     AppCard(
         modifier = Modifier.fillMaxWidth()
     ) {
-        Text("邀请推广", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = TextPrimary)
+        Text(stringResource(R.string.credits_referral_promo), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = TextPrimary)
         Spacer(modifier = Modifier.height(8.dp))
-        Text("邀请人数：${summary.totalReferees}", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-        Text("活跃邀请：${summary.activeReferees}", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-        Text("累计获得：${summary.totalEarned} 积分", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+        Text("${stringResource(R.string.credits_referral_count)}：${summary.totalReferees}", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+        Text("${stringResource(R.string.credits_active_friends)}：${summary.activeReferees}", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+        Text("${stringResource(R.string.credits_total_earned)}：${summary.totalEarned} 积分", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
         Spacer(modifier = Modifier.height(8.dp))
         Button(
             onClick = onShare,
@@ -153,7 +155,7 @@ private fun ReferralCard(summary: ReferralSummary, onShare: () -> Unit) {
             colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary),
             shape = RoundedCornerShape(12.dp)
         ) {
-            Text("复制推荐链接", color = Color.White)
+            Text(stringResource(R.string.credits_copy_referral), color = Color.White)
         }
     }
 }

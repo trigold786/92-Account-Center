@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct LoginView: View {
     @StateObject private var viewModel = LoginViewModel()
@@ -14,41 +15,41 @@ struct LoginView: View {
                     Image(systemName: "person.circle.fill")
                         .font(.system(size: 48))
                         .foregroundStyle(Color.brandGradient)
-                    Text("账户中心")
+                    Text(NSLocalizedString("login_title", comment: ""))
                         .font(.custom("SpaceGrotesk-Bold", size: 28))
                         .foregroundColor(.textPrimary)
-                    Text("登录您的账户")
+                    Text(NSLocalizedString("login_subtitle", comment: ""))
                         .font(.custom("Inter-Regular", size: 14))
                         .foregroundColor(.textSecondary)
                 }
                 .padding(.bottom, 48)
 
                 VStack(spacing: 16) {
-                    TextField("手机号", text: $viewModel.phoneNumber)
+                    TextField(NSLocalizedString("login_phone_label", comment: ""), text: $viewModel.phoneNumber)
                         .keyboardType(.numberPad)
                         .textContentType(.telephoneNumber)
                         .font(.custom("Inter-Regular", size: 15))
                         .glowingInput()
 
-                    Picker("登录方式", selection: $viewModel.loginMode) {
-                        Text("密码登录").tag(LoginViewModel.LoginMode.password)
-                        Text("验证码登录").tag(LoginViewModel.LoginMode.verificationCode)
+                    Picker(NSLocalizedString("login_password_mode", comment: ""), selection: $viewModel.loginMode) {
+                        Text(NSLocalizedString("login_password_mode", comment: "")).tag(LoginViewModel.LoginMode.password)
+                        Text(NSLocalizedString("login_code_mode", comment: "")).tag(LoginViewModel.LoginMode.verificationCode)
                     }
                     .pickerStyle(.segmented)
 
                     if viewModel.loginMode == .password {
-                        SecureField("密码", text: $viewModel.password)
+                        SecureField(NSLocalizedString("login_password_placeholder", comment: ""), text: $viewModel.password)
                             .textContentType(.password)
                             .font(.custom("Inter-Regular", size: 15))
                             .glowingInput()
                     } else {
                         HStack(spacing: 8) {
-                            TextField("验证码", text: $viewModel.verificationCode)
+                            TextField(NSLocalizedString("register_code_placeholder", comment: ""), text: $viewModel.verificationCode)
                                 .keyboardType(.numberPad)
                                 .font(.custom("Inter-Regular", size: 15))
                                 .glowingInput()
 
-                            Button(viewModel.countdownSeconds > 0 ? "\(viewModel.countdownSeconds)s" : "发送验证码") {
+                            Button(viewModel.countdownSeconds > 0 ? "\(viewModel.countdownSeconds)s" : NSLocalizedString("send_code", comment: "")) {
                                 Task { await viewModel.sendVerificationCode() }
                             }
                             .font(.custom("Inter-Regular", size: 13))
@@ -67,7 +68,7 @@ struct LoginView: View {
                         if viewModel.isLoading {
                             ProgressView()
                         } else {
-                            Text("登录")
+                            Text(NSLocalizedString("login_button", comment: ""))
                                 .font(.custom("Inter-Semibold", size: 16))
                         }
                     }
@@ -77,11 +78,11 @@ struct LoginView: View {
                 .padding(.horizontal, 32)
 
                 HStack(spacing: 4) {
-                    Text("还没有账号？")
+                    Text(NSLocalizedString("login_no_account", comment: ""))
                         .font(.custom("Inter-Regular", size: 13))
                         .foregroundColor(.textSecondary)
                     NavigationLink(destination: RegisterView()) {
-                        Text("立即注册")
+                        Text(NSLocalizedString("login_register", comment: ""))
                             .font(.custom("Inter-Semibold", size: 13))
                             .foregroundColor(.brandSecondary)
                     }
@@ -92,5 +93,6 @@ struct LoginView: View {
             }
         }
         .navigationBarHidden(true)
+        .preventScreenshot()
     }
 }

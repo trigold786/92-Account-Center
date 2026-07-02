@@ -19,6 +19,11 @@ class AuthInterceptor @Inject constructor(
             return chain.proceed(originalRequest)
         }
 
+        // Prevent infinite retry loops - if token already attached, pass through
+        if (originalRequest.header("Authorization") != null) {
+            return chain.proceed(originalRequest)
+        }
+
         val token = runBlocking { tokenManager.getAccessToken() }
         if (token != null) {
             val request = originalRequest.newBuilder()

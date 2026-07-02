@@ -19,13 +19,13 @@ struct CreditsView: View {
 
                     if let account = viewModel.account {
                         VStack(spacing: 4) {
-                            Text("当前积分")
+                            Text(NSLocalizedString("credits_current", comment: ""))
                                 .font(.custom("Inter-Regular", size: 13))
                                 .foregroundColor(.textSecondary)
                             Text("\u{00A5}\(String(format: "%.2f", account.balance))")
                                 .font(.custom("SpaceGrotesk-Bold", size: 36))
                                 .foregroundStyle(Color.brandGradient)
-                            Text(account.status == "active" ? "账户正常" : account.status)
+                            Text(account.status == "active" ? NSLocalizedString("credits_account_active", comment: "") : account.status)
                                 .font(.custom("Inter-Regular", size: 12))
                                 .foregroundColor(.success)
                         }
@@ -35,8 +35,8 @@ struct CreditsView: View {
 
                     // MARK: - Quick Actions
                     VStack(alignment: .leading, spacing: 0) {
-                        Text("快捷操作").sectionTitle().padding(.bottom, 8)
-                        Button("签到领积分") {
+                        Text(NSLocalizedString("credits_quick_actions", comment: "")).sectionTitle().padding(.bottom, 8)
+                        Button(NSLocalizedString("credits_daily_checkin", comment: "")) {
                             Task { await viewModel.earnCredits(amount: 1, reason: "daily_checkin") }
                         }
                         .buttonStyle(.borderedProminent)
@@ -45,12 +45,12 @@ struct CreditsView: View {
 
                     if let referral = viewModel.referral {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("邀请推广").font(.custom("Inter-Semibold", size: 15)).foregroundColor(.textPrimary)
-                            labeledRow("邀请人数", "\(referral.totalReferees)")
-                            labeledRow("活跃好友", "\(referral.activeReferees)")
-                            labeledRow("累计收益", "\u{00A5}\(String(format: "%.2f", referral.totalEarned))")
+                            Text(NSLocalizedString("credits_referral", comment: "")).font(.custom("Inter-Semibold", size: 15)).foregroundColor(.textPrimary)
+                            labeledRow(NSLocalizedString("credits_referral_count", comment: ""), "\(referral.totalReferees)")
+                            labeledRow(NSLocalizedString("credits_active_friends", comment: ""), "\(referral.activeReferees)")
+                            labeledRow(NSLocalizedString("credits_total_earned", comment: ""), "\u{00A5}\(String(format: "%.2f", referral.totalEarned))")
                             Button(action: { Task { await viewModel.generateLink() } }) {
-                                Label("复制推荐链接", systemImage: "link")
+                                Label(NSLocalizedString("credits_copy_referral", comment: ""), systemImage: "link")
                                     .font(.custom("Inter-Regular", size: 14))
                                     .foregroundColor(.brandPrimary)
                             }
@@ -61,12 +61,12 @@ struct CreditsView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 0) {
-                        Text("交易记录")
+                        Text(NSLocalizedString("credits_transaction_history", comment: ""))
                             .sectionTitle()
                             .padding(.bottom, 8)
 
                         if viewModel.transactions.isEmpty {
-                            Text("暂无交易记录")
+                            Text(NSLocalizedString("credits_no_transactions", comment: ""))
                                 .font(.custom("Inter-Regular", size: 14))
                                 .foregroundColor(.textSecondary)
                                 .padding(24)
@@ -106,7 +106,7 @@ struct CreditsView: View {
                         }
 
                         if viewModel.hasMore {
-                            Button("加载更多...") { Task { await viewModel.loadMore() } }
+                            Button(NSLocalizedString("credits_load_more", comment: "")) { Task { await viewModel.loadMore() } }
                                 .font(.custom("Inter-Regular", size: 14))
                                 .foregroundColor(.brandSecondary)
                                 .padding(.top, 8)
@@ -116,7 +116,7 @@ struct CreditsView: View {
                 .padding(16)
             }
         }
-        .navigationTitle("积分中心")
+        .navigationTitle(NSLocalizedString("credits_title", comment: ""))
         .toolbarBackground(Color.bgPrimary.opacity(0.9), for: .navigationBar)
         .refreshable { await viewModel.load() }
         .task { await viewModel.load() }

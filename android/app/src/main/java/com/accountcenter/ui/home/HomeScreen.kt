@@ -14,10 +14,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.accountcenter.R
 import com.accountcenter.ui.components.AppCard
 import com.accountcenter.ui.theme.*
 
@@ -40,7 +42,7 @@ fun HomeScreen(
             verticalArrangement = Arrangement.Top
         ) {
             CenterAlignedTopAppBar(
-                title = { Text("用户中心", color = TextPrimary) },
+                title = { Text(stringResource(R.string.home_title), color = TextPrimary) },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = BgPrimary.copy(alpha = 0.9f)
                 )
@@ -77,12 +79,12 @@ fun HomeScreen(
                         Spacer(modifier = Modifier.width(16.dp))
                         Column {
                             Text(
-                                userDisplay.accountId.ifEmpty { "用户" },
+                                userDisplay.accountId.ifEmpty { stringResource(R.string.user_placeholder) },
                                 style = MaterialTheme.typography.titleMedium,
                                 color = TextPrimary
                             )
                             Text(
-                                userDisplay.phoneNumber.ifEmpty { "未绑定手机号" },
+                                userDisplay.phoneNumber.ifEmpty { stringResource(R.string.phone_unbound) },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = TextSecondary
                             )
@@ -114,20 +116,20 @@ fun HomeScreen(
                 }
 
                 // Feature list
-                Text("功能", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                Text(stringResource(R.string.features_section), style = MaterialTheme.typography.labelSmall, color = TextSecondary)
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = BgCard),
                     shape = RoundedCornerShape(16.dp)
                 ) {
                     Column {
-                        FeatureRow(Icons.Default.ShoppingCart, "订阅管理", onNavigateToSubscription)
+                        FeatureRow(Icons.Default.ShoppingCart, stringResource(R.string.feature_subscription), onNavigateToSubscription)
                         HorizontalDivider(color = Divider)
-                        FeatureRow(Icons.Default.AccountBalanceWallet, "积分中心", onNavigateToCredits)
+                        FeatureRow(Icons.Default.AccountBalanceWallet, stringResource(R.string.feature_credits), onNavigateToCredits)
                         HorizontalDivider(color = Divider)
-                        FeatureRow(Icons.Default.Lock, "安全设置", onNavigateToSecurity)
+                        FeatureRow(Icons.Default.Lock, stringResource(R.string.feature_security), onNavigateToSecurity)
                         HorizontalDivider(color = Divider)
-                        FeatureRow(Icons.Default.Info, "关于", onNavigateToAbout)
+                        FeatureRow(Icons.Default.Info, stringResource(R.string.feature_about), onNavigateToAbout)
                     }
                 }
 
@@ -138,7 +140,7 @@ fun HomeScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = BgCard),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("退出登录", color = Danger)
+                    Text(stringResource(R.string.logout), color = Danger)
                 }
             }
         }
