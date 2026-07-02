@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -34,6 +35,12 @@ type TokenResponse struct {
 }
 
 func NewJWTManager(accessSecret, refreshSecret string, accessExpiry, refreshExpiry time.Duration) *JWTManager {
+	if len(accessSecret) < 32 {
+		panic("JWT_ACCESS_SECRET must be at least 32 characters")
+	}
+	if len(refreshSecret) < 32 {
+		panic("JWT_REFRESH_SECRET must be at least 32 characters")
+	}
 	return &JWTManager{
 		accessSecret:  accessSecret,
 		refreshSecret: refreshSecret,
@@ -136,14 +143,16 @@ func (m *JWTManager) RefreshTokenPair(refreshToken string) (*TokenResponse, erro
 
 func (m *JWTManager) generateToken(userID int64, accountID, tokenID, deviceFingerprint string, roles []string, secret string, expiry time.Duration) (string, error) {
 	claims := Claims{
-		UserID:         userID,
-		AccountID:      accountID,
-		TokenID:        tokenID,
+		UserID:            userID,
+		AccountID:         accountID,
+		TokenID:           tokenID,
 		DeviceFingerprint: deviceFingerprint,
-		Roles:          roles,
+		Roles:             roles,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiry)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			Issuer:    "account-center",
+			Subject:   fmt.Sprintf("%d", userID),
 		},
 	}
 

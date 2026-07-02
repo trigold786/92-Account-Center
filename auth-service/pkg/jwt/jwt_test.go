@@ -6,7 +6,7 @@ import (
 )
 
 func TestGenerateTokenPair(t *testing.T) {
-	mgr := NewJWTManager("access-secret", "refresh-secret", 15*time.Minute, 24*time.Hour)
+ mgr := NewJWTManager("test-access-secret-at-least-32chars", "test-refresh-secret-at-least-32ch", 15*time.Minute, 24*time.Hour)
 
 	accessToken, refreshToken, err := mgr.GenerateTokenPair(1, "account123", []string{})
 	if err != nil {
@@ -24,7 +24,7 @@ func TestGenerateTokenPair(t *testing.T) {
 }
 
 func TestValidateToken_AccessToken(t *testing.T) {
-	mgr := NewJWTManager("access-secret", "refresh-secret", 15*time.Minute, 24*time.Hour)
+ mgr := NewJWTManager("test-access-secret-at-least-32chars", "test-refresh-secret-at-least-32ch", 15*time.Minute, 24*time.Hour)
 
 	accessToken, _, err := mgr.GenerateTokenPair(42, "acct42", []string{})
 	if err != nil {
@@ -44,7 +44,7 @@ func TestValidateToken_AccessToken(t *testing.T) {
 }
 
 func TestValidateToken_RefreshToken(t *testing.T) {
-	mgr := NewJWTManager("access-secret", "refresh-secret", 15*time.Minute, 24*time.Hour)
+ mgr := NewJWTManager("test-access-secret-at-least-32chars", "test-refresh-secret-at-least-32ch", 15*time.Minute, 24*time.Hour)
 
 	_, refreshToken, err := mgr.GenerateTokenPair(10, "acct10", []string{})
 	if err != nil {
@@ -61,7 +61,7 @@ func TestValidateToken_RefreshToken(t *testing.T) {
 }
 
 func TestValidateToken_Invalid(t *testing.T) {
-	mgr := NewJWTManager("access-secret", "refresh-secret", 15*time.Minute, 24*time.Hour)
+ mgr := NewJWTManager("test-access-secret-at-least-32chars", "test-refresh-secret-at-least-32ch", 15*time.Minute, 24*time.Hour)
 
 	_, err := mgr.ValidateToken("this.is.invalid")
 	if err == nil {
@@ -70,8 +70,8 @@ func TestValidateToken_Invalid(t *testing.T) {
 }
 
 func TestValidateToken_WrongSecret(t *testing.T) {
-	mgr1 := NewJWTManager("secret1", "secret1", 15*time.Minute, 24*time.Hour)
-	mgr2 := NewJWTManager("secret2", "secret2", 15*time.Minute, 24*time.Hour)
+	mgr1 := NewJWTManager("test-access-secret-at-least-32chars", "test-access-secret-at-least-32chars", 15*time.Minute, 24*time.Hour)
+	mgr2 := NewJWTManager("test-refresh-secret-at-least-32char", "test-refresh-secret-at-least-32char", 15*time.Minute, 24*time.Hour)
 
 	token, _, _ := mgr1.GenerateTokenPair(1, "acct1", []string{})
 
@@ -82,7 +82,7 @@ func TestValidateToken_WrongSecret(t *testing.T) {
 }
 
 func TestRefreshAccessToken(t *testing.T) {
-	mgr := NewJWTManager("access-secret", "refresh-secret", 15*time.Minute, 24*time.Hour)
+ mgr := NewJWTManager("test-access-secret-at-least-32chars", "test-refresh-secret-at-least-32ch", 15*time.Minute, 24*time.Hour)
 
 	_, refreshToken, err := mgr.GenerateTokenPair(5, "acct5", []string{})
 	if err != nil {
@@ -107,7 +107,7 @@ func TestRefreshAccessToken(t *testing.T) {
 }
 
 func TestRefreshAccessToken_InvalidToken(t *testing.T) {
-	mgr := NewJWTManager("access-secret", "refresh-secret", 15*time.Minute, 24*time.Hour)
+ mgr := NewJWTManager("test-access-secret-at-least-32chars", "test-refresh-secret-at-least-32ch", 15*time.Minute, 24*time.Hour)
 
 	_, err := mgr.RefreshAccessToken("invalid-token")
 	if err == nil {
@@ -116,7 +116,7 @@ func TestRefreshAccessToken_InvalidToken(t *testing.T) {
 }
 
 func TestRefreshAccessToken_WithAccessTokenFails(t *testing.T) {
-	mgr := NewJWTManager("access-secret", "refresh-secret", 15*time.Minute, 24*time.Hour)
+ mgr := NewJWTManager("test-access-secret-at-least-32chars", "test-refresh-secret-at-least-32ch", 15*time.Minute, 24*time.Hour)
 
 	accessToken, _, _ := mgr.GenerateTokenPair(1, "acct1", []string{})
 
@@ -127,7 +127,7 @@ func TestRefreshAccessToken_WithAccessTokenFails(t *testing.T) {
 }
 
 func TestTokenExpiry(t *testing.T) {
-	mgr := NewJWTManager("access-secret", "refresh-secret", 15*time.Minute, 24*time.Hour)
+ mgr := NewJWTManager("test-access-secret-at-least-32chars", "test-refresh-secret-at-least-32ch", 15*time.Minute, 24*time.Hour)
 
 	accessToken, _, _ := mgr.GenerateTokenPair(1, "acct1", []string{})
 
@@ -151,7 +151,7 @@ func TestTokenExpiry(t *testing.T) {
 }
 
 func TestMultipleTokenPairs(t *testing.T) {
-	mgr := NewJWTManager("access-secret", "refresh-secret", 15*time.Minute, 24*time.Hour)
+ mgr := NewJWTManager("test-access-secret-at-least-32chars", "test-refresh-secret-at-least-32ch", 15*time.Minute, 24*time.Hour)
 
 	tests := []struct {
 		userID    int64

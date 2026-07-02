@@ -4,12 +4,14 @@ go 1.26
 
 require (
 	github.com/gin-gonic/gin v1.12.0
+	github.com/golang-jwt/jwt/v5 v5.2.0
 	github.com/hibiken/asynq v0.26.0
 	github.com/lib/pq v1.12.3
 	github.com/redis/go-redis/v9 v9.19.0
 	github.com/stretchr/testify v1.11.1
 	github.com/trigold786/92-Account-Center/pkg/config v0.0.0-00010101000000-000000000000
 	github.com/trigold786/92-Account-Center/pkg/health v0.0.0-00010101000000-000000000000
+	github.com/trigold786/92-Account-Center/pkg/jwtutil v0.0.0-00010101000000-000000000000
 	github.com/trigold786/92-Account-Center/pkg/logging v0.0.0-00010101000000-000000000000
 )
 
@@ -61,3 +63,5 @@ replace github.com/trigold786/92-Account-Center/pkg/health => ../pkg/health
 replace github.com/trigold786/92-Account-Center/pkg/logging => ../pkg/logging
 
 replace github.com/trigold786/92-Account-Center/pkg/config => ../pkg/config
+
+replace github.com/trigold786/92-Account-Center/pkg/jwtutil => ../pkg/jwtutil

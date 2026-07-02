@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/subtle"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -22,6 +23,7 @@ import (
 	proxyutil "github.com/trigold786/92-Account-Center/api-gateway/internal/proxy"
 	"github.com/trigold786/92-Account-Center/api-gateway/internal/svcconfig"
 	"github.com/trigold786/92-Account-Center/pkg/config"
+	"github.com/trigold786/92-Account-Center/pkg/env"
 	healthpkg "github.com/trigold786/92-Account-Center/pkg/health"
 	"github.com/trigold786/92-Account-Center/pkg/logging"
 )
@@ -38,7 +40,7 @@ var (
 
 func main() {
 	logger = logging.NewLogger("api-gateway")
-	configURL := getEnv("CONFIG_SERVICE_URL", "http://localhost:30315")
+	configURL := env.Get("CONFIG_SERVICE_URL", "http://localhost:30315")
 	configClient := config.NewClient(configURL)
 	svcCfg, err := svcconfig.Load(configClient)
 	if err != nil {
@@ -70,20 +72,20 @@ func main() {
 	r.Use(middleware.TimeoutMiddleware(svcCfg.GlobalRequestTimeoutSec))
 
 	publicPaths := map[string]bool{
-		"/api/v1/auth/login":              true,
-		"/api/v1/auth/refresh":            true,
-		"/api/v1/auth/biometric/login":    true,
-		"/api/v1/auth/oauth/":             true,
-		"/api/v1/auth/enterprise/":        true,
-		"/api/v1/auth/guest":              true,
-		"/api/v1/auth/guest/":             true,
-		"/api/v1/account/register":        true,
-		"/api/v1/qrcode/generate":         true,
-		"/api/v1/qrcode/":                 true,
-		"/api/v1/sms/send":                true,
-		"/api/v1/sms/verify":              true,
-		"/api/v1/email/otp/send":          true,
-		"/api/v1/email/magic-link/":       true,
+		"/api/v1/auth/login":           true,
+		"/api/v1/auth/refresh":         true,
+		"/api/v1/auth/biometric/login": true,
+		"/api/v1/auth/oauth/":          true,
+		"/api/v1/auth/enterprise/":     true,
+		"/api/v1/auth/guest":           true,
+		"/api/v1/auth/guest/":          true,
+		"/api/v1/account/register":     true,
+		"/api/v1/qrcode/generate":      true,
+		"/api/v1/qrcode/":              true,
+		"/api/v1/sms/send":             true,
+		"/api/v1/sms/verify":           true,
+		"/api/v1/email/otp/send":       true,
+		"/api/v1/email/magic-link/":    true,
 	}
 
 	r.Use(func(c *gin.Context) {
@@ -109,12 +111,14 @@ func main() {
 		{Prefix: "/api/v1/audit/", Roles: []string{"admin", "operator", "system_owner"}},
 		{Prefix: "/api/v1/blacklist/", Roles: []string{"admin", "operator", "system_owner"}},
 		{Prefix: "/api/v1/kyb/", Roles: []string{"admin", "system_owner"}},
-		{Prefix: "/api/v1/config/users/", Roles: []string{}},  // any authenticated user can query own permissions
+		{Prefix: "/api/v1/config/users/", Roles: []string{}}, // any authenticated user can query own permissions
 		{Prefix: "/api/v1/config/", Roles: []string{"admin", "system_owner", "config_editor", "config_viewer"}},
 		{Prefix: "/api/v1/risk/", Roles: []string{"admin", "operator", "support"}},
 		{Prefix: "/api/v1/orders/", Roles: []string{"admin", "finance"}},
 		{Prefix: "/api/v1/invoices/", Roles: []string{"admin", "finance"}},
 		{Prefix: "/api/v1/refunds/", Roles: []string{"admin", "finance"}},
+		{Prefix: "/api/v1/payment/", Roles: []string{"admin", "finance", "user"}},
+		{Prefix: "/api/v1/payment-flow/", Roles: []string{"admin", "finance", "user"}},
 	}
 	r.Use(middleware.RoleGuardMiddleware(roleRoutes))
 
@@ -136,10 +140,15 @@ func main() {
 	r.Any("/api/v1/kyb/*path", proxyHandler(svcCfg.ComplianceServiceURL, svcCfg))
 	r.Any("/api/v1/config/*path", proxyHandler(svcCfg.ConfigServiceURL, svcCfg))
 	r.Any("/api/v1/data/*path", proxyHandler(svcCfg.DataProductServiceURL, svcCfg))
+	r.Any("/api/v1/payment/*path", proxyHandler(svcCfg.PaymentServiceURL, svcCfg))
+	r.Any("/api/v1/payment-flow/*path", proxyHandler(svcCfg.PaymentServiceURL, svcCfg))
+	r.Any("/api/v1/orders/*path", proxyHandler(svcCfg.PaymentServiceURL, svcCfg))
+	r.Any("/api/v1/refunds/*path", proxyHandler(svcCfg.PaymentServiceURL, svcCfg))
+	r.Any("/api/v1/invoices/*path", proxyHandler(svcCfg.PaymentServiceURL, svcCfg))
 
 	v2Routes := []struct {
-		prefix  string
-		target  string
+		prefix string
+		target string
 	}{
 		{"/api/v2/account", svcCfg.AccountServiceURL},
 		{"/api/v2/entitlements", svcCfg.AccountServiceURL},
@@ -149,6 +158,11 @@ func main() {
 		{"/api/v2/device", svcCfg.AuthServiceURL},
 		{"/api/v2/credits", svcCfg.CreditServiceURL},
 		{"/api/v2/data", svcCfg.DataProductServiceURL},
+		{"/api/v2/payment", svcCfg.PaymentServiceURL},
+		{"/api/v2/payment-flow", svcCfg.PaymentServiceURL},
+		{"/api/v2/orders", svcCfg.PaymentServiceURL},
+		{"/api/v2/refunds", svcCfg.PaymentServiceURL},
+		{"/api/v2/invoices", svcCfg.PaymentServiceURL},
 	}
 	for _, route := range v2Routes {
 		r.Any(route.prefix+"/*path", v2ProxyHandler(route.target, svcCfg))
@@ -158,7 +172,17 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"pins": []string{"sha256/AAAA...", "sha256/BBBB..."}})
 	})
 
-	r.Any("/metrics", func(c *gin.Context) {
+	metricsAuth := func(c *gin.Context) {
+		token := c.GetHeader("X-Internal-Token")
+		expected := env.Get("INTERNAL_API_TOKEN", "")
+		if expected == "" || subtle.ConstantTimeCompare([]byte(token), []byte(expected)) != 1 {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+	r.Any("/metrics", metricsAuth, func(c *gin.Context) {
 		var buf bytes.Buffer
 		fmt.Fprintf(&buf, "# HELP http_requests_total Total HTTP requests\n")
 		fmt.Fprintf(&buf, "# TYPE http_requests_total counter\n")
@@ -177,7 +201,8 @@ func main() {
 
 	r.Any("/health", func(c *gin.Context) {
 		result := compositeHealth.Check(c.Request.Context())
-		resp := healthpkg.BuildResponse(result.Checks)
+		showDetails := env.Get("HEALTH_SHOW_DETAILS", "false") == "true"
+		resp := healthpkg.BuildResponseConditional(result.Checks, showDetails)
 		statusCode := 200
 		if result.Status == healthpkg.StatusDown {
 			statusCode = 503
@@ -306,20 +331,7 @@ func wrapWriter(c *gin.Context) http.ResponseWriter {
 	return &responseWriter{ResponseWriter: c.Writer}
 }
 
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
 
-func getEnvSecret(key, defaultValue string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	logger.Warn("environment variable not set, using insecure default", "key", key)
-	return defaultValue
-}
 
 func sanitizeInputMiddleware() gin.HandlerFunc {
 	return middleware.SanitizeInputMiddleware()

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -71,7 +72,7 @@ func (m *mockRoleRepo) GetUserRolesByUserID(ctx context.Context, userID int64) (
 }
 
 func newTestAuthService(repo UserRepository) AuthService {
-	jwtMgr := jwt.NewJWTManager("test-access-secret", "test-refresh-secret", 15*time.Minute, 24*time.Hour)
+	jwtMgr := jwt.NewJWTManager("test-access-secret-at-least-32chars", "test-refresh-secret-at-least-32ch", 15*time.Minute, 24*time.Hour)
 	cfg := &svcconfig.AuthConfig{
 		JwtAccessTokenExpire:  15 * time.Minute,
 		JwtRefreshTokenExpire: 24 * time.Hour,
@@ -465,5 +466,44 @@ func TestLogin_LockoutExpires(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("expected success (graceful degradation without Redis), got %v", err)
+	}
+}
+
+func TestLogin_RehashesSM3ToArgon2id(t *testing.T) {
+	salt := "rehashsalt"
+	password := "correctpassword"
+	sm3Hash := salt + "$" + crypto.SM3Hash([]byte(salt+password))
+	user := &model.User{
+		ID:           2,
+		PhoneNumber:  "13900139000",
+		AccountID:    "rehashtest",
+		PasswordHash: sm3Hash,
+		MFAEnabled:   false,
+	}
+	repo := &mockUserRepo{
+		users: map[string]*model.User{
+			"phone:13900139000": user,
+		},
+	}
+	svc := newTestAuthService(repo)
+
+	resp, err := svc.Login(context.Background(), &model.LoginRequest{
+		Credential: "13900139000",
+		Password:   password,
+	})
+	if err != nil {
+		t.Fatalf("expected login to succeed, got %v", err)
+	}
+	if resp == nil {
+		t.Fatal("expected non-nil login response")
+	}
+
+	if !strings.HasPrefix(user.PasswordHash, "$argon2id$") {
+		t.Fatalf("expected stored hash to be upgraded to argon2id, got %q", user.PasswordHash)
+	}
+
+	// The rehashed password should still verify against the original password.
+	if !svc.VerifyPassword(password, user.PasswordHash) {
+		t.Fatal("expected rehashed argon2id password to verify against original password")
 	}
 }

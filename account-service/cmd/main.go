@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/subtle"
 	"database/sql"
 	"fmt"
 	"log/slog"
@@ -16,8 +17,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
-	"github.com/redis/go-redis/v9"
 	_ "github.com/lib/pq"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/trigold786/92-Account-Center/account-service/internal/cache"
 	"github.com/trigold786/92-Account-Center/account-service/internal/handler"
@@ -28,6 +29,7 @@ import (
 	"github.com/trigold786/92-Account-Center/account-service/internal/worker"
 	"github.com/trigold786/92-Account-Center/account-service/pkg/sms"
 	"github.com/trigold786/92-Account-Center/pkg/config"
+	"github.com/trigold786/92-Account-Center/pkg/env"
 	healthpkg "github.com/trigold786/92-Account-Center/pkg/health"
 	"github.com/trigold786/92-Account-Center/pkg/logging"
 )
@@ -40,16 +42,16 @@ var (
 
 var logger = logging.NewLogger("account-service")
 
-
 func main() {
 	slog.SetDefault(logger)
-	dbHost := getEnv("DB_HOST", "localhost")
-	dbPort := getEnv("DB_PORT", "5432")
-	dbUser := getEnv("DB_USER", "postgres")
-	dbPassword := getEnvSecret("DB_PASSWORD", "postgres")
-	dbName := getEnv("DB_NAME", "account_center")
+	dbHost := env.Get("DB_HOST", "localhost")
+	dbPort := env.Get("DB_PORT", "5432")
+	dbUser := env.Get("DB_USER", "postgres")
+	dbPassword := env.GetSecret("DB_PASSWORD", "postgres")
+	dbName := env.Get("DB_NAME", "account_center")
+	sslmode := env.Get("DB_SSLMODE", "disable")
 
-	dsn := "host=" + dbHost + " port=" + dbPort + " user=" + dbUser + " password=" + dbPassword + " dbname=" + dbName + " sslmode=disable"
+	dsn := "host=" + dbHost + " port=" + dbPort + " user=" + dbUser + " password=" + dbPassword + " dbname=" + dbName + " sslmode=" + sslmode
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		logger.Error("failed to connect to database", "error", err.Error())
@@ -57,13 +59,17 @@ func main() {
 	}
 	defer db.Close()
 
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(5 * time.Minute)
+
 	if err := db.Ping(); err != nil {
 		logger.Error("failed to ping database", "error", err.Error())
 		os.Exit(1)
 	}
 	logger.Info("connected to database")
 
-	redisURL := getEnv("REDIS_URL", "redis://localhost:6379")
+	redisURL := env.Get("REDIS_URL", "redis://localhost:6379")
 	opt, err := redis.ParseURL(redisURL)
 	if err != nil {
 		logger.Error("failed to parse REDIS_URL", "error", err.Error())
@@ -92,32 +98,34 @@ func main() {
 	}
 	compositeHealth := healthpkg.CompositeChecker{Checkers: healthCheckers}
 
-	configURL := getEnv("CONFIG_SERVICE_URL", "http://localhost:30315")
+	configURL := env.Get("CONFIG_SERVICE_URL", "http://localhost:30315")
 	configClient := config.NewClient(configURL)
 	svcCfg, err := svcconfig.Load(configClient)
 	if err != nil {
-	logger.Warn("config-service unavailable, continuing with env/defaults", "error", err)
-}
+		logger.Warn("config-service unavailable, continuing with env/defaults", "error", err)
+	}
 	logger.Info("config loaded")
 
 	userRepo := repository.NewUserRepository(db)
 	entitlementRepo := repository.NewEntitlementRepository(db)
 	subscriptionRepo := repository.NewSubscriptionRepository(db)
-	smsClient := sms.NewClient(getEnv("SMS_SERVICE_URL", "http://localhost:30311"))
+	smsClient := sms.NewClient(env.Get("SMS_SERVICE_URL", "http://localhost:30311"))
 
 	entitlementCache := cache.NewEntitlementCache(rdb, svcCfg.EntitlementCacheTTL)
 
 	userService := service.NewUserService(userRepo, smsClient, svcCfg)
 	entitlementService := service.NewEntitlementService(entitlementRepo, entitlementCache)
-	subscriptionService := service.NewSubscriptionService(subscriptionRepo, userRepo, entitlementService, svcCfg)
+	paymentVerifier := service.NewHTTPPaymentOrderVerifier(env.Get("PAYMENT_SERVICE_URL", "http://localhost:30316"))
+	subscriptionService := service.NewSubscriptionServiceWithPaymentVerifier(subscriptionRepo, userRepo, entitlementService, svcCfg, paymentVerifier)
 
-	deletionService := service.NewDeletionService(userRepo, entitlementRepo, rdb, logger)
+	sessionInvalidator := service.NewHTTPSessionInvalidator(env.Get("AUTH_SERVICE_URL", "http://localhost:30302"))
+	deletionService := service.NewDeletionService(userRepo, entitlementRepo, rdb, logger, sessionInvalidator)
 	deletionWorker := worker.NewDeletionWorker(deletionService, logger)
 
 	renewalSvc := service.NewRenewalService(nil, nil)
 	renewalWorker := worker.NewRenewalWorker(renewalSvc)
 
-	redisAddr := getEnv("REDIS_ADDR", "localhost:6379")
+	redisAddr := env.Get("REDIS_ADDR", "localhost:6379")
 	asynqServer := asynq.NewServer(
 		asynq.RedisClientOpt{Addr: redisAddr},
 		asynq.Config{Concurrency: 5},
@@ -147,7 +155,7 @@ func main() {
 	}()
 
 	var referralBinder handler.ReferralBinder
-	creditServiceURL := getEnv("CREDIT_SERVICE_URL", "")
+	creditServiceURL := env.Get("CREDIT_SERVICE_URL", "")
 	if creditServiceURL != "" {
 		referralBinder = service.NewReferralClient(creditServiceURL)
 	}
@@ -222,7 +230,23 @@ func main() {
 		accountGroup.GET("/:user_id/tier", tierHandler.GetTier)
 	}
 
-	internalAccountGroup := r.Group("/internal/v1/account")
+	internalAuth := func(c *gin.Context) {
+		token := c.GetHeader("X-Internal-Token")
+		expected := env.Get("INTERNAL_API_TOKEN", "")
+		if expected == "" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "internal API not configured"})
+			c.Abort()
+			return
+		}
+		if subtle.ConstantTimeCompare([]byte(token), []byte(expected)) != 1 {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+
+	internalAccountGroup := r.Group("/internal/v1/account", internalAuth)
 	{
 		internalAccountGroup.PUT("/:user_id/tier", tierHandler.UpdateTier)
 	}
@@ -232,7 +256,7 @@ func main() {
 		entitlementGroup.GET("/:user_id", entitlementHandler.GetUserEntitlements)
 	}
 
-	internalEntitlementGroup := r.Group("/internal/v1/entitlements")
+	internalEntitlementGroup := r.Group("/internal/v1/entitlements", internalAuth)
 	{
 		internalEntitlementGroup.POST("/consume", entitlementHandler.Consume)
 		internalEntitlementGroup.POST("/grant", entitlementHandler.Grant)
@@ -244,6 +268,12 @@ func main() {
 		subscriptionGroup.POST("/upgrade", subscriptionHandler.Upgrade)
 		subscriptionGroup.POST("/renew", subscriptionHandler.Renew)
 		subscriptionGroup.GET("/:user_id", subscriptionHandler.GetUserSubscriptions)
+	}
+
+	internalSubscriptionGroup := r.Group("/internal/v1/subscriptions", internalAuth)
+	{
+		internalSubscriptionGroup.POST("/activate-paid-order", subscriptionHandler.ActivatePaidOrder)
+		internalSubscriptionGroup.POST("/cancel-refunded-order", subscriptionHandler.CancelRefundedOrder)
 	}
 
 	pricingGroup := r.Group("/api/v1/pricing")
@@ -261,7 +291,7 @@ func main() {
 		upgradeGroup.POST("/execute", upgradeHandler.ExecuteUpgrade)
 	}
 
-	jwtSecret := getEnv("JWT_SECRET", "default-secret")
+	jwtSecret := env.Get("JWT_ACCESS_SECRET", "default-secret")
 
 	adminGroup := r.Group("/api/v1/admin")
 	adminGroup.Use(middleware.AdminAuthMiddleware(jwtSecret))
@@ -272,6 +302,9 @@ func main() {
 		adminGroup.PUT("/users/:user_id/tier", adminHandler.AdjustIdentityTier)
 		adminGroup.POST("/users/:user_id/credits", adminHandler.AdjustCredits)
 		adminGroup.GET("/users/:user_id/audit-log", adminHandler.GetAuditLog)
+
+		adminGroup.GET("/kyc/pending", adminHandler.ListPendingKYC)
+		adminGroup.PUT("/kyc/:enterprise_id/review", adminHandler.ReviewKYC)
 
 		adminGroup.POST("/plans", subAdminHandler.CreatePlan)
 		adminGroup.GET("/plans", subAdminHandler.ListPlans)
@@ -298,7 +331,17 @@ func main() {
 	r.GET("/api/v1/leaderboard", leaderboardHandler.GetLeaderboard)
 	r.GET("/api/v1/leaderboard/me", leaderboardHandler.GetMyRank)
 
-	r.Any("/metrics", func(c *gin.Context) {
+	metricsAuth := func(c *gin.Context) {
+		token := c.GetHeader("X-Internal-Token")
+		expected := env.Get("INTERNAL_API_TOKEN", "")
+		if expected == "" || subtle.ConstantTimeCompare([]byte(token), []byte(expected)) != 1 {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+	r.Any("/metrics", metricsAuth, func(c *gin.Context) {
 		var buf bytes.Buffer
 		fmt.Fprintf(&buf, "# HELP http_requests_total Total HTTP requests\n")
 		fmt.Fprintf(&buf, "# TYPE http_requests_total counter\n")
@@ -317,7 +360,8 @@ func main() {
 
 	r.Any("/health", func(c *gin.Context) {
 		result := compositeHealth.Check(c.Request.Context())
-		resp := healthpkg.BuildResponse(result.Checks)
+		showDetails := env.Get("HEALTH_SHOW_DETAILS", "false") == "true"
+		resp := healthpkg.BuildResponseConditional(result.Checks, showDetails)
 		statusCode := 200
 		if result.Status == healthpkg.StatusDown {
 			statusCode = 503
@@ -325,7 +369,7 @@ func main() {
 		c.JSON(statusCode, resp)
 	})
 
-	port := getEnv("PORT", "30301")
+	port := env.Get("PORT", "30301")
 	logger.Info("starting server", "port", port)
 
 	srv := &http.Server{
@@ -352,17 +396,4 @@ func main() {
 	}
 }
 
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
 
-func getEnvSecret(key, defaultValue string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	logger.Warn("environment variable not set, using insecure default", "key", key)
-	return defaultValue
-}

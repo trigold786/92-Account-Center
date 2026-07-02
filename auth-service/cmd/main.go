@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/subtle"
 	"database/sql"
 	"fmt"
 	"log/slog"
@@ -25,6 +26,7 @@ import (
 	"github.com/trigold786/92-Account-Center/auth-service/internal/svcconfig"
 	"github.com/trigold786/92-Account-Center/auth-service/pkg/jwt"
 	"github.com/trigold786/92-Account-Center/pkg/config"
+	"github.com/trigold786/92-Account-Center/pkg/env"
 	healthpkg "github.com/trigold786/92-Account-Center/pkg/health"
 	"github.com/trigold786/92-Account-Center/pkg/logging"
 )
@@ -40,13 +42,14 @@ var logger = logging.NewLogger("auth-service")
 func main() {
 	slog.SetDefault(logger)
 
-	dbHost := getEnv("DB_HOST", "localhost")
-	dbPort := getEnv("DB_PORT", "5432")
-	dbUser := getEnv("DB_USER", "postgres")
-	dbPassword := getEnvSecret("DB_PASSWORD", "postgres")
-	dbName := getEnv("DB_NAME", "account_center")
+	dbHost := env.Get("DB_HOST", "localhost")
+	dbPort := env.Get("DB_PORT", "5432")
+	dbUser := env.Get("DB_USER", "postgres")
+	dbPassword := env.GetSecret("DB_PASSWORD", "postgres")
+	dbName := env.Get("DB_NAME", "account_center")
+	sslmode := env.Get("DB_SSLMODE", "disable")
 
-	dsn := "host=" + dbHost + " port=" + dbPort + " user=" + dbUser + " password=" + dbPassword + " dbname=" + dbName + " sslmode=disable"
+	dsn := "host=" + dbHost + " port=" + dbPort + " user=" + dbUser + " password=" + dbPassword + " dbname=" + dbName + " sslmode=" + sslmode
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		logger.Error("failed to connect to database", "error", err.Error())
@@ -54,16 +57,28 @@ func main() {
 	}
 	defer db.Close()
 
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(5 * time.Minute)
+
 	if err := db.Ping(); err != nil {
 		logger.Error("failed to ping database", "error", err.Error())
 		os.Exit(1)
 	}
 	logger.Info("connected to database")
 
-	accessSecret := getEnvSecret("JWT_ACCESS_SECRET", "access-secret-key-change-in-production")
-	refreshSecret := getEnvSecret("JWT_REFRESH_SECRET", "refresh-secret-key-change-in-production")
+	accessSecret := env.GetSecret("JWT_ACCESS_SECRET", "")
+	if accessSecret == "" {
+		logger.Error("JWT_ACCESS_SECRET not configured")
+		os.Exit(1)
+	}
+	refreshSecret := env.GetSecret("JWT_REFRESH_SECRET", "")
+	if refreshSecret == "" {
+		logger.Error("JWT_REFRESH_SECRET not configured")
+		os.Exit(1)
+	}
 
-	configSvcURL := getEnv("CONFIG_SERVICE_URL", "http://localhost:30315")
+	configSvcURL := env.Get("CONFIG_SERVICE_URL", "http://localhost:30315")
 	configClient := config.NewClient(configSvcURL)
 	authCfg, err := svcconfig.Load(configClient)
 	if err != nil {
@@ -86,8 +101,8 @@ func main() {
 	roleRepo := repository.NewRoleRepository(db)
 
 	rdb := redis.NewClient(&redis.Options{
-		Addr:     getEnv("REDIS_ADDR", "localhost:6379"),
-		Password: getEnvSecret("REDIS_PASSWORD", ""),
+		Addr:     env.Get("REDIS_ADDR", "localhost:6379"),
+		Password: env.GetSecret("REDIS_PASSWORD", ""),
 		DB:       0,
 	})
 	defer rdb.Close()
@@ -111,7 +126,8 @@ func main() {
 	compositeHealth := healthpkg.CompositeChecker{Checkers: healthCheckers}
 
 	authService := service.NewAuthService(userRepo, roleRepo, jwtMgr, rdb, authCfg)
-	loginHandler := handler.NewLoginHandler(authService, authCfg.LoginRateLimitPerIP)
+	rateLimiter := service.NewRateLimiter(rdb, authCfg.LoginRateLimitPerIP, time.Minute)
+	loginHandler := handler.NewLoginHandler(authService, rateLimiter)
 
 	sessionRepo := repository.NewSessionRepository(rdb, authCfg.SessionTimeout)
 	sessionSvc := service.NewSessionService(sessionRepo, int64(authCfg.SessionMaxPerUser), authCfg.SessionTimeout)
@@ -126,27 +142,27 @@ func main() {
 
 	oauthRegistry := service.NewOAuthProviderRegistry()
 	oauthRegistry.Register(service.NewWeChatOAuthProvider(
-		getEnvSecret("WECHAT_APP_ID", authCfg.WeChatAppID),
-		getEnvSecret("WECHAT_SECRET", authCfg.WeChatSecret),
-		getEnv("OAUTH_REDIRECT_URI", authCfg.OAuthRedirectURI),
+		env.GetSecret("WECHAT_APP_ID", authCfg.WeChatAppID),
+		env.GetSecret("WECHAT_SECRET", authCfg.WeChatSecret),
+		env.Get("OAUTH_REDIRECT_URI", authCfg.OAuthRedirectURI),
 	))
 	oauthRegistry.Register(service.NewAppleOAuthProvider(
-		getEnvSecret("APPLE_CLIENT_ID", authCfg.AppleClientID),
-		getEnvSecret("APPLE_TEAM_ID", authCfg.AppleTeamID),
-		getEnvSecret("APPLE_KEY_ID", authCfg.AppleKeyID),
-		getEnv("OAUTH_REDIRECT_URI", authCfg.OAuthRedirectURI),
+		env.GetSecret("APPLE_CLIENT_ID", authCfg.AppleClientID),
+		env.GetSecret("APPLE_TEAM_ID", authCfg.AppleTeamID),
+		env.GetSecret("APPLE_KEY_ID", authCfg.AppleKeyID),
+		env.Get("OAUTH_REDIRECT_URI", authCfg.OAuthRedirectURI),
 	))
 	oauthRegistry.Register(service.NewGoogleOAuthProvider(
-		getEnvSecret("GOOGLE_CLIENT_ID", authCfg.GoogleClientID),
-		getEnvSecret("GOOGLE_SECRET", authCfg.GoogleSecret),
-		getEnv("OAUTH_REDIRECT_URI", authCfg.OAuthRedirectURI),
+		env.GetSecret("GOOGLE_CLIENT_ID", authCfg.GoogleClientID),
+		env.GetSecret("GOOGLE_SECRET", authCfg.GoogleSecret),
+		env.Get("OAUTH_REDIRECT_URI", authCfg.OAuthRedirectURI),
 	))
 	oauthRegistry.Register(service.NewAlipayOAuthProvider(
-		getEnvSecret("ALIPAY_APP_ID", ""),
-		getEnvSecret("ALIPAY_PRIVATE_KEY", ""),
-		getEnv("OAUTH_REDIRECT_URI", ""),
+		env.GetSecret("ALIPAY_APP_ID", ""),
+		env.GetSecret("ALIPAY_PRIVATE_KEY", ""),
+		env.Get("OAUTH_REDIRECT_URI", ""),
 	))
-	oauthSvc := service.NewOAuthService(oauthRegistry, userRepo)
+	oauthSvc := service.NewOAuthService(oauthRegistry, userRepo, roleRepo, jwtMgr)
 	oauthH := handler.NewOAuthHandler(oauthSvc)
 
 	guestSvc := service.NewGuestService(nil)
@@ -154,15 +170,15 @@ func main() {
 
 	entOAuthSvc := service.NewEnterpriseOAuthService()
 	entOAuthSvc.Register(provider.NewWorkWeChatProvider(
-		getEnvSecret("WORK_WECHAT_CORP_ID", ""),
-		getEnv("WORK_WECHAT_AGENT_ID", ""),
-		getEnvSecret("WORK_WECHAT_CORP_SECRET", ""),
-		getEnv("ENTERPRISE_OAUTH_REDIRECT_URI", ""),
+		env.GetSecret("WORK_WECHAT_CORP_ID", ""),
+		env.Get("WORK_WECHAT_AGENT_ID", ""),
+		env.GetSecret("WORK_WECHAT_CORP_SECRET", ""),
+		env.Get("ENTERPRISE_OAUTH_REDIRECT_URI", ""),
 	))
 	entOAuthSvc.Register(provider.NewDingTalkProvider(
-		getEnvSecret("DINGTALK_APP_KEY", ""),
-		getEnvSecret("DINGTALK_APP_SECRET", ""),
-		getEnv("ENTERPRISE_OAUTH_REDIRECT_URI", ""),
+		env.GetSecret("DINGTALK_APP_KEY", ""),
+		env.GetSecret("DINGTALK_APP_SECRET", ""),
+		env.Get("ENTERPRISE_OAUTH_REDIRECT_URI", ""),
 	))
 	entOAuthHandler := handler.NewEnterpriseOAuthHandler(entOAuthSvc)
 
@@ -227,7 +243,17 @@ func main() {
 		qrcodeGroup.POST("/:code_id/confirm", qrcodeHandler.Confirm)
 	}
 
-	r.Any("/metrics", func(c *gin.Context) {
+	metricsAuth := func(c *gin.Context) {
+		token := c.GetHeader("X-Internal-Token")
+		expected := env.Get("INTERNAL_API_TOKEN", "")
+		if expected == "" || subtle.ConstantTimeCompare([]byte(token), []byte(expected)) != 1 {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+	r.Any("/metrics", metricsAuth, func(c *gin.Context) {
 		var buf bytes.Buffer
 		fmt.Fprintf(&buf, "# HELP http_requests_total Total HTTP requests\n")
 		fmt.Fprintf(&buf, "# TYPE http_requests_total counter\n")
@@ -246,7 +272,8 @@ func main() {
 
 	r.Any("/health", func(c *gin.Context) {
 		result := compositeHealth.Check(c.Request.Context())
-		resp := healthpkg.BuildResponse(result.Checks)
+		showDetails := env.Get("HEALTH_SHOW_DETAILS", "false") == "true"
+		resp := healthpkg.BuildResponseConditional(result.Checks, showDetails)
 		statusCode := 200
 		if result.Status == healthpkg.StatusDown {
 			statusCode = 503
@@ -254,7 +281,7 @@ func main() {
 		c.JSON(statusCode, resp)
 	})
 
-	port := getEnv("PORT", "30302")
+	port := env.Get("PORT", "30302")
 	srv := &http.Server{
 		Addr:    ":" + port,
 		Handler: r,
@@ -278,17 +305,4 @@ func main() {
 	}
 }
 
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
 
-func getEnvSecret(key, defaultValue string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	logger.Warn("environment variable not set, using insecure default", "key", key)
-	return defaultValue
-}

@@ -9,17 +9,18 @@ import (
 )
 
 type GatewayConfig struct {
-	AccountServiceURL      string
-	AuthServiceURL         string
-	NotificationServiceURL string
-	CreditServiceURL       string
-	ComplianceServiceURL   string
-	DataProductServiceURL  string
-	ConfigServiceURL       string
-	JWTSecret              string
-	Port                   string
-	RateLimitRPS           int
-	CacheMaxAge            int
+	AccountServiceURL        string
+	AuthServiceURL           string
+	NotificationServiceURL   string
+	CreditServiceURL         string
+	ComplianceServiceURL     string
+	DataProductServiceURL    string
+	ConfigServiceURL         string
+	PaymentServiceURL        string
+	JWTSecret                string
+	Port                     string
+	RateLimitRPS             int
+	CacheMaxAge              int
 	ShutdownTimeout          time.Duration
 	MaxDesensitizeBodySize   int64
 	ResponseHeaderTimeoutSec int
@@ -37,7 +38,8 @@ func Load(c *config.Client) (*GatewayConfig, error) {
 	cfg.ComplianceServiceURL = loadString(c, "COMPLIANCE_SERVICE_URL", "COMPLIANCE_SERVICE_URL", "http://localhost:30313")
 	cfg.DataProductServiceURL = loadString(c, "DATA_PRODUCT_SERVICE_URL", "DATA_PRODUCT_SERVICE_URL", "http://localhost:30314")
 	cfg.ConfigServiceURL = loadString(c, "CONFIG_SERVICE_URL", "CONFIG_SERVICE_URL", "http://localhost:30315")
-	cfg.JWTSecret = loadString(c, "JWT_SECRET", "JWT_SECRET", "default-secret")
+	cfg.PaymentServiceURL = loadString(c, "PAYMENT_SERVICE_URL", "PAYMENT_SERVICE_URL", "http://localhost:30316")
+	cfg.JWTSecret = loadString(c, "JWT_ACCESS_SECRET", "JWT_ACCESS_SECRET", "default-secret")
 	cfg.Port = loadString(c, "GATEWAY_PORT", "PORT", "30300")
 	cfg.RateLimitRPS = loadInt(c, "GATEWAY_RATE_LIMIT_RPS", "RATE_LIMIT_RPS", 100)
 	cfg.CacheMaxAge = loadInt(c, "GATEWAY_CACHE_MAX_AGE", "CACHE_MAX_AGE", 60)
