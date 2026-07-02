@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/subtle"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -25,15 +27,12 @@ import (
 	"github.com/trigold786/92-Account-Center/payment-service/internal/svcconfig"
 	"github.com/trigold786/92-Account-Center/payment-service/internal/worker"
 	"github.com/trigold786/92-Account-Center/pkg/config"
+	"github.com/trigold786/92-Account-Center/pkg/env"
 	healthpkg "github.com/trigold786/92-Account-Center/pkg/health"
 	"github.com/trigold786/92-Account-Center/pkg/logging"
 )
 
 var logger = slog.Default()
-
-type PaymentEventNotifier interface {
-	NotifyPaymentSuccess(ctx context.Context, orderID int64, userID int64, amount float64) error
-}
 
 type httpNotifier struct {
 	baseURL string
@@ -44,7 +43,49 @@ func newHTTPNotifier(baseURL string) *httpNotifier {
 	return &httpNotifier{baseURL: baseURL, client: &http.Client{Timeout: 5 * time.Second}}
 }
 
-func (n *httpNotifier) NotifyPaymentSuccess(ctx context.Context, orderID int64, userID int64, amount float64) error {
+func (n *httpNotifier) CancelRefundedOrderSubscription(ctx context.Context, userID int64, orderID int64, reason string) error {
+	payload, err := json.Marshal(struct {
+		UserID  int64  `json:"user_id"`
+		OrderID string `json:"order_id"`
+		Reason  string `json:"reason"`
+	}{UserID: userID, OrderID: fmt.Sprintf("%d", orderID), Reason: reason})
+	if err != nil {
+		return err
+	}
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, n.baseURL+"/internal/v1/subscriptions/cancel-refunded-order", bytes.NewReader(payload))
+	if err != nil {
+		return err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	resp, err := n.client.Do(httpReq)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("account-service refund cancellation returned status %d", resp.StatusCode)
+	}
+	return nil
+}
+
+func (n *httpNotifier) NotifySubscriptionActivation(ctx context.Context, req handler.SubscriptionActivationRequest) error {
+	payload, err := json.Marshal(req)
+	if err != nil {
+		return err
+	}
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, n.baseURL+"/internal/v1/subscriptions/activate-paid-order", bytes.NewReader(payload))
+	if err != nil {
+		return err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	resp, err := n.client.Do(httpReq)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("account-service activation returned status %d", resp.StatusCode)
+	}
 	return nil
 }
 
@@ -110,19 +151,23 @@ var (
 func main() {
 	logger = logging.NewLogger("payment-service")
 
-	dbHost := getEnv("DB_HOST", "localhost")
-	dbPort := getEnv("DB_PORT", "5432")
-	dbUser := getEnv("DB_USER", "postgres")
-	dbPassword := getEnvSecret("DB_PASSWORD", "postgres")
-	dbName := getEnv("DB_NAME", "account_center")
+	dbHost := env.Get("DB_HOST", "localhost")
+	dbPort := env.Get("DB_PORT", "5432")
+	dbUser := env.Get("DB_USER", "postgres")
+	dbPassword := env.GetSecret("DB_PASSWORD", "postgres")
+	dbName := env.Get("DB_NAME", "account_center")
+	sslmode := env.Get("DB_SSLMODE", "disable")
 
-	dsn := "host=" + dbHost + " port=" + dbPort + " user=" + dbUser + " password=" + dbPassword + " dbname=" + dbName + " sslmode=disable"
+	dsn := "host=" + dbHost + " port=" + dbPort + " user=" + dbUser + " password=" + dbPassword + " dbname=" + dbName + " sslmode=" + sslmode
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		logger.Error("failed to connect to database", "error", err.Error())
 		os.Exit(1)
 	}
 	defer db.Close()
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(5 * time.Minute)
 	if err := db.Ping(); err != nil {
 		logger.Error("failed to ping database", "error", err.Error())
 		os.Exit(1)
@@ -140,7 +185,7 @@ func main() {
 	}
 	compositeHealth := healthpkg.CompositeChecker{Checkers: healthCheckers}
 
-	configURL := getEnv("CONFIG_SERVICE_URL", "http://localhost:30315")
+	configURL := env.Get("CONFIG_SERVICE_URL", "http://localhost:30315")
 	configClient := config.NewClient(configURL)
 	svcCfg, err := svcconfig.Load(configClient)
 	if err != nil {
@@ -158,35 +203,48 @@ func main() {
 	invoiceSvcHandler := handler.NewInvoiceServiceHandler(invoiceSvc)
 	paymentFlowHandler := handler.NewPaymentFlowHandler()
 
-	refundRepo := repository.NewRefundRepository(db)
-	creditSvc := newHTTPCreditService(getEnv("CREDIT_SERVICE_URL", "http://localhost:30317"))
-	orderRepoRefund := &orderRepoRefundAdapter{repo: orderRepo}
-	refundSvc := service.NewRefundService(refundRepo, orderRepoRefund, creditSvc)
-	refundHandler := handler.NewRefundHandler(refundSvc)
-
 	providerRegistry := provider.NewProviderRegistry()
-	wechatProvider := service.NewWeChatPayProvider(service.WeChatPayConfig{
-		AppID:               getEnv("WECHAT_APP_ID", "wx_sandbox_app_id"),
-		MchID:               getEnv("WECHAT_MCH_ID", "sandbox_mch_id"),
-		APIKey:              getEnvSecret("WECHAT_API_KEY", "sandbox_api_key"),
-		CertificateSerialNo: getEnv("WECHAT_CERT_SERIAL_NO", ""),
-		PrivateKeyPath:      getEnv("WECHAT_PRIVATE_KEY_PATH", ""),
-	})
-	alipayProvider := service.NewAlipayProvider(service.AlipayConfig{
-		AppID:      getEnv("ALIPAY_APP_ID", "alipay_sandbox_app_id"),
-		PrivateKey: getEnvSecret("ALIPAY_PRIVATE_KEY", "sandbox_private_key"),
-		PublicKey:  getEnvSecret("ALIPAY_PUBLIC_KEY", "sandbox_public_key"),
-		NotifyURL:  getEnv("ALIPAY_NOTIFY_URL", "http://localhost:30316/api/v1/payment/callback/alipay"),
-	})
+	paymentMode := env.Get("PAYMENT_MODE", "sandbox")
+	wechatCfg := service.WeChatPayConfig{
+		Mode:                paymentMode,
+		AppID:               env.Get("WECHAT_APP_ID", "wx_sandbox_app_id"),
+		MchID:               env.Get("WECHAT_MCH_ID", "sandbox_mch_id"),
+		APIKey:              env.GetSecret("WECHAT_API_KEY", "sandbox_api_key"),
+		CertificateSerialNo: env.Get("WECHAT_CERT_SERIAL_NO", ""),
+		PrivateKeyPath:      env.Get("WECHAT_PRIVATE_KEY_PATH", ""),
+	}
+	if err := wechatCfg.ValidateProduction(); err != nil {
+		logger.Error("invalid wechat production payment config", "error", err)
+		os.Exit(1)
+	}
+	wechatProvider := service.NewWeChatPayProvider(wechatCfg)
+	alipayCfg := service.AlipayConfig{
+		Mode:       paymentMode,
+		AppID:      env.Get("ALIPAY_APP_ID", "alipay_sandbox_app_id"),
+		PrivateKey: env.GetSecret("ALIPAY_PRIVATE_KEY", "sandbox_private_key"),
+		PublicKey:  env.GetSecret("ALIPAY_PUBLIC_KEY", "sandbox_public_key"),
+		NotifyURL:  env.Get("ALIPAY_NOTIFY_URL", "http://localhost:30316/api/v1/payment/callback/alipay"),
+	}
+	if err := alipayCfg.ValidateProduction(); err != nil {
+		logger.Error("invalid alipay production payment config", "error", err)
+		os.Exit(1)
+	}
+	alipayProvider := service.NewAlipayProvider(alipayCfg)
 	providerRegistry.Register(wechatProvider)
 	providerRegistry.Register(alipayProvider)
 
-	callbackHandler := handler.NewCallbackHandler(providerRegistry, orderRepo, orderSvc, logger)
-	createPaymentHandler := handler.NewCreatePaymentHandler(providerRegistry, orderSvc, logger)
-	reconciliationSvc := service.NewReconciliationService(providerRegistry, orderRepo, logger)
+	refundRepo := repository.NewRefundRepository(db)
+	creditSvc := newHTTPCreditService(env.Get("CREDIT_SERVICE_URL", "http://localhost:30312"))
+	accountNotifier := newHTTPNotifier(env.Get("ACCOUNT_SERVICE_URL", "http://localhost:30301"))
+	orderRepoRefund := &orderRepoRefundAdapter{repo: orderRepo}
+	refundSvc := service.NewRefundService(refundRepo, orderRepoRefund, creditSvc, accountNotifier, providerRegistry)
+	refundHandler := handler.NewRefundHandler(refundSvc)
 
-	notifier := newHTTPNotifier(getEnv("NOTIFIER_SERVICE_URL", "http://localhost:30318"))
-	_ = notifier
+	paymentCallbackRepo := repository.NewPaymentCallbackRepository(db)
+	callbackHandler := handler.NewCallbackHandlerWithActivationNotifier(providerRegistry, orderRepo, orderSvc, paymentCallbackRepo, accountNotifier, logger)
+	createPaymentHandler := handler.NewCreatePaymentHandler(providerRegistry, orderSvc, logger)
+	reconciliationReportRepo := service.NewSQLReconciliationReportRepository(db)
+	reconciliationSvc := service.NewReconciliationServiceWithRepository(providerRegistry, orderRepo, reconciliationReportRepo, logger)
 
 	expiryInterval := 5 * time.Minute
 	if svcCfg != nil && svcCfg.OrderExpiryMinutes > 0 {
@@ -257,7 +315,8 @@ func main() {
 			}
 			report, err := reconciliationSvc.ReconcileOrders(c.Request.Context(), req.Provider, req.Date)
 			if err != nil {
-				c.JSON(500, gin.H{"code": 500, "message": err.Error()})
+				logger.Error("reconciliation failed", "error", err)
+				c.JSON(500, gin.H{"code": 500, "message": "reconciliation failed"})
 				return
 			}
 			c.JSON(200, gin.H{"code": 200, "message": "success", "data": report})
@@ -266,14 +325,25 @@ func main() {
 			reportID := c.Param("report_id")
 			report, err := reconciliationSvc.GetReconciliationReport(c.Request.Context(), reportID)
 			if err != nil {
-				c.JSON(404, gin.H{"code": 404, "message": err.Error()})
+				logger.Error("get reconciliation report failed", "error", err)
+				c.JSON(404, gin.H{"code": 404, "message": "report not found"})
 				return
 			}
 			c.JSON(200, gin.H{"code": 200, "message": "success", "data": report})
 		})
 	}
 
-	r.Any("/metrics", func(c *gin.Context) {
+	metricsAuth := func(c *gin.Context) {
+		token := c.GetHeader("X-Internal-Token")
+		expected := env.Get("INTERNAL_API_TOKEN", "")
+		if expected == "" || subtle.ConstantTimeCompare([]byte(token), []byte(expected)) != 1 {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+	r.Any("/metrics", metricsAuth, func(c *gin.Context) {
 		var buf bytes.Buffer
 		fmt.Fprintf(&buf, "# HELP http_requests_total Total HTTP requests\n")
 		fmt.Fprintf(&buf, "# TYPE http_requests_total counter\n")
@@ -292,7 +362,8 @@ func main() {
 
 	r.Any("/health", func(c *gin.Context) {
 		result := compositeHealth.Check(c.Request.Context())
-		resp := healthpkg.BuildResponse(result.Checks)
+		showDetails := env.Get("HEALTH_SHOW_DETAILS", "false") == "true"
+		resp := healthpkg.BuildResponseConditional(result.Checks, showDetails)
 		statusCode := 200
 		if result.Status == healthpkg.StatusDown {
 			statusCode = 503
@@ -300,7 +371,7 @@ func main() {
 		c.JSON(statusCode, resp)
 	})
 
-	port := getEnv("PORT", "30316")
+	port := env.Get("PORT", "30316")
 	srv := &http.Server{Addr: ":" + port, Handler: r}
 
 	go func() {
@@ -321,17 +392,4 @@ func main() {
 	}
 }
 
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
 
-func getEnvSecret(key, defaultValue string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	logger.Warn("environment variable not set, using an insecure default", "key", key)
-	return defaultValue
-}

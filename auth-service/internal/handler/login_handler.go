@@ -3,8 +3,6 @@ package handler
 import (
 	"net/http"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -20,80 +18,25 @@ type LoginRequest struct {
 	DeviceFingerprintID string `json:"device_fingerprint_id,omitempty"`
 }
 
-const rateLimitCleanupInterval = 5 * time.Minute
-const rateLimitEntryTTL = 2 * time.Minute
-
-type ipRateLimiter struct {
-	mu       sync.Mutex
-	attempts []time.Time
-	lastUsed time.Time
-}
-
-func (rl *ipRateLimiter) allow(maxAttempts int, window time.Duration) bool {
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
-	rl.lastUsed = time.Now()
-	now := time.Now()
-	cutoff := now.Add(-window)
-	var valid []time.Time
-	for _, t := range rl.attempts {
-		if t.After(cutoff) {
-			valid = append(valid, t)
-		}
-	}
-	rl.attempts = valid
-	if len(valid) >= maxAttempts {
-		return false
-	}
-	rl.attempts = append(rl.attempts, now)
-	return true
-}
-
-func (rl *ipRateLimiter) isStale() bool {
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
-	return time.Since(rl.lastUsed) > rateLimitEntryTTL
-}
-
 type LoginHandler struct {
-	authService    service.AuthService
-	rateLimiters   *sync.Map
-	loginRateLimit int
+	authService  service.AuthService
+	rateLimiter  *service.RateLimiter
 }
 
-func NewLoginHandler(authService service.AuthService, loginRateLimit int) *LoginHandler {
-	h := &LoginHandler{
-		authService:    authService,
-		rateLimiters:   &sync.Map{},
-		loginRateLimit: loginRateLimit,
-	}
-	if h.loginRateLimit <= 0 {
-		h.loginRateLimit = 10
-	}
-	go h.cleanupRateLimiters()
-	return h
-}
-
-func (h *LoginHandler) cleanupRateLimiters() {
-	for {
-		time.Sleep(rateLimitCleanupInterval)
-		h.rateLimiters.Range(func(key, value interface{}) bool {
-			if limiter, ok := value.(*ipRateLimiter); ok && limiter.isStale() {
-				h.rateLimiters.Delete(key)
-			}
-			return true
-		})
+func NewLoginHandler(authService service.AuthService, rateLimiter *service.RateLimiter) *LoginHandler {
+	return &LoginHandler{
+		authService: authService,
+		rateLimiter: rateLimiter,
 	}
 }
 
 func (h *LoginHandler) Login(c *gin.Context) {
 	ip := c.ClientIP()
-	limiterIface, _ := h.rateLimiters.LoadOrStore(ip, &ipRateLimiter{})
-	limiter := limiterIface.(*ipRateLimiter)
-	if !limiter.allow(h.loginRateLimit, time.Minute) {
+	if h.rateLimiter.IsLocked(c.Request.Context(), "login:"+ip) {
 		c.JSON(http.StatusTooManyRequests, gin.H{"error": "too many requests"})
 		return
 	}
+	h.rateLimiter.RecordAttempt(c.Request.Context(), "login:"+ip)
 
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -196,6 +139,13 @@ func (h *LoginHandler) LoginWithBiometric(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
+
+	rateLimitKey := "biometric:" + req.DeviceFingerprint
+	if h.rateLimiter.IsLocked(c.Request.Context(), rateLimitKey) {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "too many requests"})
+		return
+	}
+	h.rateLimiter.RecordAttempt(c.Request.Context(), rateLimitKey)
 
 	resp, err := h.authService.LoginWithBiometric(c.Request.Context(), &req)
 	if err != nil {

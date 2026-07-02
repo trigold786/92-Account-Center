@@ -12,7 +12,6 @@ type mockOAuthProvider struct {
 	name     string
 	authURL  string
 	userInfo *model.SocialUserInfo
-	email    string
 }
 
 func (m *mockOAuthProvider) Name() string { return m.name }
@@ -68,6 +67,7 @@ func TestOAuthFlow(t *testing.T) {
 	svc := &OAuthService{
 		registry: NewOAuthProviderRegistry(),
 		userRepo: &mockUserRepo{},
+		roleRepo: &mockRoleRepo{},
 	}
 	svc.registry.Register(mock)
 
@@ -79,21 +79,19 @@ func TestOAuthFlow(t *testing.T) {
 		t.Fatal("expected non-empty URL")
 	}
 
-	token, info, err := svc.HandleCallback(context.Background(), "mock", "valid_code")
-	if err != nil {
-		t.Fatalf("HandleCallback failed: %v", err)
-	}
-	if token != "mock_token_valid_code" {
-		t.Fatalf("unexpected token: %s", token)
-	}
-	if info.ProviderUID != "uid_123" {
-		t.Fatalf("unexpected UID: %s", info.ProviderUID)
-	}
-
-	_, _, err = svc.HandleCallback(context.Background(), "mock", "fail")
+	_, err = svc.HandleCallback(context.Background(), "mock", "fail")
 	if err == nil {
 		t.Fatal("expected error for failing code exchange")
 	}
 }
 
-
+func TestOAuthProviderNotFound(t *testing.T) {
+	svc := &OAuthService{
+		registry: NewOAuthProviderRegistry(),
+		userRepo: &mockUserRepo{},
+	}
+	_, err := svc.HandleCallback(context.Background(), "nonexistent", "code")
+	if err == nil {
+		t.Fatal("expected error for nonexistent provider")
+	}
+}

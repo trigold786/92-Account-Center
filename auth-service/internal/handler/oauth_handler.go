@@ -24,8 +24,12 @@ func (h *OAuthHandler) Authorize(c *gin.Context) {
 		return
 	}
 	state := make([]byte, 16)
-	rand.Read(state)
+	_, _ = rand.Read(state)
 	stateStr := hex.EncodeToString(state)
+
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie("oauth_state", stateStr, 300, "/", "", false, true)
+
 	url, err := h.oauthService.GetAuthURL(c.Request.Context(), provider, stateStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -37,17 +41,28 @@ func (h *OAuthHandler) Authorize(c *gin.Context) {
 func (h *OAuthHandler) Callback(c *gin.Context) {
 	provider := c.Query("provider")
 	code := c.Query("code")
+	state := c.Query("state")
+
 	if provider == "" || code == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "provider and code are required"})
 		return
 	}
-	token, info, err := h.oauthService.HandleCallback(c.Request.Context(), provider, code)
+
+	stateCookie, _ := c.Cookie("oauth_state")
+	if stateCookie == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing oauth state"})
+		return
+	}
+	if state == "" || stateCookie != state {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid oauth state"})
+		return
+	}
+	c.SetCookie("oauth_state", "", -1, "/", "", false, true)
+
+	result, err := h.oauthService.HandleCallback(c.Request.Context(), provider, code)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"access_token": token,
-		"user_info":    info,
-	})
+	c.JSON(http.StatusOK, result)
 }

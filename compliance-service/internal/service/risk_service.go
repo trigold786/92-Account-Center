@@ -44,7 +44,10 @@ func (s *RiskService) AssessRisk(ctx context.Context, req model.AssessRiskReques
 		location = &model.Location{}
 	}
 
-	geoAnomaly, distance, _ := s.DetectGeoAnomaly(ctx, req.UserID, location)
+	geoAnomaly, distance, err := s.DetectGeoAnomaly(ctx, req.UserID, location)
+	if err != nil {
+		return nil, err
+	}
 	if geoAnomaly {
 		factors = append(factors, model.RiskFactor{
 			Type:   "impossible_travel",
@@ -54,7 +57,10 @@ func (s *RiskService) AssessRisk(ctx context.Context, req model.AssessRiskReques
 		})
 	}
 
-	deviceAnomaly, _, _ := s.DetectDeviceAnomaly(ctx, req.UserID, req.DeviceFingerprint)
+	deviceAnomaly, _, err := s.DetectDeviceAnomaly(ctx, req.UserID, req.DeviceFingerprint)
+	if err != nil {
+		return nil, err
+	}
 	if deviceAnomaly {
 		factors = append(factors, model.RiskFactor{
 			Type:   "device_change",
@@ -64,7 +70,10 @@ func (s *RiskService) AssessRisk(ctx context.Context, req model.AssessRiskReques
 		})
 	}
 
-	velocityAnomaly, _, _ := s.DetectVelocityAnomaly(ctx, req.UserID)
+	velocityAnomaly, _, err := s.DetectVelocityAnomaly(ctx, req.UserID)
+	if err != nil {
+		return nil, err
+	}
 	if velocityAnomaly {
 		factors = append(factors, model.RiskFactor{
 			Type:   "velocity_exceeded",

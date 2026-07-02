@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/subtle"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -17,14 +18,15 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 
-	"github.com/trigold786/92-Account-Center/pkg/config"
-	"github.com/trigold786/92-Account-Center/pkg/logging"
 	"github.com/trigold786/92-Account-Center/notification-service/internal/handler"
 	"github.com/trigold786/92-Account-Center/notification-service/internal/provider"
 	"github.com/trigold786/92-Account-Center/notification-service/internal/service"
 	"github.com/trigold786/92-Account-Center/notification-service/internal/svcconfig"
 	circuitbreaker "github.com/trigold786/92-Account-Center/pkg/circuitbreaker"
+	"github.com/trigold786/92-Account-Center/pkg/config"
+	"github.com/trigold786/92-Account-Center/pkg/env"
 	healthpkg "github.com/trigold786/92-Account-Center/pkg/health"
+	"github.com/trigold786/92-Account-Center/pkg/logging"
 )
 
 var (
@@ -37,9 +39,9 @@ var logger = slog.Default()
 
 func main() {
 	logger = logging.NewLogger("notification-service")
-	redisAddr := getEnv("REDIS_URL", "localhost:6379")
-	redisPassword := getEnvSecret("REDIS_PASSWORD", "")
-	redisDB, _ := strconv.Atoi(getEnv("REDIS_DB", "0"))
+	redisAddr := env.Get("REDIS_URL", "localhost:6379")
+	redisPassword := env.GetSecret("REDIS_PASSWORD", "")
+	redisDB, _ := strconv.Atoi(env.Get("REDIS_DB", "0"))
 
 	redisClient := redis.NewClient(&redis.Options{
 		Addr:     redisAddr,
@@ -66,28 +68,28 @@ func main() {
 
 	service.SetRedisClient(redisClient)
 
-	configURL := getEnv("CONFIG_SERVICE_URL", "http://localhost:30315")
+	configURL := env.Get("CONFIG_SERVICE_URL", "http://localhost:30315")
 	configClient := config.NewClient(configURL)
 	svcCfg, err := svcconfig.Load(configClient)
 	if err != nil {
-	logger.Warn("config-service unavailable, continuing with env/defaults", "error", err)
-}
+		logger.Warn("config-service unavailable, continuing with env/defaults", "error", err)
+	}
 	logger.Info("notification config loaded successfully")
 
 	aliyunProvider := provider.NewAliyunProvider(
-		getEnv("ALIYUN_ACCESS_KEY_ID", ""),
-		getEnvSecret("ALIYUN_ACCESS_KEY_SECRET", ""),
-		getEnv("ALIYUN_SIGN_NAME", "速通互联验证码"),
+		env.Get("ALIYUN_ACCESS_KEY_ID", ""),
+		env.GetSecret("ALIYUN_ACCESS_KEY_SECRET", ""),
+		env.Get("ALIYUN_SIGN_NAME", "速通互联验证码"),
 	)
 	tencentProvider := provider.NewTencentProvider(
-		getEnv("TENCENT_APP_ID", ""),
-		getEnvSecret("TENCENT_APP_SECRET", ""),
-		getEnv("TENCENT_SIGN_NAME", "AccountCenter"),
+		env.Get("TENCENT_APP_ID", ""),
+		env.GetSecret("TENCENT_APP_SECRET", ""),
+		env.Get("TENCENT_SIGN_NAME", "AccountCenter"),
 	)
 	chinaTelecomProvider := provider.NewChinaTelecomProvider(
-		getEnv("CHINATELECOM_APP_ID", ""),
-		getEnvSecret("CHINATELECOM_APP_SECRET", ""),
-		getEnv("CHINATELECOM_SIGN_NAME", "AccountCenter"),
+		env.Get("CHINATELECOM_APP_ID", ""),
+		env.GetSecret("CHINATELECOM_APP_SECRET", ""),
+		env.Get("CHINATELECOM_SIGN_NAME", "AccountCenter"),
 	)
 
 	smsProviders := []provider.SMSProvider{aliyunProvider, tencentProvider, chinaTelecomProvider}
@@ -101,29 +103,29 @@ func main() {
 	smsHandler := handler.NewSMSHandler(smsService)
 
 	simpleSMTP := provider.NewSimpleSMTPProvider(
-		getEnv("SMTP_HOST", "smtp.163.com"),
-		getEnv("SMTP_PORT", "465"),
-		getEnv("SMTP_USERNAME", ""),
-		getEnvSecret("SMTP_PASSWORD", ""),
-		getEnv("SMTP_FROM", ""),
+		env.Get("SMTP_HOST", "smtp.163.com"),
+		env.Get("SMTP_PORT", "465"),
+		env.Get("SMTP_USERNAME", ""),
+		env.GetSecret("SMTP_PASSWORD", ""),
+		env.Get("SMTP_FROM", ""),
 	)
 	verificationEmailService := service.NewSimpleEmailService(simpleSMTP, svcCfg)
 	verificationEmailHandler := handler.NewVerificationEmailHandler(verificationEmailService)
 
-	emailProviderType := getEnv("EMAIL_PROVIDER", "smtp")
-	jwtSecret := getEnvSecret("JWT_SECRET", "your-secret-key-change-in-production")
-	fromAddress := getEnv("FROM_ADDRESS", "noreply@accountcenter.com")
+	emailProviderType := env.Get("EMAIL_PROVIDER", "smtp")
+	jwtSecret := env.GetSecret("JWT_SECRET", "your-secret-key-change-in-production")
+	fromAddress := env.Get("FROM_ADDRESS", "noreply@accountcenter.com")
 
 	var emailProvider provider.EmailProvider
 
 	switch emailProviderType {
 	case "sendgrid":
-		emailProvider = provider.NewSendGridProvider(getEnv("SENDGRID_API_KEY", ""), fromAddress)
+		emailProvider = provider.NewSendGridProvider(env.Get("SENDGRID_API_KEY", ""), fromAddress)
 	case "aws_ses":
 		sesProvider, sesErr := provider.NewSESProvider(
-			getEnv("AWS_REGION", "us-east-1"),
-			getEnv("AWS_ACCESS_KEY", ""),
-			getEnvSecret("AWS_SECRET_KEY", ""),
+			env.Get("AWS_REGION", "us-east-1"),
+			env.Get("AWS_ACCESS_KEY", ""),
+			env.GetSecret("AWS_SECRET_KEY", ""),
 			fromAddress,
 		)
 		if sesErr != nil {
@@ -133,10 +135,10 @@ func main() {
 		}
 	case "smtp":
 		emailProvider = provider.NewSMTPProvider(
-			getEnv("SMTP_HOST", "localhost"),
-			getEnv("SMTP_PORT", "587"),
-			getEnv("SMTP_USERNAME", ""),
-			getEnvSecret("SMTP_PASSWORD", ""),
+			env.Get("SMTP_HOST", "localhost"),
+			env.Get("SMTP_PORT", "587"),
+			env.Get("SMTP_USERNAME", ""),
+			env.GetSecret("SMTP_PASSWORD", ""),
 			fromAddress,
 		)
 	default:
@@ -148,28 +150,61 @@ func main() {
 	otpEmailService := service.NewOTPEmailService(redisClient, emailProvider, jwtSecret, fromAddress, svcCfg)
 	otpEmailHandler := handler.NewOTPEmailHandler(otpEmailService)
 
+	pushMode := getEnv("PUSH_MODE", "sandbox")
+
+	apnsCfg := provider.APNsConfig{
+		Mode:        pushMode,
+		Endpoint:    getEnv("APNS_ENDPOINT", ""),
+		BundleID:    getEnv("APNS_BUNDLE_ID", ""),
+		AccessToken: getEnvSecret("APNS_ACCESS_TOKEN", ""),
+	}
+	if err := apnsCfg.ValidateProduction(); err != nil {
+		logger.Error("invalid apns production push config", "error", err)
+		os.Exit(1)
+	}
+
+	fcmCfg := provider.FCMConfig{
+		Mode:        pushMode,
+		Endpoint:    getEnv("FCM_ENDPOINT", ""),
+		ProjectID:   getEnv("FCM_PROJECT_ID", ""),
+		AccessToken: getEnvSecret("FCM_ACCESS_TOKEN", ""),
+	}
+	if err := fcmCfg.ValidateProduction(); err != nil {
+		logger.Error("invalid fcm production push config", "error", err)
+		os.Exit(1)
+	}
+
+	hmsCfg := provider.HMSConfig{
+		Mode:        pushMode,
+		Endpoint:    getEnv("HMS_ENDPOINT", ""),
+		AppID:       getEnv("HMS_APP_ID", ""),
+		AccessToken: getEnvSecret("HMS_ACCESS_TOKEN", ""),
+	}
+	if err := hmsCfg.ValidateProduction(); err != nil {
+		logger.Error("invalid hms production push config", "error", err)
+		os.Exit(1)
+	}
+
 	pushRegistry := provider.NewPushProviderRegistry()
-	pushRegistry.Register(provider.NewAPNsProvider(provider.APNsConfig{
-		CertificatePath: getEnv("APNS_CERTIFICATE_PATH", ""),
-		KeyPath:         getEnv("APNS_KEY_PATH", ""),
-		BundleID:        getEnv("APNS_BUNDLE_ID", ""),
-		Production:      getEnv("APNS_PRODUCTION", "false") == "true",
-	}))
-	pushRegistry.Register(provider.NewFCMProvider(provider.FCMConfig{
-		ServerKey: getEnv("FCM_SERVER_KEY", ""),
-		ProjectID: getEnv("FCM_PROJECT_ID", ""),
-	}))
-	pushRegistry.Register(provider.NewHMSProvider(provider.HMSConfig{
-		AppID:     getEnv("HMS_APP_ID", ""),
-		AppSecret: getEnvSecret("HMS_APP_SECRET", ""),
-	}))
+	pushRegistry.Register(provider.NewAPNsProvider(apnsCfg))
+	pushRegistry.Register(provider.NewFCMProvider(fcmCfg))
+	pushRegistry.Register(provider.NewHMSProvider(hmsCfg))
 	logger.Info("push providers registered", "providers", pushRegistry.List())
 
 	pushService := service.NewPushService(redisClient, pushRegistry)
 	pushHandler := handler.NewPushHandler(pushService)
 	deviceHandler := handler.NewDeviceHandler(pushService)
 
-	wechatTemplateSvc := service.NewWeChatTemplateService(nil)
+	wechatTemplateSvc := service.NewWeChatTemplateService(
+		getEnv("WECHAT_APP_ID", ""),
+		getEnvSecret("WECHAT_APP_SECRET", ""),
+		map[string]string{
+			"subscription_expiring": getEnv("WECHAT_TPL_SUBSCRIPTION_EXPIRING", ""),
+			"payment_success":       getEnv("WECHAT_TPL_PAYMENT_SUCCESS", ""),
+			"referral_bonus":        getEnv("WECHAT_TPL_REFERRAL_BONUS", ""),
+			"tier_upgrade":          getEnv("WECHAT_TPL_TIER_UPGRADE", ""),
+		},
+	)
 	wechatTemplateHandler := handler.NewWeChatTemplateHandler(wechatTemplateSvc)
 
 	messageSvc := service.NewMessageService(nil)
@@ -192,7 +227,17 @@ func main() {
 		atomic.AddUint64(&durationCount, 1)
 	})
 
-	r.Any("/metrics", func(c *gin.Context) {
+	metricsAuth := func(c *gin.Context) {
+		token := c.GetHeader("X-Internal-Token")
+		expected := env.Get("INTERNAL_API_TOKEN", "")
+		if expected == "" || subtle.ConstantTimeCompare([]byte(token), []byte(expected)) != 1 {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+	r.Any("/metrics", metricsAuth, func(c *gin.Context) {
 		var buf bytes.Buffer
 		fmt.Fprintf(&buf, "# HELP http_requests_total Total HTTP requests\n")
 		fmt.Fprintf(&buf, "# TYPE http_requests_total counter\n")
@@ -211,7 +256,8 @@ func main() {
 
 	r.Any("/health", func(c *gin.Context) {
 		result := compositeHealth.Check(c.Request.Context())
-		resp := healthpkg.BuildResponse(result.Checks)
+		showDetails := env.Get("HEALTH_SHOW_DETAILS", "false") == "true"
+		resp := healthpkg.BuildResponseConditional(result.Checks, showDetails)
 		statusCode := 200
 		if result.Status == healthpkg.StatusDown {
 			statusCode = 503

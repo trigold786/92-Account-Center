@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/subtle"
 	"database/sql"
 	"fmt"
 	"log/slog"
@@ -22,6 +23,7 @@ import (
 	"github.com/trigold786/92-Account-Center/data-product-service/internal/service"
 	"github.com/trigold786/92-Account-Center/data-product-service/internal/svcconfig"
 	"github.com/trigold786/92-Account-Center/pkg/config"
+	"github.com/trigold786/92-Account-Center/pkg/env"
 	healthpkg "github.com/trigold786/92-Account-Center/pkg/health"
 	"github.com/trigold786/92-Account-Center/pkg/logging"
 )
@@ -36,19 +38,23 @@ var logger = slog.Default()
 
 func main() {
 	logger = logging.NewLogger("data-product-service")
-	dbHost := getEnv("DB_HOST", "localhost")
-	dbPort := getEnv("DB_PORT", "5432")
-	dbUser := getEnv("DB_USER", "postgres")
-	dbPassword := getEnvSecret("DB_PASSWORD", "postgres")
-	dbName := getEnv("DB_NAME", "account_center")
+	dbHost := env.Get("DB_HOST", "localhost")
+	dbPort := env.Get("DB_PORT", "5432")
+	dbUser := env.Get("DB_USER", "postgres")
+	dbPassword := env.GetSecret("DB_PASSWORD", "postgres")
+	dbName := env.Get("DB_NAME", "account_center")
+	sslmode := env.Get("DB_SSLMODE", "disable")
 
-	dsn := "host=" + dbHost + " port=" + dbPort + " user=" + dbUser + " password=" + dbPassword + " dbname=" + dbName + " sslmode=disable"
+	dsn := "host=" + dbHost + " port=" + dbPort + " user=" + dbUser + " password=" + dbPassword + " dbname=" + dbName + " sslmode=" + sslmode
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		logger.Error("failed to connect to database", "error", err.Error())
 		os.Exit(1)
 	}
 	defer db.Close()
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(5 * time.Minute)
 	if err := db.Ping(); err != nil {
 		logger.Error("failed to ping database", "error", err.Error())
 		os.Exit(1)
@@ -56,7 +62,7 @@ func main() {
 	logger.Info("connected to database")
 
 	var replicaDB *sql.DB
-	readReplicaURL := getEnv("READ_REPLICA_URL", "")
+	readReplicaURL := env.Get("READ_REPLICA_URL", "")
 	if readReplicaURL != "" {
 		replicaDB, err = sql.Open("postgres", readReplicaURL)
 		if err != nil {
@@ -83,7 +89,7 @@ func main() {
 	}
 	compositeHealth := healthpkg.CompositeChecker{Checkers: healthCheckers}
 
-	configURL := getEnv("CONFIG_SERVICE_URL", "http://localhost:30315")
+	configURL := env.Get("CONFIG_SERVICE_URL", "http://localhost:30315")
 	configClient := config.NewClient(configURL)
 	svcCfg, err := svcconfig.Load(configClient)
 	if err != nil {
@@ -174,7 +180,17 @@ func main() {
 		experimentGroup.GET("/:id/results", abTestHandler.GetResults)
 	}
 
-	r.Any("/metrics", func(c *gin.Context) {
+	metricsAuth := func(c *gin.Context) {
+		token := c.GetHeader("X-Internal-Token")
+		expected := env.Get("INTERNAL_API_TOKEN", "")
+		if expected == "" || subtle.ConstantTimeCompare([]byte(token), []byte(expected)) != 1 {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+	r.Any("/metrics", metricsAuth, func(c *gin.Context) {
 		var buf bytes.Buffer
 		fmt.Fprintf(&buf, "# HELP http_requests_total Total HTTP requests\n")
 		fmt.Fprintf(&buf, "# TYPE http_requests_total counter\n")
@@ -193,7 +209,8 @@ func main() {
 
 	r.Any("/health", func(c *gin.Context) {
 		result := compositeHealth.Check(c.Request.Context())
-		resp := healthpkg.BuildResponse(result.Checks)
+		showDetails := env.Get("HEALTH_SHOW_DETAILS", "false") == "true"
+		resp := healthpkg.BuildResponseConditional(result.Checks, showDetails)
 		statusCode := 200
 		if result.Status == healthpkg.StatusDown {
 			statusCode = 503
@@ -201,7 +218,7 @@ func main() {
 		c.JSON(statusCode, resp)
 	})
 
-	port := getEnv("PORT", "30314")
+	port := env.Get("PORT", "30314")
 	srv := &http.Server{Addr: ":" + port, Handler: r}
 
 	go func() {
@@ -222,17 +239,4 @@ func main() {
 	}
 }
 
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
 
-func getEnvSecret(key, defaultValue string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	logger.Warn("environment variable not set, using insecure default", "key", key)
-	return defaultValue
-}

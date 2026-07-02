@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -63,14 +64,27 @@ func (h *SessionHandler) ValidateSession(c *gin.Context) {
 }
 
 func (h *SessionHandler) GetUserSessions(c *gin.Context) {
-	userIDStr := c.Param("user_id")
-	var userID int64
-	if _, err := parseUserID(userIDStr, &userID); err != nil {
+	targetUserID, err := strconv.ParseInt(c.Param("user_id"), 10, 64)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user_id"})
 		return
 	}
 
-	sessions, err := h.sessionService.GetUserSessions(c.Request.Context(), userID)
+	requestUserID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	if requestUserID.(int64) != targetUserID {
+		roles, _ := c.Get("roles")
+		roleList, ok := roles.([]string)
+		if !ok || !containsAdminRole(roleList) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+			return
+		}
+	}
+
+	sessions, err := h.sessionService.GetUserSessions(c.Request.Context(), targetUserID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
@@ -105,12 +119,33 @@ func (h *SessionHandler) InvalidateSession(c *gin.Context) {
 		return
 	}
 
-	err := h.sessionService.InvalidateSession(c.Request.Context(), req.SessionID)
+	requestUserID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	sessionInfo, err := h.sessionService.ValidateSession(c.Request.Context(), req.SessionID)
 	if err != nil {
-		if err == service.ErrSessionNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		if err == service.ErrSessionNotFound || err == service.ErrSessionExpired {
+			c.JSON(http.StatusNotFound, gin.H{"error": "session not found"})
 			return
 		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+		return
+	}
+
+	if sessionInfo.UserID != requestUserID.(int64) {
+		roles, _ := c.Get("roles")
+		roleList, ok := roles.([]string)
+		if !ok || !containsAdminRole(roleList) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+			return
+		}
+	}
+
+	err = h.sessionService.InvalidateSession(c.Request.Context(), req.SessionID)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
@@ -123,6 +158,21 @@ func (h *SessionHandler) InvalidateAllUserSessions(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
+	}
+
+	requestUserID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	if req.UserID != requestUserID.(int64) {
+		roles, _ := c.Get("roles")
+		roleList, ok := roles.([]string)
+		if !ok || !containsAdminRole(roleList) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+			return
+		}
 	}
 
 	err := h.sessionService.InvalidateAllUserSessions(c.Request.Context(), req.UserID)
@@ -169,4 +219,13 @@ func parseUserID(s string, userID *int64) (bool, error) {
 	}
 	*userID = id
 	return true, nil
+}
+
+func containsAdminRole(roles []string) bool {
+	for _, role := range roles {
+		if role == "admin" || role == "superadmin" {
+			return true
+		}
+	}
+	return false
 }
