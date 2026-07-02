@@ -2,7 +2,10 @@ package repository
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/trigold786/92-Account-Center/account-service/internal/model"
@@ -25,6 +28,8 @@ type UserRepository interface {
 	UpdatePhone(ctx context.Context, id int64, phone string) error
 	UpdateIdentityTier(ctx context.Context, userID int64, tier int) error
 	GetIdentityTier(ctx context.Context, userID int64) (int, error)
+	WriteDeletionAudit(ctx context.Context, userID int64, details map[string]interface{}) error
+	AnonymizeEnterprisePII(ctx context.Context, userID int64) error
 }
 
 // userRepository implements UserRepository using PostgreSQL.
@@ -285,4 +290,29 @@ func (r *userRepository) GetExpiredDeletions(ctx context.Context) ([]model.User,
 		users = append(users, u)
 	}
 	return users, rows.Err()
+}
+
+func (r *userRepository) WriteDeletionAudit(ctx context.Context, userID int64, details map[string]interface{}) error {
+	logID := fmt.Sprintf("deletion_%d_%d", userID, time.Now().UnixNano())
+	detailsJSON, _ := json.Marshal(details)
+	hash := fmt.Sprintf("%x", sha256.Sum256(detailsJSON))
+	_, err := r.db.ExecContext(ctx,
+		`INSERT INTO audit_logs (log_id, user_id, event_time, action_type, target_resource, result, details, sm3_hash)
+		 VALUES ($1, $2, NOW(), 'account_deletion', $3, 'success', $4, $5)`,
+		logID, userID, fmt.Sprintf("user:%d", userID), detailsJSON, hash,
+	)
+	return err
+}
+
+func (r *userRepository) AnonymizeEnterprisePII(ctx context.Context, userID int64) error {
+	query := `
+		UPDATE enterprises SET
+			legal_person_name = 'DELETED_' || user_id::text,
+			legal_person_id_number = 'DELETED_' || user_id::text,
+			bank_account_number = 'DELETED_' || user_id::text,
+			unified_social_credit_code = 'DELETED_' || user_id::text,
+			updated_at = NOW()
+		WHERE user_id = $1::text::uuid`
+	_, err := r.db.ExecContext(ctx, query, userID)
+	return err
 }

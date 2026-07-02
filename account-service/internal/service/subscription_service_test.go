@@ -38,6 +38,14 @@ func (m *mockSubscriptionRepo) GetByUserID(ctx context.Context, userID int64) ([
 	return args.Get(0).([]model.Subscription), args.Error(1)
 }
 
+func (m *mockSubscriptionRepo) GetByOrderID(ctx context.Context, orderID string) (*model.Subscription, error) {
+	args := m.Called(ctx, orderID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*model.Subscription), args.Error(1)
+}
+
 func (m *mockSubscriptionRepo) UpdateStatus(ctx context.Context, id int64, status string) error {
 	return m.Called(ctx, id, status).Error(0)
 }
@@ -56,6 +64,18 @@ func (m *mockSubscriptionRepo) FindExpired(ctx context.Context) ([]model.Subscri
 
 type mockEntitlementService struct {
 	mock.Mock
+}
+
+type mockPaymentVerifier struct {
+	mock.Mock
+}
+
+func (m *mockPaymentVerifier) VerifyPaidOrder(ctx context.Context, orderID string, userID int64, amount float64) (*PaidOrder, error) {
+	args := m.Called(ctx, orderID, userID, amount)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*PaidOrder), args.Error(1)
 }
 
 func (m *mockEntitlementService) GetUserEntitlements(ctx context.Context, userID int64) ([]model.Entitlement, error) {
@@ -78,6 +98,10 @@ func (m *mockEntitlementService) GrantEntitlements(ctx context.Context, userID i
 	return m.Called(ctx, userID, tierLevel).Error(0)
 }
 
+func (m *mockEntitlementService) DeleteUserEntitlements(ctx context.Context, userID int64) error {
+	return m.Called(ctx, userID).Error(0)
+}
+
 var subTestCfg = &svcconfig.AccountConfig{
 	DeletionFreezeDays:          7,
 	SubscriptionDefaultDuration: 720 * time.Hour,
@@ -86,6 +110,22 @@ var subTestCfg = &svcconfig.AccountConfig{
 
 func newTestSubService(subRepo repository.SubscriptionRepository, userRepo repository.UserRepository, entSvc EntitlementService) SubscriptionService {
 	return NewSubscriptionService(subRepo, userRepo, entSvc, subTestCfg)
+}
+
+func newTestSubServiceWithVerifier(subRepo repository.SubscriptionRepository, userRepo repository.UserRepository, entSvc EntitlementService, verifier PaymentOrderVerifier) SubscriptionService {
+	return NewSubscriptionServiceWithPaymentVerifier(subRepo, userRepo, entSvc, subTestCfg, verifier)
+}
+
+func newPaidOrderVerifier(orderID string, userID int64, amount float64, paymentMethod string) *mockPaymentVerifier {
+	verifier := new(mockPaymentVerifier)
+	verifier.On("VerifyPaidOrder", mock.Anything, orderID, userID, amount).Return(&PaidOrder{
+		OrderID:       orderID,
+		UserID:        userID,
+		Amount:        amount,
+		Status:        "paid",
+		PaymentMethod: paymentMethod,
+	}, nil)
+	return verifier
 }
 
 func TestSubscriptionService_Interface(t *testing.T) {
@@ -102,6 +142,35 @@ func TestSubscriptionService_Purchase_Success(t *testing.T) {
 	subRepo.On("Create", mock.Anything, mock.AnythingOfType("*model.Subscription")).Return(nil)
 	userRepo.On("UpdateIdentityTier", mock.Anything, int64(1), 2).Return(nil)
 	entSvc.On("GrantEntitlements", mock.Anything, int64(1), 2).Return(nil)
+	verifier := newPaidOrderVerifier("1001", 1, 99.9, "alipay")
+
+	svc := newTestSubServiceWithVerifier(subRepo, userRepo, entSvc, verifier)
+	sub, err := svc.PurchaseSubscription(context.Background(), &model.PurchaseRequest{
+		UserID:        "1",
+		TierLevel:     2,
+		Price:         99.9,
+		PaymentMethod: "alipay",
+		OrderID:       "1001",
+	})
+
+	assert.NoError(t, err)
+	assert.NotNil(t, sub)
+	assert.Equal(t, int64(1), sub.UserID)
+	assert.Equal(t, 2, sub.TierLevel)
+	assert.Equal(t, "ACTIVE", sub.Status)
+	assert.Equal(t, 99.9, sub.Price)
+	assert.Equal(t, "1001", sub.OrderID)
+	subRepo.AssertExpectations(t)
+	userRepo.AssertExpectations(t)
+	entSvc.AssertExpectations(t)
+}
+
+func TestSubscriptionService_Purchase_RequiresPaidOrder(t *testing.T) {
+	subRepo := new(mockSubscriptionRepo)
+	userRepo := new(mockUserRepo)
+	entSvc := new(mockEntitlementService)
+
+	subRepo.On("GetActiveByUserID", mock.Anything, int64(1)).Return(nil, nil)
 
 	svc := newTestSubService(subRepo, userRepo, entSvc)
 	sub, err := svc.PurchaseSubscription(context.Background(), &model.PurchaseRequest{
@@ -111,13 +180,59 @@ func TestSubscriptionService_Purchase_Success(t *testing.T) {
 		PaymentMethod: "alipay",
 	})
 
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "paid order")
+	}
+	assert.Nil(t, sub)
+	subRepo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
+	userRepo.AssertNotCalled(t, "UpdateIdentityTier", mock.Anything, mock.Anything, mock.Anything)
+	entSvc.AssertNotCalled(t, "GrantEntitlements", mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestSubscriptionService_ActivatePaidOrder_IsIdempotentByOrderID(t *testing.T) {
+	subRepo := new(mockSubscriptionRepo)
+	userRepo := new(mockUserRepo)
+	entSvc := new(mockEntitlementService)
+
+	existing := &model.Subscription{ID: 88, UserID: 1, TierLevel: 2, Status: "ACTIVE", OrderID: "1001"}
+	subRepo.On("GetByOrderID", mock.Anything, "1001").Return(existing, nil)
+
+	svc := newTestSubServiceWithVerifier(subRepo, userRepo, entSvc, new(mockPaymentVerifier))
+	sub, err := svc.ActivatePaidOrderSubscription(context.Background(), &model.ActivatePaidOrderRequest{
+		UserID:        1,
+		OrderID:       "1001",
+		TierLevel:     2,
+		Price:         99.9,
+		PaymentMethod: "wechat",
+	})
+
 	assert.NoError(t, err)
-	assert.NotNil(t, sub)
-	assert.Equal(t, int64(1), sub.UserID)
-	assert.Equal(t, 2, sub.TierLevel)
-	assert.Equal(t, "ACTIVE", sub.Status)
-	assert.Equal(t, 99.9, sub.Price)
-	assert.Contains(t, sub.OrderID, "ORD-")
+	assert.Equal(t, existing, sub)
+	subRepo.AssertExpectations(t)
+	subRepo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
+	userRepo.AssertNotCalled(t, "UpdateIdentityTier", mock.Anything, mock.Anything, mock.Anything)
+	entSvc.AssertNotCalled(t, "GrantEntitlements", mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestSubscriptionService_CancelRefundedOrder_CancelsSubscriptionAndDeletesEntitlements(t *testing.T) {
+	subRepo := new(mockSubscriptionRepo)
+	userRepo := new(mockUserRepo)
+	entSvc := new(mockEntitlementService)
+
+	sub := &model.Subscription{ID: 55, UserID: 7, TierLevel: 2, Status: "ACTIVE", OrderID: "102"}
+	subRepo.On("GetByOrderID", mock.Anything, "102").Return(sub, nil)
+	subRepo.On("UpdateStatus", mock.Anything, int64(55), "REFUNDED").Return(nil)
+	userRepo.On("UpdateIdentityTier", mock.Anything, int64(7), 0).Return(nil)
+	entSvc.On("DeleteUserEntitlements", mock.Anything, int64(7)).Return(nil)
+
+	svc := newTestSubService(subRepo, userRepo, entSvc)
+	err := svc.CancelRefundedOrderSubscription(context.Background(), &model.CancelRefundedOrderRequest{
+		UserID:  7,
+		OrderID: "102",
+		Reason:  "refund approved",
+	})
+
+	assert.NoError(t, err)
 	subRepo.AssertExpectations(t)
 	userRepo.AssertExpectations(t)
 	entSvc.AssertExpectations(t)
@@ -168,12 +283,14 @@ func TestSubscriptionService_Purchase_CreateError(t *testing.T) {
 
 	subRepo.On("GetActiveByUserID", mock.Anything, int64(1)).Return(nil, nil)
 	subRepo.On("Create", mock.Anything, mock.AnythingOfType("*model.Subscription")).Return(errors.New("db error"))
+	verifier := newPaidOrderVerifier("1002", 1, 99.0, "alipay")
 
-	svc := newTestSubService(subRepo, userRepo, entSvc)
+	svc := newTestSubServiceWithVerifier(subRepo, userRepo, entSvc, verifier)
 	sub, err := svc.PurchaseSubscription(context.Background(), &model.PurchaseRequest{
 		UserID:    "1",
 		TierLevel: 2,
 		Price:     99.0,
+		OrderID:   "1002",
 	})
 
 	assert.Error(t, err)
@@ -190,12 +307,14 @@ func TestSubscriptionService_Purchase_UpdateTierError(t *testing.T) {
 	subRepo.On("GetActiveByUserID", mock.Anything, int64(1)).Return(nil, nil)
 	subRepo.On("Create", mock.Anything, mock.AnythingOfType("*model.Subscription")).Return(nil)
 	userRepo.On("UpdateIdentityTier", mock.Anything, int64(1), 2).Return(errors.New("tier update failed"))
+	verifier := newPaidOrderVerifier("1003", 1, 99.0, "wechat")
 
-	svc := newTestSubService(subRepo, userRepo, entSvc)
+	svc := newTestSubServiceWithVerifier(subRepo, userRepo, entSvc, verifier)
 	sub, err := svc.PurchaseSubscription(context.Background(), &model.PurchaseRequest{
 		UserID:    "1",
 		TierLevel: 2,
 		Price:     99.0,
+		OrderID:   "1003",
 	})
 
 	assert.Error(t, err)
@@ -214,12 +333,14 @@ func TestSubscriptionService_Purchase_GrantEntitlementsError(t *testing.T) {
 	subRepo.On("Create", mock.Anything, mock.AnythingOfType("*model.Subscription")).Return(nil)
 	userRepo.On("UpdateIdentityTier", mock.Anything, int64(1), 2).Return(nil)
 	entSvc.On("GrantEntitlements", mock.Anything, int64(1), 2).Return(errors.New("grant failed"))
+	verifier := newPaidOrderVerifier("1004", 1, 99.0, "wechat")
 
-	svc := newTestSubService(subRepo, userRepo, entSvc)
+	svc := newTestSubServiceWithVerifier(subRepo, userRepo, entSvc, verifier)
 	sub, err := svc.PurchaseSubscription(context.Background(), &model.PurchaseRequest{
 		UserID:    "1",
 		TierLevel: 2,
 		Price:     99.0,
+		OrderID:   "1004",
 	})
 
 	assert.Error(t, err)
@@ -649,12 +770,14 @@ func TestSubscriptionService_Purchase_SetsEndTimeFromConfig(t *testing.T) {
 	})).Return(nil)
 	userRepo.On("UpdateIdentityTier", mock.Anything, int64(5), 2).Return(nil)
 	entSvc.On("GrantEntitlements", mock.Anything, int64(5), 2).Return(nil)
+	verifier := newPaidOrderVerifier("1005", 5, 99.0, "alipay")
 
-	svc := newTestSubService(subRepo, userRepo, entSvc)
+	svc := newTestSubServiceWithVerifier(subRepo, userRepo, entSvc, verifier)
 	_, err := svc.PurchaseSubscription(context.Background(), &model.PurchaseRequest{
 		UserID:    "5",
 		TierLevel: 2,
 		Price:     99.0,
+		OrderID:   "1005",
 	})
 
 	assert.NoError(t, err)

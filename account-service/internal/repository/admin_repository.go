@@ -12,13 +12,15 @@ import (
 )
 
 type AdminRepository interface {
-	ListUsers(ctx context.Context, page, pageSize int, search string, status string, tier int) ([]model.User, int, error)
+	ListUsers(ctx context.Context, page, pageSize int, search string, status string, tier *int) ([]model.User, int, error)
 	GetUserDetail(ctx context.Context, userID int64) (*model.User, error)
 	UpdateUserStatus(ctx context.Context, userID int64, status string, reason string, operator string) error
 	AdjustIdentityTier(ctx context.Context, userID int64, tier int, reason string, operator string) error
 	InsertAuditLog(ctx context.Context, userID int64, action string, details string, operator string) error
 	GetAuditLog(ctx context.Context, userID int64, page, pageSize int) ([]model.AuditLogEntry, int, error)
 	EnsureAuditLogTable(ctx context.Context) error
+	ListPendingEnterprises(ctx context.Context) ([]model.EnterpriseKYC, error)
+	UpdateEnterpriseStatus(ctx context.Context, enterpriseID string, status string, reviewer string) error
 }
 
 type adminRepository struct {
@@ -43,7 +45,7 @@ func (r *adminRepository) EnsureAuditLogTable(ctx context.Context) error {
 	return err
 }
 
-func (r *adminRepository) ListUsers(ctx context.Context, page, pageSize int, search string, status string, tier int) ([]model.User, int, error) {
+func (r *adminRepository) ListUsers(ctx context.Context, page, pageSize int, search string, status string, tier *int) ([]model.User, int, error) {
 	var conditions []string
 	var args []interface{}
 	argIdx := 1
@@ -58,9 +60,9 @@ func (r *adminRepository) ListUsers(ctx context.Context, page, pageSize int, sea
 		args = append(args, status)
 		argIdx++
 	}
-	if tier >= 0 {
+	if tier != nil {
 		conditions = append(conditions, fmt.Sprintf("identity_tier = $%d", argIdx))
-		args = append(args, tier)
+		args = append(args, *tier)
 		argIdx++
 	}
 
@@ -205,4 +207,45 @@ func (r *adminRepository) GetAuditLog(ctx context.Context, userID int64, page, p
 		entries = append(entries, e)
 	}
 	return entries, total, rows.Err()
+}
+
+func (r *adminRepository) ListPendingEnterprises(ctx context.Context) ([]model.EnterpriseKYC, error) {
+	query := `SELECT enterprise_id, user_id, company_name, unified_social_credit_code,
+		legal_person_name, verification_status, created_at
+		FROM enterprises
+		WHERE verification_status = 'pending'
+		ORDER BY created_at ASC`
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		slog.Error("list pending enterprises failed", "error", err.Error())
+		return nil, err
+	}
+	defer rows.Close()
+
+	var entries []model.EnterpriseKYC
+	for rows.Next() {
+		var e model.EnterpriseKYC
+		if err := rows.Scan(
+			&e.EnterpriseID, &e.UserID, &e.CompanyName, &e.UnifiedSocialCreditCode,
+			&e.LegalPersonName, &e.VerificationStatus, &e.CreatedAt,
+		); err != nil {
+			slog.Error("scan pending enterprise failed", "error", err.Error())
+			return nil, err
+		}
+		entries = append(entries, e)
+	}
+	return entries, rows.Err()
+}
+
+func (r *adminRepository) UpdateEnterpriseStatus(ctx context.Context, enterpriseID string, status string, reviewer string) error {
+	query := `UPDATE enterprises SET verification_status = $1, updated_at = NOW() WHERE enterprise_id = $2::uuid`
+	result, err := r.db.ExecContext(ctx, query, status, enterpriseID)
+	if err != nil {
+		return err
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }

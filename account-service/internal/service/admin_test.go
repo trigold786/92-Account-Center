@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"testing"
 
@@ -15,7 +16,7 @@ type mockAdminRepo struct {
 	mock.Mock
 }
 
-func (m *mockAdminRepo) ListUsers(ctx context.Context, page, pageSize int, search string, status string, tier int) ([]model.User, int, error) {
+func (m *mockAdminRepo) ListUsers(ctx context.Context, page, pageSize int, search string, status string, tier *int) ([]model.User, int, error) {
 	args := m.Called(ctx, page, pageSize, search, status, tier)
 	if args.Get(0) == nil {
 		return nil, args.Int(1), args.Error(2)
@@ -55,6 +56,18 @@ func (m *mockAdminRepo) EnsureAuditLogTable(ctx context.Context) error {
 	return m.Called(ctx).Error(0)
 }
 
+func (m *mockAdminRepo) ListPendingEnterprises(ctx context.Context) ([]model.EnterpriseKYC, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]model.EnterpriseKYC), args.Error(1)
+}
+
+func (m *mockAdminRepo) UpdateEnterpriseStatus(ctx context.Context, enterpriseID string, status string, reviewer string) error {
+	return m.Called(ctx, enterpriseID, status, reviewer).Error(0)
+}
+
 type mockCreditClient struct {
 	mock.Mock
 }
@@ -72,7 +85,7 @@ func TestAdmin_ListUsers_Success(t *testing.T) {
 		{ID: 1, PhoneNumber: "13800138000", AccountID: "user1", Status: "active"},
 		{ID: 2, PhoneNumber: "13900139000", AccountID: "user2", Status: "active"},
 	}
-	repo.On("ListUsers", mock.Anything, 1, 20, "", "", 0).Return(users, 2, nil)
+	repo.On("ListUsers", mock.Anything, 1, 20, "", "", (*int)(nil)).Return(users, 2, nil)
 
 	resp, err := svc.ListUsers(context.Background(), &model.AdminUserListRequest{Page: 1, PageSize: 20})
 	assert.NoError(t, err)
@@ -86,7 +99,7 @@ func TestAdmin_ListUsers_Empty(t *testing.T) {
 	credit := new(mockCreditClient)
 	svc := NewAdminService(repo, credit)
 
-	repo.On("ListUsers", mock.Anything, 1, 20, "", "", 0).Return([]model.User(nil), 0, nil)
+	repo.On("ListUsers", mock.Anything, 1, 20, "", "", (*int)(nil)).Return([]model.User(nil), 0, nil)
 
 	resp, err := svc.ListUsers(context.Background(), &model.AdminUserListRequest{Page: 1, PageSize: 20})
 	assert.NoError(t, err)
@@ -102,7 +115,7 @@ func TestAdmin_ListUsers_Pagination(t *testing.T) {
 	svc := NewAdminService(repo, credit)
 
 	users := []model.User{{ID: 3, AccountID: "user3"}}
-	repo.On("ListUsers", mock.Anything, 2, 10, "", "", 0).Return(users, 15, nil)
+	repo.On("ListUsers", mock.Anything, 2, 10, "", "", (*int)(nil)).Return(users, 15, nil)
 
 	resp, err := svc.ListUsers(context.Background(), &model.AdminUserListRequest{Page: 2, PageSize: 10})
 	assert.NoError(t, err)
@@ -118,9 +131,24 @@ func TestAdmin_ListUsers_SearchFilter(t *testing.T) {
 	svc := NewAdminService(repo, credit)
 
 	users := []model.User{{ID: 1, PhoneNumber: "13800138000"}}
-	repo.On("ListUsers", mock.Anything, 1, 20, "138", "active", 0).Return(users, 1, nil)
+	repo.On("ListUsers", mock.Anything, 1, 20, "138", "active", (*int)(nil)).Return(users, 1, nil)
 
 	resp, err := svc.ListUsers(context.Background(), &model.AdminUserListRequest{Page: 1, PageSize: 20, Search: "138", Status: "active"})
+	assert.NoError(t, err)
+	assert.Equal(t, 1, resp.Total)
+	repo.AssertExpectations(t)
+}
+
+func TestAdmin_ListUsers_TierFilter(t *testing.T) {
+	repo := new(mockAdminRepo)
+	credit := new(mockCreditClient)
+	svc := NewAdminService(repo, credit)
+
+	tier := 3
+	users := []model.User{{ID: 1, IdentityTier: 3}}
+	repo.On("ListUsers", mock.Anything, 1, 20, "", "", &tier).Return(users, 1, nil)
+
+	resp, err := svc.ListUsers(context.Background(), &model.AdminUserListRequest{Page: 1, PageSize: 20, Tier: &tier})
 	assert.NoError(t, err)
 	assert.Equal(t, 1, resp.Total)
 	repo.AssertExpectations(t)
@@ -279,5 +307,74 @@ func TestAdmin_GetAuditLog_Empty(t *testing.T) {
 	assert.Equal(t, 0, total)
 	assert.NotNil(t, result)
 	assert.Len(t, result, 0)
+	repo.AssertExpectations(t)
+}
+
+func TestAdmin_ListPendingKYC_Success(t *testing.T) {
+	repo := new(mockAdminRepo)
+	credit := new(mockCreditClient)
+	svc := NewAdminService(repo, credit)
+
+	entries := []model.EnterpriseKYC{
+		{EnterpriseID: "11111111-1111-1111-1111-111111111111", CompanyName: "Acme", VerificationStatus: "pending"},
+	}
+	repo.On("ListPendingEnterprises", mock.Anything).Return(entries, nil)
+
+	result, err := svc.ListPendingKYC(context.Background())
+	assert.NoError(t, err)
+	assert.Len(t, result, 1)
+	assert.Equal(t, "Acme", result[0].CompanyName)
+	repo.AssertExpectations(t)
+}
+
+func TestAdmin_ListPendingKYC_Empty(t *testing.T) {
+	repo := new(mockAdminRepo)
+	credit := new(mockCreditClient)
+	svc := NewAdminService(repo, credit)
+
+	repo.On("ListPendingEnterprises", mock.Anything).Return([]model.EnterpriseKYC(nil), nil)
+
+	result, err := svc.ListPendingKYC(context.Background())
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Len(t, result, 0)
+	repo.AssertExpectations(t)
+}
+
+func TestAdmin_ReviewKYC_Approve_Success(t *testing.T) {
+	repo := new(mockAdminRepo)
+	credit := new(mockCreditClient)
+	svc := NewAdminService(repo, credit)
+
+	repo.On("UpdateEnterpriseStatus", mock.Anything, "11111111-1111-1111-1111-111111111111", "approved", "admin_1").Return(nil)
+	repo.On("InsertAuditLog", mock.Anything, int64(0), "kyc_review", mock.AnythingOfType("string"), "admin_1").Return(nil)
+
+	err := svc.ReviewKYC(context.Background(), "11111111-1111-1111-1111-111111111111", "approve", "admin_1")
+	assert.NoError(t, err)
+	repo.AssertExpectations(t)
+}
+
+func TestAdmin_ReviewKYC_Reject_Success(t *testing.T) {
+	repo := new(mockAdminRepo)
+	credit := new(mockCreditClient)
+	svc := NewAdminService(repo, credit)
+
+	repo.On("UpdateEnterpriseStatus", mock.Anything, "22222222-2222-2222-2222-222222222222", "rejected", "admin_1").Return(nil)
+	repo.On("InsertAuditLog", mock.Anything, int64(0), "kyc_review", mock.AnythingOfType("string"), "admin_1").Return(nil)
+
+	err := svc.ReviewKYC(context.Background(), "22222222-2222-2222-2222-222222222222", "reject", "admin_1")
+	assert.NoError(t, err)
+	repo.AssertExpectations(t)
+}
+
+func TestAdmin_ReviewKYC_NotFound(t *testing.T) {
+	repo := new(mockAdminRepo)
+	credit := new(mockCreditClient)
+	svc := NewAdminService(repo, credit)
+
+	repo.On("UpdateEnterpriseStatus", mock.Anything, "missing", "approved", "admin_1").Return(sql.ErrNoRows)
+
+	err := svc.ReviewKYC(context.Background(), "missing", "approve", "admin_1")
+	assert.Equal(t, ErrEnterpriseNotFound, err)
 	repo.AssertExpectations(t)
 }

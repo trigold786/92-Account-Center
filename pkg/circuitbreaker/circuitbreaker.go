@@ -148,3 +148,49 @@ func (cb *CircuitBreaker) FailureRate() float64 {
 	}
 	return float64(cb.totalFailure.Load()) / float64(total)
 }
+
+func (cb *CircuitBreaker) Allow() bool {
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+	switch cb.state {
+	case StateOpen:
+		if time.Since(cb.lastStateChange) >= cb.timeout {
+			cb.setState(StateHalfOpen)
+			cb.halfOpenSuccess = 0
+			return true
+		}
+		return false
+	case StateHalfOpen:
+		if cb.halfOpenMax > 0 && cb.halfOpenSuccess >= cb.halfOpenMax {
+			return false
+		}
+		return true
+	default:
+		return true
+	}
+}
+
+func (cb *CircuitBreaker) RecordSuccess() {
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+	cb.totalSuccess.Add(1)
+	if cb.state == StateHalfOpen {
+		cb.halfOpenSuccess++
+		if cb.halfOpenMax > 0 && cb.halfOpenSuccess >= cb.halfOpenMax {
+			cb.failureCount = 0
+			cb.setState(StateClosed)
+		}
+	} else {
+		cb.failureCount = 0
+	}
+}
+
+func (cb *CircuitBreaker) RecordFailure() {
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+	cb.failureCount++
+	cb.totalFailure.Add(1)
+	if cb.state == StateHalfOpen || cb.failureCount >= cb.maxFailures {
+		cb.setState(StateOpen)
+	}
+}

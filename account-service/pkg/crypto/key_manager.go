@@ -19,14 +19,14 @@ type keyManager struct {
 	currentKey []byte
 }
 
-func NewKeyManager() KeyManager {
+func NewKeyManager() (KeyManager, error) {
 	km := &keyManager{}
 	key, err := km.GenerateKey()
 	if err != nil {
-		panic("failed to generate initial encryption key: " + err.Error())
+		return nil, fmt.Errorf("failed to generate initial encryption key: %w", err)
 	}
 	km.currentKey = key
-	return km
+	return km, nil
 }
 
 func (km *keyManager) GenerateKey() ([]byte, error) {

@@ -95,6 +95,12 @@ func (m *mockUserRepo) GetIdentityTier(ctx context.Context, userID int64) (int, 
 	args := m.Called(ctx, userID)
 	return args.Int(0), args.Error(1)
 }
+func (m *mockUserRepo) WriteDeletionAudit(ctx context.Context, userID int64, details map[string]interface{}) error {
+	return m.Called(ctx, userID, details).Error(0)
+}
+func (m *mockUserRepo) AnonymizeEnterprisePII(ctx context.Context, userID int64) error {
+	return m.Called(ctx, userID).Error(0)
+}
 
 type mockEntitlementRepo struct {
 	mock.Mock
@@ -154,8 +160,12 @@ func TestProcessExpiredDeletions_WithExpired(t *testing.T) {
 	userRepo.On("GetExpiredDeletions", mock.Anything).Return(users, nil)
 	userRepo.On("AnonymizeUser", mock.Anything, int64(1)).Return(nil)
 	userRepo.On("AnonymizeUser", mock.Anything, int64(2)).Return(nil)
+	userRepo.On("AnonymizeEnterprisePII", mock.Anything, int64(1)).Return(nil)
+	userRepo.On("AnonymizeEnterprisePII", mock.Anything, int64(2)).Return(nil)
 	entRepo.On("DeleteByUserID", mock.Anything, int64(1)).Return(nil)
 	entRepo.On("DeleteByUserID", mock.Anything, int64(2)).Return(nil)
+	userRepo.On("WriteDeletionAudit", mock.Anything, int64(1), mock.Anything).Return(nil)
+	userRepo.On("WriteDeletionAudit", mock.Anything, int64(2), mock.Anything).Return(nil)
 
 	svc := NewDeletionService(
 		userRepo,
@@ -179,7 +189,9 @@ func TestProcessExpiredDeletions_PartialFailure(t *testing.T) {
 	userRepo.On("GetExpiredDeletions", mock.Anything).Return(users, nil)
 	userRepo.On("AnonymizeUser", mock.Anything, int64(1)).Return(errors.New("db error"))
 	userRepo.On("AnonymizeUser", mock.Anything, int64(2)).Return(nil)
+	userRepo.On("AnonymizeEnterprisePII", mock.Anything, int64(2)).Return(nil)
 	entRepo.On("DeleteByUserID", mock.Anything, int64(2)).Return(nil)
+	userRepo.On("WriteDeletionAudit", mock.Anything, int64(2), mock.Anything).Return(nil)
 
 	svc := NewDeletionService(
 		userRepo,
@@ -216,4 +228,21 @@ func TestProcessExpiredDeletions_QueryError(t *testing.T) {
 func TestDeletionService_Interface(t *testing.T) {
 	var _ repository.UserRepository = (*mockUserRepo)(nil)
 	var _ repository.EntitlementRepository = (*mockEntitlementRepo)(nil)
+}
+
+func TestProcessExpiredDeletions_WritesAuditLog(t *testing.T) {
+	userRepo := new(mockUserRepo)
+	entRepo := new(mockEntitlementRepo)
+	users := []model.User{{ID: 42}}
+	userRepo.On("GetExpiredDeletions", mock.Anything).Return(users, nil)
+	userRepo.On("AnonymizeUser", mock.Anything, int64(42)).Return(nil)
+	userRepo.On("AnonymizeEnterprisePII", mock.Anything, int64(42)).Return(nil)
+	entRepo.On("DeleteByUserID", mock.Anything, int64(42)).Return(nil)
+	userRepo.On("WriteDeletionAudit", mock.Anything, int64(42), mock.Anything).Return(nil)
+
+	svc := NewDeletionService(userRepo, entRepo, (*redis.Client)(nil), testLogger())
+	count, err := svc.ProcessExpiredDeletions(context.Background())
+	assert.NoError(t, err)
+	assert.Equal(t, 1, count)
+	userRepo.AssertExpectations(t)
 }

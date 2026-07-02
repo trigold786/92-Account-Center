@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -11,6 +12,8 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	"golang.org/x/crypto/argon2"
 
 	"github.com/trigold786/92-Account-Center/account-service/internal/model"
 	"github.com/trigold786/92-Account-Center/account-service/internal/repository"
@@ -97,14 +100,16 @@ func (s *userService) Register(ctx context.Context, phoneNumber, accountID, pass
 		return nil, ErrAccountIDTaken
 	}
 
-	salt := generateSalt()
-	hashedPassword := hashPassword(password, salt)
+	passwordHash, err := hashPasswordArgon2id(password)
+	if err != nil {
+		return nil, err
+	}
 
 	now := time.Now()
 	user := &model.User{
 		PhoneNumber:  phoneNumber,
 		AccountID:    accountID,
-		PasswordHash: fmt.Sprintf("%s$%s", salt, hashedPassword),
+		PasswordHash: passwordHash,
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
@@ -134,9 +139,11 @@ func (s *userService) ChangePassword(ctx context.Context, userID string, req *mo
 		return errors.New("passwords do not match")
 	}
 
-	salt := generateSalt()
-	hashedPassword := hashPassword(req.NewPassword, salt)
-	user.PasswordHash = fmt.Sprintf("%s$%s", salt, hashedPassword)
+	passwordHash, err := hashPasswordArgon2id(req.NewPassword)
+	if err != nil {
+		return err
+	}
+	user.PasswordHash = passwordHash
 	user.UpdatedAt = time.Now()
 
 	return s.repo.Update(ctx, user)
@@ -177,19 +184,21 @@ func (s *userService) RequestAccountDeletion(ctx context.Context, userID string,
 		if req.VerificationCode == "" {
 			return nil, errors.New("verification code required")
 		}
-		if s.smsClient != nil && user.PhoneNumber != "" {
-			valid, err := s.smsClient.VerifyCode(user.PhoneNumber, req.VerificationCode)
-			if err != nil {
-				return nil, fmt.Errorf("verification failed: %w", err)
-			}
-			if !valid {
-				return nil, errors.New("invalid or expired verification code")
-			}
+		if s.smsClient == nil {
+			return nil, errors.New("SMS verification service is not configured")
+		}
+		if user.PhoneNumber == "" {
+			return nil, errors.New("no phone number on file for verification")
+		}
+		valid, err := s.smsClient.VerifyCode(user.PhoneNumber, req.VerificationCode)
+		if err != nil {
+			return nil, fmt.Errorf("verification failed: %w", err)
+		}
+		if !valid {
+			return nil, errors.New("invalid or expired verification code")
 		}
 	case "email_otp":
-		if req.VerificationCode == "" {
-			return nil, errors.New("verification code required")
-		}
+		return nil, errors.New("email OTP verification is not yet supported; please use SMS code")
 	default:
 		return nil, errors.New("invalid verification type")
 	}
@@ -303,7 +312,9 @@ func (s *userService) validatePasswordStrength(password string) error {
 
 func generateSalt() string {
 	salt := make([]byte, 16)
-	rand.Read(salt)
+	if _, err := rand.Read(salt); err != nil {
+		panic(fmt.Sprintf("generate salt: %v", err))
+	}
 	return hex.EncodeToString(salt)
 }
 
@@ -312,7 +323,33 @@ func hashPassword(password, salt string) string {
 	return crypto.SM3Hash(data)
 }
 
+func hashPasswordArgon2id(password string) (string, error) {
+	const (
+		argon2idTime    = 3
+		argon2idMemory  = 64 * 1024
+		argon2idThreads = 2
+		argon2idKeyLen  = 32
+		argon2idSaltLen = 16
+	)
+	salt := make([]byte, argon2idSaltLen)
+	if _, err := rand.Read(salt); err != nil {
+		return "", fmt.Errorf("generate argon2id salt: %w", err)
+	}
+	hash := argon2.IDKey([]byte(password), salt, argon2idTime, argon2idMemory, argon2idThreads, argon2idKeyLen)
+	return fmt.Sprintf("$argon2id$v=%d$m=%d,t=%d,p=%d$%s$%s",
+		argon2.Version,
+		argon2idMemory,
+		argon2idTime,
+		argon2idThreads,
+		base64.RawStdEncoding.EncodeToString(salt),
+		base64.RawStdEncoding.EncodeToString(hash),
+	), nil
+}
+
 func VerifyPassword(password, storedHash string) bool {
+	if strings.HasPrefix(storedHash, "$argon2id$") {
+		return verifyPasswordArgon2id(password, storedHash)
+	}
 	parts := splitStoredHash(storedHash)
 	if len(parts) != 2 {
 		return false
@@ -320,6 +357,32 @@ func VerifyPassword(password, storedHash string) bool {
 	salt, hash := parts[0], parts[1]
 	computedHash := hashPassword(password, salt)
 	return subtleCompare(hash, computedHash)
+}
+
+func verifyPasswordArgon2id(password, encodedHash string) bool {
+	parts := strings.Split(encodedHash, "$")
+	if len(parts) != 6 || parts[1] != "argon2id" {
+		return false
+	}
+	var version int
+	if _, err := fmt.Sscanf(parts[2], "v=%d", &version); err != nil || version != argon2.Version {
+		return false
+	}
+	var memory, timeCost uint32
+	var threads uint8
+	if _, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &memory, &timeCost, &threads); err != nil {
+		return false
+	}
+	salt, err := base64.RawStdEncoding.DecodeString(parts[4])
+	if err != nil {
+		return false
+	}
+	expectedHash, err := base64.RawStdEncoding.DecodeString(parts[5])
+	if err != nil {
+		return false
+	}
+	computedHash := argon2.IDKey([]byte(password), salt, timeCost, memory, threads, uint32(len(expectedHash)))
+	return subtleCompare(string(expectedHash), string(computedHash))
 }
 
 func splitStoredHash(stored string) []string {

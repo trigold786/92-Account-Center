@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,18 +13,18 @@ import (
 var testAccountConfig = &svcconfig.AccountConfig{DeletionFreezeDays: 7, SubscriptionDefaultDuration: 720 * time.Hour, EntitlementCacheTTL: 24 * time.Hour}
 
 type MockUserRepository struct {
-	users         map[string]*model.User
-	phoneIndex    map[string]int64
+	users          map[string]*model.User
+	phoneIndex     map[string]int64
 	accountIDIndex map[string]int64
-	nextID        int64
+	nextID         int64
 }
 
 func NewMockUserRepository() *MockUserRepository {
 	return &MockUserRepository{
-		users:         make(map[string]*model.User),
-		phoneIndex:    make(map[string]int64),
+		users:          make(map[string]*model.User),
+		phoneIndex:     make(map[string]int64),
 		accountIDIndex: make(map[string]int64),
-		nextID:        1,
+		nextID:         1,
 	}
 }
 
@@ -83,7 +84,7 @@ func (m *MockUserRepository) PermanentDelete(ctx context.Context, userID int64) 
 
 func (m *MockUserRepository) ExistsByEmail(ctx context.Context, email string) (bool, error) {
 	for _, u := range m.users {
-		if u.Email == email {
+		if u.Email != nil && *u.Email == email {
 			return true, nil
 		}
 	}
@@ -92,7 +93,7 @@ func (m *MockUserRepository) ExistsByEmail(ctx context.Context, email string) (b
 
 func (m *MockUserRepository) UpdateEmail(ctx context.Context, id int64, email string) error {
 	if u, ok := m.users[int64ToString(id)]; ok {
-		u.Email = email
+		u.Email = &email
 		return nil
 	}
 	return nil
@@ -131,6 +132,14 @@ func (m *MockUserRepository) GetExpiredDeletions(ctx context.Context) ([]model.U
 	return nil, nil
 }
 
+func (m *MockUserRepository) WriteDeletionAudit(ctx context.Context, userID int64, details map[string]interface{}) error {
+	return nil
+}
+
+func (m *MockUserRepository) AnonymizeEnterprisePII(ctx context.Context, userID int64) error {
+	return nil
+}
+
 func int64ToString(n int64) string {
 	return string(rune(n))
 }
@@ -148,6 +157,22 @@ func TestUserService_Register_Success(t *testing.T) {
 	}
 	if user.AccountID != "testuser" {
 		t.Errorf("expected accountID testuser, got %s", user.AccountID)
+	}
+}
+
+func TestUserService_Register_StoresArgon2idPasswordHash(t *testing.T) {
+	repo := NewMockUserRepository()
+	svc := NewUserService(repo, nil, testAccountConfig)
+
+	user, err := svc.Register(context.Background(), "13800138000", "testuser", "Password123!", true)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if !strings.HasPrefix(user.PasswordHash, "$argon2id$") {
+		t.Fatalf("expected argon2id password hash, got %q", user.PasswordHash)
+	}
+	if strings.Count(user.PasswordHash, "$") < 5 {
+		t.Fatalf("argon2id hash format is incomplete: %q", user.PasswordHash)
 	}
 }
 
@@ -237,5 +262,51 @@ func TestUserService_ValidatePassword(t *testing.T) {
 		if !tt.valid && err == nil {
 			t.Errorf("password '%s' should be invalid", tt.password)
 		}
+	}
+}
+
+func TestVerifyPassword_Argon2idRoundTrip(t *testing.T) {
+	password := "TestPass123!"
+	hash, err := hashPasswordArgon2id(password)
+	if err != nil {
+		t.Fatalf("hashPasswordArgon2id failed: %v", err)
+	}
+
+	if !strings.HasPrefix(hash, "$argon2id$") {
+		t.Fatalf("expected argon2id prefix, got %q", hash)
+	}
+
+	if !VerifyPassword(password, hash) {
+		t.Fatal("expected argon2id hash to verify against correct password")
+	}
+
+	if VerifyPassword("wrongpassword", hash) {
+		t.Fatal("expected argon2id hash to reject wrong password")
+	}
+}
+
+func TestVerifyPassword_SM3Legacy(t *testing.T) {
+	salt := "legacysalt"
+	password := "TestPass123!"
+	sm3Hash := salt + "$" + hashPassword(password, salt)
+
+	if strings.HasPrefix(sm3Hash, "$argon2id$") {
+		t.Fatalf("SM3 legacy hash should not have argon2id prefix: %q", sm3Hash)
+	}
+
+	if !VerifyPassword(password, sm3Hash) {
+		t.Fatal("expected SM3 legacy hash to verify against correct password")
+	}
+
+	if VerifyPassword("wrongpassword", sm3Hash) {
+		t.Fatal("expected SM3 legacy hash to reject wrong password")
+	}
+
+	if VerifyPassword(password, "malformedhash") {
+		t.Fatal("expected malformed hash (no separator) to fail verification")
+	}
+
+	if VerifyPassword(password, "") {
+		t.Fatal("expected empty hash to fail verification")
 	}
 }

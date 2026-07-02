@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"time"
 )
 
@@ -36,7 +37,9 @@ func (s *ExportService) ExportPersonalData(ctx context.Context, userID int64) (*
 
 func (s *ExportService) RequestExport(ctx context.Context, userID int64) (string, error) {
 	b := make([]byte, 16)
-	rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("generate export request id: %w", err)
+	}
 	reqID := hex.EncodeToString(b)
 	return reqID, nil
 }

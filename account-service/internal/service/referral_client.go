@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	circuitbreaker "github.com/trigold786/92-Account-Center/pkg/circuitbreaker"
 )
 
 type ReferralClient struct {
@@ -17,7 +19,7 @@ type ReferralClient struct {
 func NewReferralClient(baseURL string) *ReferralClient {
 	return &ReferralClient{
 		baseURL:    baseURL,
-		httpClient: &http.Client{Timeout: 5 * time.Second},
+		httpClient: circuitbreaker.WrapHTTPClient(&http.Client{Timeout: 5 * time.Second}, "credit-service-referral"),
 	}
 }
 

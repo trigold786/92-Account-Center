@@ -175,3 +175,46 @@ func (h *AdminHandler) GetAuditLog(c *gin.Context) {
 		"page_size": pageSize,
 	})
 }
+
+func (h *AdminHandler) ListPendingKYC(c *gin.Context) {
+	entries, err := h.adminService.ListPendingKYC(c.Request.Context())
+	if err != nil {
+		slog.Error("ListPendingKYC failed", "error", err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"entries": entries})
+}
+
+func (h *AdminHandler) ReviewKYC(c *gin.Context) {
+	enterpriseID := c.Param("enterprise_id")
+	if enterpriseID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid enterprise_id"})
+		return
+	}
+
+	var req model.KYCReviewRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	adminID, _ := c.Get("account_id")
+	adminIDStr := ""
+	if s, ok := adminID.(string); ok {
+		adminIDStr = s
+	}
+
+	if err := h.adminService.ReviewKYC(c.Request.Context(), enterpriseID, req.Action, adminIDStr); err != nil {
+		if err == service.ErrEnterpriseNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "enterprise not found"})
+			return
+		}
+		slog.Error("ReviewKYC failed", "error", err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "kyc review completed"})
+}

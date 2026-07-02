@@ -34,6 +34,37 @@ func (h *SubscriptionHandler) Purchase(c *gin.Context) {
 	c.JSON(http.StatusCreated, sub)
 }
 
+func (h *SubscriptionHandler) ActivatePaidOrder(c *gin.Context) {
+	var req model.ActivatePaidOrderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	sub, err := h.svc.ActivatePaidOrderSubscription(c.Request.Context(), &req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, sub)
+}
+
+func (h *SubscriptionHandler) CancelRefundedOrder(c *gin.Context) {
+	var req model.CancelRefundedOrderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	if err := h.svc.CancelRefundedOrderSubscription(c.Request.Context(), &req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "subscription cancelled"})
+}
+
 func (h *SubscriptionHandler) Upgrade(c *gin.Context) {
 	var req model.UpgradeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

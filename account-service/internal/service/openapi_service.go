@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -27,7 +28,9 @@ func NewOpenAPIService() *OpenAPIService {
 
 func (s *OpenAPIService) IssueToken(ctx context.Context, clientID, scope string) (*OpenAPIToken, error) {
 	b := make([]byte, 32)
-	rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		return nil, fmt.Errorf("generate openapi token: %w", err)
+	}
 	token := &OpenAPIToken{
 		Token:     hex.EncodeToString(b),
 		ClientID:  clientID,

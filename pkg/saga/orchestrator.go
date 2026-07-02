@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -20,6 +21,7 @@ const (
 	StatusCompensated Status = 4
 )
 
+// Saga orchestrates a series of steps with automatic compensation on failure.
 type Saga struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`
@@ -30,6 +32,7 @@ type Saga struct {
 	mu        sync.Mutex
 }
 
+// New creates a Saga with the given name and optional Redis-backed state store.
 func New(name string, rdb *redis.Client) *Saga {
 	s := &Saga{
 		Name:      name,
@@ -51,6 +54,7 @@ func (s *Saga) AddStep(step *SagaStep) {
 	s.Steps = append(s.Steps, step)
 }
 
+// Execute runs all saga steps sequentially, compensating completed steps on failure.
 func (s *Saga) Execute(ctx context.Context) error {
 	s.mu.Lock()
 	s.Status = StatusRunning
@@ -85,7 +89,7 @@ func (s *Saga) compensate(ctx context.Context, failedAtIndex int) {
 		step := s.Steps[i]
 		if step.executed && step.Compensate != nil {
 			if err := step.Compensate(ctx); err != nil {
-				fmt.Printf("compensation failed for step %s: %v\n", step.Name, err)
+				slog.Error("saga compensation failed", "step", step.Name, "error", err)
 			}
 		}
 	}

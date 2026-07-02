@@ -12,11 +12,13 @@ import (
 
 	"github.com/trigold786/92-Account-Center/account-service/internal/model"
 	"github.com/trigold786/92-Account-Center/account-service/internal/repository"
+	circuitbreaker "github.com/trigold786/92-Account-Center/pkg/circuitbreaker"
 )
 
 var (
-	ErrInvalidCreditType  = errors.New("invalid credit type")
-	ErrCreditAdjustFailed = errors.New("credit adjustment failed")
+	ErrInvalidCreditType   = errors.New("invalid credit type")
+	ErrCreditAdjustFailed  = errors.New("credit adjustment failed")
+	ErrEnterpriseNotFound  = errors.New("enterprise not found")
 )
 
 type AdminService interface {
@@ -26,6 +28,8 @@ type AdminService interface {
 	AdjustIdentityTier(ctx context.Context, adminID string, userID int64, req *model.AdminTierUpdateRequest) error
 	AdjustCredits(ctx context.Context, adminID string, userID int64, req *model.AdminCreditAdjustRequest) error
 	GetAuditLog(ctx context.Context, userID int64, page, pageSize int) ([]model.AuditLogEntry, int, error)
+	ListPendingKYC(ctx context.Context) ([]model.EnterpriseKYC, error)
+	ReviewKYC(ctx context.Context, enterpriseID string, action string, reviewer string) error
 }
 
 type CreditClient interface {
@@ -40,7 +44,7 @@ type httpCreditClient struct {
 func NewHTTPCreditClient(baseURL string) CreditClient {
 	return &httpCreditClient{
 		baseURL:    baseURL,
-		httpClient: &http.Client{Timeout: 5 * time.Second},
+		httpClient: circuitbreaker.WrapHTTPClient(&http.Client{Timeout: 5 * time.Second}, "credit-service"),
 	}
 }
 
@@ -176,6 +180,39 @@ func (s *adminService) GetAuditLog(ctx context.Context, userID int64, page, page
 		entries = []model.AuditLogEntry{}
 	}
 	return entries, total, nil
+}
+
+func (s *adminService) ListPendingKYC(ctx context.Context) ([]model.EnterpriseKYC, error) {
+	entries, err := s.repo.ListPendingEnterprises(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if entries == nil {
+		entries = []model.EnterpriseKYC{}
+	}
+	return entries, nil
+}
+
+func (s *adminService) ReviewKYC(ctx context.Context, enterpriseID string, action string, reviewer string) error {
+	status := "approved"
+	if action == "reject" {
+		status = "rejected"
+	}
+
+	if err := s.repo.UpdateEnterpriseStatus(ctx, enterpriseID, status, reviewer); err != nil {
+		if isNoRows(err) {
+			return ErrEnterpriseNotFound
+		}
+		return err
+	}
+
+	details, _ := json.Marshal(map[string]interface{}{
+		"enterprise_id": enterpriseID,
+		"action":        action,
+		"status":        status,
+		"reviewer":      reviewer,
+	})
+	return s.repo.InsertAuditLog(ctx, 0, "kyc_review", string(details), reviewer)
 }
 
 func isNoRows(err error) bool {

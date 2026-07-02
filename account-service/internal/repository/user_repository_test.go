@@ -97,12 +97,22 @@ func (m *MockUserRepository) GetIdentityTier(ctx context.Context, userID int64) 
 	return args.Int(0), args.Error(1)
 }
 
+func (m *MockUserRepository) WriteDeletionAudit(ctx context.Context, userID int64, details map[string]interface{}) error {
+	args := m.Called(ctx, userID, details)
+	return args.Error(0)
+}
+
+func (m *MockUserRepository) AnonymizeEnterprisePII(ctx context.Context, userID int64) error {
+	args := m.Called(ctx, userID)
+	return args.Error(0)
+}
+
 func TestUserRepository_Create(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockUserRepository)
 	user := &model.User{
-		PhoneNumber: "13800138000",
-		AccountID:   "testuser",
+		PhoneNumber:  "13800138000",
+		AccountID:    "testuser",
 		PasswordHash: "hashedpassword",
 	}
 

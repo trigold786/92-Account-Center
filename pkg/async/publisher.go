@@ -3,10 +3,11 @@ package async
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	"log/slog"
 	"time"
 )
 
+// Message is an event envelope published to an async stream.
 type Message struct {
 	ID         string                 `json:"id"`
 	EventType  string                 `json:"event_type"`
@@ -34,15 +35,18 @@ func (m *Message) GetHeader(key string) string {
 	return m.Headers[key]
 }
 
+// Publisher publishes messages to a named stream via Redis Streams.
 type Publisher struct {
 	rdb    interface{}
 	Stream string
 }
 
+// NewPublisher creates a Publisher targeting the given stream.
 func NewPublisher(rdb interface{}, stream string) *Publisher {
 	return &Publisher{rdb: rdb, Stream: stream}
 }
 
+// Publish constructs a Message and publishes it to the stream.
 func (p *Publisher) Publish(ctx context.Context, eventType string, data map[string]interface{}, traceID string) error {
 	msg := NewMessage(eventType, data)
 	msg.TraceID = traceID
@@ -55,7 +59,7 @@ func (p *Publisher) PublishMessage(ctx context.Context, msg *Message) error {
 		return err
 	}
 	if p.rdb == nil {
-		fmt.Printf("[async] publish to %s: %s\n", p.Stream, string(payload))
+		slog.Debug("async publish (no redis)", "stream", p.Stream, "payload", string(payload))
 		return nil
 	}
 	return nil

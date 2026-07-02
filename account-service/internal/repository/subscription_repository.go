@@ -11,6 +11,7 @@ type SubscriptionRepository interface {
 	Create(ctx context.Context, sub *model.Subscription) error
 	GetActiveByUserID(ctx context.Context, userID int64) (*model.Subscription, error)
 	GetByUserID(ctx context.Context, userID int64) ([]model.Subscription, error)
+	GetByOrderID(ctx context.Context, orderID string) (*model.Subscription, error)
 	UpdateStatus(ctx context.Context, id int64, status string) error
 	UpdateEndTime(ctx context.Context, id int64, endTime string) error
 	FindExpired(ctx context.Context) ([]model.Subscription, error)
@@ -68,6 +69,22 @@ func (r *subscriptionRepository) GetByUserID(ctx context.Context, userID int64) 
 		subs = append(subs, sub)
 	}
 	return subs, rows.Err()
+}
+
+func (r *subscriptionRepository) GetByOrderID(ctx context.Context, orderID string) (*model.Subscription, error) {
+	query := `SELECT id, user_id, tier_level, start_time, end_time, status, price, payment_method, order_id, created_at, updated_at
+		FROM subscriptions WHERE order_id = $1 ORDER BY created_at DESC LIMIT 1`
+	var sub model.Subscription
+	err := r.db.QueryRowContext(ctx, query, orderID).Scan(
+		&sub.ID, &sub.UserID, &sub.TierLevel, &sub.StartTime, &sub.EndTime, &sub.Status, &sub.Price, &sub.PaymentMethod, &sub.OrderID, &sub.CreatedAt, &sub.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &sub, nil
 }
 
 func (r *subscriptionRepository) UpdateStatus(ctx context.Context, id int64, status string) error {

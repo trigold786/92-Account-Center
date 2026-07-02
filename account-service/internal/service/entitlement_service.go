@@ -26,6 +26,7 @@ type EntitlementService interface {
 	GetUserEntitlements(ctx context.Context, userID int64) ([]model.Entitlement, error)
 	ConsumeQuota(ctx context.Context, userID int64, featureCode string, amount int) (*model.ConsumeResponse, error)
 	GrantEntitlements(ctx context.Context, userID int64, tierLevel int) error
+	DeleteUserEntitlements(ctx context.Context, userID int64) error
 }
 
 type entitlementService struct {
@@ -87,6 +88,18 @@ func (s *entitlementService) ConsumeQuota(ctx context.Context, userID int64, fea
 		remaining = quota.Total - quota.Used
 	}
 	return &model.ConsumeResponse{Success: true, Remaining: remaining}, nil
+}
+
+func (s *entitlementService) DeleteUserEntitlements(ctx context.Context, userID int64) error {
+	if err := s.repo.DeleteByUserID(ctx, userID); err != nil {
+		return err
+	}
+	if s.cache != nil {
+		if err := s.cache.InvalidateCache(ctx, userID); err != nil {
+			slog.Warn("failed to invalidate entitlement cache", "user_id", userID, "error", err)
+		}
+	}
+	return nil
 }
 
 func (s *entitlementService) GrantEntitlements(ctx context.Context, userID int64, tierLevel int) error {

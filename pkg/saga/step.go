@@ -4,6 +4,7 @@ import "context"
 
 type StepAction func(ctx context.Context) error
 
+// SagaStep is a named unit of work with an execute and optional compensate action.
 type SagaStep struct {
 	Name       string
 	Execute    StepAction

@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	circuitbreaker "github.com/trigold786/92-Account-Center/pkg/circuitbreaker"
 )
 
 type Client struct {
@@ -17,7 +19,7 @@ type Client struct {
 func NewClient(baseURL string) *Client {
 	return &Client{
 		baseURL:    baseURL,
-		httpClient: &http.Client{Timeout: 10 * time.Second},
+		httpClient: circuitbreaker.WrapHTTPClient(&http.Client{Timeout: 10 * time.Second}, "notification-service-sms"),
 	}
 }
 
@@ -30,7 +32,7 @@ func (c *Client) SendCode(phoneNumber string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 		return fmt.Errorf("sms send failed: %s", string(respBody))
 	}
 	return nil

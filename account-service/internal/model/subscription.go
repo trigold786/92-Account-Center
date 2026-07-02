@@ -21,6 +21,21 @@ type PurchaseRequest struct {
 	TierLevel     int     `json:"tier_level" binding:"required,oneof=2 3 4"`
 	Price         float64 `json:"price" binding:"required"`
 	PaymentMethod string  `json:"payment_method"`
+	OrderID       string  `json:"order_id" binding:"required"`
+}
+
+type ActivatePaidOrderRequest struct {
+	UserID        int64   `json:"user_id" binding:"required"`
+	OrderID       string  `json:"order_id" binding:"required"`
+	TierLevel     int     `json:"tier_level" binding:"required,oneof=2 3 4"`
+	Price         float64 `json:"price" binding:"required"`
+	PaymentMethod string  `json:"payment_method"`
+}
+
+type CancelRefundedOrderRequest struct {
+	UserID  int64  `json:"user_id" binding:"required"`
+	OrderID string `json:"order_id" binding:"required"`
+	Reason  string `json:"reason"`
 }
 
 type UpgradeRequest struct {
